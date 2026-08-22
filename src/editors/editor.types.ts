@@ -14,7 +14,7 @@ export interface EditorContext {
 }
 
 export interface Editor {
-  name: "micro" | "vim" | "nvim" | "nano";
+  name: "micro" | "vim" | "nvim" | "nano" | "custom";
   available(): boolean;
   prepare(context: EditorContext): EditorLaunch;
   bufferSuffix(sourcePath: string): string;

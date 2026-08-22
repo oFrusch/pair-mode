@@ -8,7 +8,7 @@ import type { RenderInput } from "./render.types";
 import { renderSplit, renderInline } from "./render";
 import { isEnabled, stateDir } from "./state";
 import { collect, formatQuestions } from "./collect";
-import { resolveEditor } from "./resolve-editor";
+import { resolve } from "../editors";
 import { detect } from "../multiplexers";
 import type { RunResult } from "../multiplexers/multiplexer.types";
 
@@ -84,7 +84,7 @@ export async function runPair(request: EditRequest, config: PairConfig): Promise
 
   const override = process.env["CC_PAIR_EDITOR"] || process.env["VISUAL"] || process.env["EDITOR"];
   const preference = override ? splitCommand(override) : config.editor;
-  const editor = resolveEditor(preference);
+  const editor = resolve(preference);
   const multiplexer = detect(config.multiplexer);
 
   const suffix = editor.bufferSuffix(request.filePath);
