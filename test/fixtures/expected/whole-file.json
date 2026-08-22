@@ -1,0 +1,53 @@
+{
+  "left": [
+    "# PAIR MODE. Left pane is the current file. Right pane is the proposal.",
+    "# Type questions on their own lines in the RIGHT pane. Add lines only.",
+    "# Every line you add becomes a question anchored to the code above it.",
+    "# F3 moves between panes. Ctrl+W or F2 sends and closes.",
+    "#",
+    "# tool: Write",
+    "# file: /repo/main.go",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+  ],
+  "right": [
+    "# PAIR MODE. Left pane is the current file. Right pane is the proposal.",
+    "# Type questions on their own lines in the RIGHT pane. Add lines only.",
+    "# Every line you add becomes a question anchored to the code above it.",
+    "# F3 moves between panes. Ctrl+W or F2 sends and closes.",
+    "#",
+    "# tool: Write",
+    "# file: /repo/main.go",
+    "▌▌+ package main",
+    "▌▌+ ",
+    "▌▌+ import \"fmt\"",
+    "▌▌+ ",
+    "▌▌+ func main() {",
+    "▌▌+ \tfmt.Println(\"hello\")",
+    "▌▌+ \treturn",
+    "▌▌+ }"
+  ],
+  "numbers": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ]
+}

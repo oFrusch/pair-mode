@@ -1,0 +1,21 @@
+{
+  "original": [
+    "func main() {",
+    "\tx := 1",
+    "\tfmt.Println(x)",
+    "}"
+  ],
+  "numbers": [
+    10,
+    11,
+    12,
+    13
+  ],
+  "saved": [
+    "func main() {",
+    "\tx := 1",
+    "\tfmt.Println(x)",
+    "why print x here?",
+    "}"
+  ]
+}

@@ -1,0 +1,15 @@
+// Copyright 2026 pair-mode
+//
+// SPDX-License-Identifier: MIT
+package main
+
+import "fmt"
+
+func main() {
+	fmt.Println("a")
+	fmt.Println("b")
+	fmt.Println("c")
+	fmt.Println("d")
+	fmt.Println("e")
+	return
+}
