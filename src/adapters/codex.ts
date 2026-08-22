@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { isEnabled } from "../core/state";
 import { simulate } from "../core/simulate";
 import { runPair } from "../core/run";
@@ -6,6 +7,7 @@ import { loadConfig, DEFAULT_CONFIG } from "../core/config";
 import { trace } from "../core/trace";
 import type { PairConfig } from "../core/config.types";
 import type { EditItem } from "../core/simulate.types";
+import type { ParsedPatch } from "./codex.types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -41,13 +43,6 @@ function extractPatchText(toolInput: Record<string, unknown>): string | null {
   }
 
   return null;
-}
-
-interface ParsedPatch {
-  filePath: string;
-  tool: "Write" | "MultiEdit";
-  content?: string;
-  edits?: EditItem[];
 }
 
 // Extracts the single file section between the Begin/End markers, or null when unsupported.
@@ -187,7 +182,7 @@ function parseUpdateFile(body: string[]): EditItem[] | null {
 }
 
 // Translates one apply_patch body into the shape simulate() already understands.
-function parsePatch(patchText: string): ParsedPatch | null {
+export function parsePatch(patchText: string): ParsedPatch | null {
   const section = extractSection(patchText);
 
   if (section === null) {
@@ -292,7 +287,6 @@ async function main(config: PairConfig): Promise<number> {
   const verdict = await runPair(request, config);
 
   if (verdict.decision === "allow") {
-    process.stdout.write(JSON.stringify({ hookSpecificOutput: { permissionDecision: "allow" } }) + "\n");
     return 0;
   }
 
@@ -326,5 +320,22 @@ async function run(): Promise<number> {
   }
 }
 
-const code = await run();
-process.exit(code);
+// Only runs the hook when this file is the process entry point, not when a test imports parsePatch.
+function isEntryPoint(): boolean {
+  const entryArg = process.argv[1];
+
+  if (entryArg === undefined) {
+    return false;
+  }
+
+  try {
+    return realpathSync(entryArg) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint()) {
+  const code = await run();
+  process.exit(code);
+}

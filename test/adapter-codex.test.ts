@@ -6,6 +6,8 @@ import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test, expect, beforeAll } from "vitest";
 import { enable } from "../src/core/state";
+import { parsePatch } from "../src/adapters/codex";
+import { applyEdit } from "../src/core/simulate";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
@@ -212,7 +214,64 @@ test("malformed JSON on stdin exits 0", () => {
   expect(outcome.status).toBe(0);
 });
 
-test("an editor that changes nothing allows and prints the allow JSON", () => {
+test("parsePatch reconstructs the exact before and after text for an Update File patch", () => {
+  const patch = [
+    "*** Begin Patch",
+    "*** Update File: /tmp/example.ts",
+    "@@",
+    " line one",
+    "-line two",
+    "+line TWO",
+    " line three",
+    "*** End Patch",
+    "",
+  ].join("\n");
+
+  const parsed = parsePatch(patch);
+
+  expect(parsed).not.toBeNull();
+  expect(parsed?.filePath).toBe("/tmp/example.ts");
+  expect(parsed?.tool).toBe("MultiEdit");
+  expect(parsed?.edits).toEqual([
+    { old_string: "line one\nline two\nline three", new_string: "line one\nline TWO\nline three" },
+  ]);
+
+  const before = "line one\nline two\nline three";
+  const edit = parsed?.edits?.[0];
+  const after = edit === undefined ? null : applyEdit(before, edit);
+
+  expect(after).toBe("line one\nline TWO\nline three");
+});
+
+test("parsePatch reconstructs the exact content for an Add File patch", () => {
+  const patch = [
+    "*** Begin Patch",
+    "*** Add File: /tmp/hello.txt",
+    "+Hello, world!",
+    "*** End Patch",
+    "",
+  ].join("\n");
+
+  const parsed = parsePatch(patch);
+
+  expect(parsed).not.toBeNull();
+  expect(parsed?.filePath).toBe("/tmp/hello.txt");
+  expect(parsed?.tool).toBe("Write");
+  expect(parsed?.content).toBe("Hello, world!\n");
+});
+
+test("parsePatch reconstructs empty content for a Delete File patch", () => {
+  const patch = ["*** Begin Patch", "*** Delete File: /tmp/obsolete.txt", "*** End Patch", ""].join("\n");
+
+  const parsed = parsePatch(patch);
+
+  expect(parsed).not.toBeNull();
+  expect(parsed?.filePath).toBe("/tmp/obsolete.txt");
+  expect(parsed?.tool).toBe("Write");
+  expect(parsed?.content).toBe("");
+});
+
+test("an editor that changes nothing allows and prints nothing on stdout", () => {
   const harness = setupHarness();
   const editorScript = writeEditorScript(harness.targetDir, null);
 
@@ -224,6 +283,5 @@ test("an editor that changes nothing allows and prints the allow JSON", () => {
   const outcome = runAdapter(payload, harness, editorScript);
 
   expect(outcome.status).toBe(0);
-  const parsed = JSON.parse(outcome.stdout);
-  expect(parsed.hookSpecificOutput.permissionDecision).toBe("allow");
+  expect(outcome.stdout).toBe("");
 });
