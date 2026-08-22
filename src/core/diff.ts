@@ -1,6 +1,21 @@
 import { diffArrays } from "diff";
+import type { ArrayChange } from "diff";
 import type { Opcode, Row, Panes } from "./diff.types";
 import { MARK_OLD, MARK_NEW, MARK_SAME, FOLD_PREFIX } from "./marks";
+
+export function mergeChangedPair(
+  first: ArrayChange<string>,
+  second: ArrayChange<string>,
+  i: number,
+  j: number,
+): Opcode {
+  const removed = first.removed ? first : second;
+  const added = first.added ? first : second;
+  const removedCount = removed.value.length;
+  const addedCount = added.value.length;
+
+  return { tag: "replace", i1: i, i2: i + removedCount, j1: j, j2: j + addedCount };
+}
 
 export function opcodes(before: string[], after: string[]): Opcode[] {
   const chunks = diffArrays(before, after);
@@ -25,25 +40,20 @@ export function opcodes(before: string[], after: string[]): Opcode[] {
       continue;
     }
 
+    const next = chunks[index + 1];
+    const nextChanged = next !== undefined && (next.added || next.removed);
+    const isPair = nextChanged && next !== undefined && chunk.removed !== next.removed;
+
+    if (isPair && next !== undefined) {
+      const opcode = mergeChangedPair(chunk, next, i, j);
+      result.push(opcode);
+      i = opcode.i2;
+      j = opcode.j2;
+      index += 2;
+      continue;
+    }
+
     if (chunk.removed) {
-      const next = chunks[index + 1];
-
-      if (next !== undefined && next.added) {
-        const removedCount = chunk.value.length;
-        const addedCount = next.value.length;
-        result.push({
-          tag: "replace",
-          i1: i,
-          i2: i + removedCount,
-          j1: j,
-          j2: j + addedCount,
-        });
-        i += removedCount;
-        j += addedCount;
-        index += 2;
-        continue;
-      }
-
       const removedCount = chunk.value.length;
       result.push({ tag: "delete", i1: i, i2: i + removedCount, j1: j, j2: j });
       i += removedCount;

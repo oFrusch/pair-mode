@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect, describe } from "vitest";
-import { opcodes, align, fold } from "../src/core/diff";
+import { opcodes, align, fold, mergeChangedPair } from "../src/core/diff";
 
 const casesDir = join(__dirname, "fixtures/cases");
 const expectedDir = join(__dirname, "fixtures/expected");
@@ -93,6 +93,36 @@ test("opcodes cover both inputs with no gaps for replace-block", () => {
     expect(current?.i1).toBe(previous?.i2);
     expect(current?.j1).toBe(previous?.j2);
   }
+});
+
+test("mergeChangedPair merges an added-then-removed pair into one replace opcode", () => {
+  const added = { added: true, removed: false, value: ["x", "y"], count: 2 };
+  const removed = { added: false, removed: true, value: ["a", "b", "c"], count: 3 };
+
+  const opcode = mergeChangedPair(added, removed, 4, 9);
+
+  expect(opcode).toEqual({ tag: "replace", i1: 4, i2: 7, j1: 9, j2: 11 });
+});
+
+test("all 8 fixture cases still pass unchanged after the merge fix", () => {
+  for (const id of caseIds) {
+    const before = readLines(join(casesDir, id, "before.txt"));
+    const after = readLines(join(casesDir, id, "after.txt"));
+    const expected = JSON.parse(readFileSync(join(expectedDir, `${id}.json`), "utf-8")) as {
+      left: string[];
+      right: string[];
+      numbers: (number | null)[];
+    };
+
+    const header = expected.left.filter((line) => line.startsWith("#"));
+    const panes = fold(align(before, after), header, 5, 4);
+
+    expect(panes.left).toEqual(expected.left);
+    expect(panes.right).toEqual(expected.right);
+    expect(panes.numbers).toEqual(expected.numbers);
+  }
+
+  expect(caseIds.length).toBe(8);
 });
 
 test("a lone removal yields delete and a lone addition yields insert", () => {
