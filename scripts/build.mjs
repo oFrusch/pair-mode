@@ -1,0 +1,60 @@
+import { build } from 'esbuild';
+import { existsSync } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get directory context for ESM.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(__dirname, '..');
+
+// Define all entry points to build.
+const entryPoints = [
+  { src: 'src/cli/index.ts', out: 'dist/cli.js', banner: '#!/usr/bin/env node' },
+  { src: 'src/adapters/claude-code.ts', out: 'dist/claude-code.js' },
+  { src: 'src/adapters/codex.ts', out: 'dist/codex.js' },
+  { src: 'src/adapters/opencode.ts', out: 'dist/opencode.js' },
+  { src: 'src/adapters/pi.ts', out: 'dist/pi.js' },
+];
+
+// Check which entry points exist.
+const tooBuild = [];
+const toSkip = [];
+
+for (const entry of entryPoints) {
+  const fullSrcPath = path.resolve(projectRoot, entry.src);
+  if (existsSync(fullSrcPath)) {
+    tooBuild.push(entry);
+  } else {
+    toSkip.push(entry);
+  }
+}
+
+// Print skip messages.
+for (const entry of toSkip) {
+  console.log(`skip ${entry.src} (not built yet)`);
+}
+
+// Build present entry points.
+let hasError = false;
+
+for (const entry of tooBuild) {
+  try {
+    await build({
+      entryPoints: [path.resolve(projectRoot, entry.src)],
+      outfile: path.resolve(projectRoot, entry.out),
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      target: 'node20',
+      sourcemap: false,
+      ...(entry.banner && { banner: { js: entry.banner } }),
+    });
+    console.log(`built ${entry.out}`);
+  } catch (err) {
+    console.error(`error building ${entry.src}:`, err.message);
+    hasError = true;
+  }
+}
+
+// Exit with appropriate code.
+process.exit(hasError ? 1 : 0);
