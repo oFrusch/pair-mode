@@ -12,7 +12,8 @@
     "capture": "node scripts/capture-fixtures.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
     "diff": "^8.0.2"
