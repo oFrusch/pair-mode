@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-import { existsSync } from 'fs';
+import { existsSync, chmodSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -7,9 +7,12 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
 
+// Every entry point is a hook or CLI a shell invokes directly, so every one needs the shebang and the executable bit.
+const SHEBANG = '#!/usr/bin/env node';
+
 // Define all entry points to build.
 const entryPoints = [
-  { src: 'src/cli/index.ts', out: 'dist/cli.js', banner: '#!/usr/bin/env node' },
+  { src: 'src/cli/index.ts', out: 'dist/cli.js' },
   { src: 'src/adapters/claude-code.ts', out: 'dist/claude-code.js' },
   { src: 'src/adapters/codex.ts', out: 'dist/codex.js' },
   { src: 'src/adapters/opencode.ts', out: 'dist/opencode.js' },
@@ -39,16 +42,20 @@ let hasError = false;
 
 for (const entry of tooBuild) {
   try {
+    const outfile = path.resolve(projectRoot, entry.out);
+
     await build({
       entryPoints: [path.resolve(projectRoot, entry.src)],
-      outfile: path.resolve(projectRoot, entry.out),
+      outfile,
       bundle: true,
       platform: 'node',
       format: 'esm',
       target: 'node20',
       sourcemap: false,
-      ...(entry.banner && { banner: { js: entry.banner } }),
+      banner: { js: SHEBANG },
     });
+
+    chmodSync(outfile, 0o755);
     console.log(`built ${entry.out}`);
   } catch (err) {
     console.error(`error building ${entry.src}:`, err.message);

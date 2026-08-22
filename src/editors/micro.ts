@@ -83,6 +83,10 @@ export function createMicroEditor(resolvesOnPath: PathResolver = defaultResolves
       return resolvesOnPath("micro");
     },
 
+    headerHint(): string[] {
+      return ["# F3 moves between panes. Ctrl+W or F2 sends and closes."];
+    },
+
     bufferSuffix(sourcePath: string): string {
       const lang = syntaxName(sourcePath);
 

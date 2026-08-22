@@ -103,6 +103,11 @@ test("argv contains -multiopen and vsplit in order, and both buffer paths", () =
   expect(launch.argv).toContain(context().rightFile);
 });
 
+test("headerHint keeps micro's own key instructions", () => {
+  const editor = createMicroEditor();
+  expect(editor.headerHint()).toEqual(["# F3 moves between panes. Ctrl+W or F2 sends and closes."]);
+});
+
 test("env.MICRO_CONFIG_HOME equals the config directory", () => {
   const editor = createMicroEditor();
   const launch = editor.prepare(context());

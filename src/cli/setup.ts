@@ -1,11 +1,12 @@
 import { createInterface } from "node:readline/promises";
 import { homedir } from "node:os";
-import { DEFAULT_CONFIG, saveConfig } from "../core/config";
+import { configPath, loadConfig, saveConfig } from "../core/config";
 import type { EditorName, Layout, MultiplexerName, PairConfig } from "../core/config.types";
 import { detectInstalls } from "./detect";
 import { installRoot } from "./install-root";
 import { runDoctor } from "./doctor";
 import {
+  backupIfPresent,
   correctMultiEditMatchers,
   findMultiEditMatchers,
   registerClaudeCode,
@@ -82,17 +83,26 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
       console.log(`  ${editor.name}: ${editor.onPath ? "on PATH" : "not on PATH"}`);
     }
 
-    const defaultEditor = report.editors.find((editor) => editor.onPath)?.name ?? "auto";
+    // Seed every default from the existing config, not just from what's on PATH, so a re-run doesn't quietly reset a prior choice.
+    const configFilePath = configPath(home);
+    const existingConfig = loadConfig(configFilePath).config;
+
+    const existingEditorLabel = Array.isArray(existingConfig.editor)
+      ? existingConfig.editor.join(" ")
+      : existingConfig.editor;
+    const defaultEditor =
+      existingEditorLabel !== "auto" ? existingEditorLabel : report.editors.find((editor) => editor.onPath)?.name ?? "auto";
     const editorAnswer = withDefault(await prompter.question(`Editor [${defaultEditor}]: `), defaultEditor);
 
     const onPathMultiplexer = report.multiplexers.find((multiplexer) => multiplexer.onPath)?.name;
-    const defaultMultiplexer = report.insideMultiplexer ?? onPathMultiplexer ?? "none";
+    const defaultMultiplexer =
+      existingConfig.multiplexer !== "auto" ? existingConfig.multiplexer : report.insideMultiplexer ?? onPathMultiplexer ?? "none";
     const multiplexerAnswer = withDefault(
       await prompter.question(`Multiplexer [${defaultMultiplexer}]: `),
       defaultMultiplexer,
     );
 
-    const defaultLayout = "split";
+    const defaultLayout = existingConfig.layout;
     const layoutAnswer = withDefault(await prompter.question(`Layout [${defaultLayout}]: `), defaultLayout);
 
     const presentClis = report.clis.filter((cli) => cli.present).map((cli) => cli.name);
@@ -117,18 +127,33 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
       }
     }
 
+    // A blank answer to "Editor" keeps a previously configured custom editor array intact rather than collapsing it to a name.
+    const editorValue: EditorName | string[] =
+      editorAnswer === defaultEditor && Array.isArray(existingConfig.editor) ? existingConfig.editor : toEditorName(editorAnswer);
+
     const config: PairConfig = {
-      ...DEFAULT_CONFIG,
-      editor: toEditorName(editorAnswer),
+      ...existingConfig,
+      editor: editorValue,
       multiplexer: toMultiplexerName(multiplexerAnswer),
       layout: toLayout(layoutAnswer),
     };
 
-    saveConfig(config);
+    const configBackupPath = backupIfPresent(configFilePath);
+    saveConfig(config, configFilePath);
+    changedFiles.push(configFilePath);
+
+    if (configBackupPath !== null) {
+      changedFiles.push(configBackupPath);
+    }
 
     for (const name of selectedClis) {
       if (name === "claude-code") {
         const result = registerClaudeCode(home, root);
+
+        if (result.error !== undefined) {
+          console.log(result.error);
+          continue;
+        }
 
         if (result.changed) {
           pushChanged(changedFiles, result.path, result.backupPath);
@@ -150,13 +175,24 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
           if (isYes(fixAnswer)) {
             const fixResult = correctMultiEditMatchers(home);
 
-            if (fixResult.changed) {
+            if (fixResult.error !== undefined) {
+              console.log(fixResult.error);
+            } else if (fixResult.changed) {
               pushChanged(changedFiles, fixResult.path, fixResult.backupPath);
+
+              if (fixResult.note !== undefined) {
+                console.log(fixResult.note);
+              }
             }
           }
         }
 
         const result = registerCodex(home, root);
+
+        if (result.error !== undefined) {
+          console.log(result.error);
+          continue;
+        }
 
         if (result.changed) {
           pushChanged(changedFiles, result.path, result.backupPath);

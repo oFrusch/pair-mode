@@ -29,6 +29,7 @@ describe("renderSplit against captured fixtures", () => {
         readFileSync(join(expectedDir, `${id}.json`), "utf-8"),
       ) as Expected;
 
+      // These fixtures were captured with micro's header hint, so the comparison keeps that line.
       const result = renderSplit({
         before,
         after,
@@ -36,6 +37,7 @@ describe("renderSplit against captured fixtures", () => {
         path: meta.path,
         context: 5,
         minFold: 4,
+        headerHint: ["# F3 moves between panes. Ctrl+W or F2 sends and closes."],
       });
 
       expect(result.left).toEqual(expected.left);
@@ -63,6 +65,7 @@ test("header carries the case tool and path", () => {
     path: meta.path,
     context: 5,
     minFold: 4,
+    headerHint: [],
   });
 
   expect(result.left).toContain(`# tool: ${meta.tool}`);
@@ -80,6 +83,7 @@ test("renderInline produces a single array shared between left and right", () =>
     path: "/repo/file.txt",
     context: 5,
     minFold: 4,
+    headerHint: [],
   });
 
   expect(result.left).toBe(result.right);
@@ -95,9 +99,40 @@ test("an empty before renders every line of after as a changed row", () => {
     path: "/repo/new.txt",
     context: 5,
     minFold: 4,
+    headerHint: [],
   });
 
   const body = result.left.filter((line) => !line.startsWith("#"));
 
   expect(body).toEqual(["▌▌+ one", "▌▌+ two", "▌▌+ three"]);
+});
+
+test("renderSplit's header carries the caller's headerHint lines instead of a hardcoded editor's keys", () => {
+  const result = renderSplit({
+    before: "a\n",
+    after: "b\n",
+    tool: "Edit",
+    path: "/repo/file.txt",
+    context: 5,
+    minFold: 4,
+    headerHint: ["# Save and quit both windows with :wqa."],
+  });
+
+  expect(result.left).toContain("# Save and quit both windows with :wqa.");
+  expect(result.left.join("\n")).not.toContain("F3 moves between panes");
+});
+
+test("an empty headerHint still renders a clean header with no dangling line", () => {
+  const result = renderSplit({
+    before: "a\n",
+    after: "b\n",
+    tool: "Edit",
+    path: "/repo/file.txt",
+    context: 5,
+    minFold: 4,
+    headerHint: [],
+  });
+
+  expect(result.left).toContain("# tool: Edit");
+  expect(result.left.join("\n")).not.toContain("F3 moves between panes");
 });

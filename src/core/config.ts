@@ -29,8 +29,9 @@ export const DEFAULT_CONFIG: PairConfig = {
   trace: false,
 };
 
-export function configPath(): string {
-  const base = process.env["XDG_CONFIG_HOME"] || join(homedir(), ".config");
+// homeDir lets a caller (setup, in particular) resolve the config path for an explicit home rather than the process's real one.
+export function configPath(homeDir?: string): string {
+  const base = process.env["XDG_CONFIG_HOME"] || join(homeDir ?? homedir(), ".config");
   return join(base, "pair-mode", "config.json");
 }
 

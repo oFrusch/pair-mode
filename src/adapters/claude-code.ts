@@ -5,6 +5,7 @@ import { runPair } from "../core/run";
 import { loadConfig, DEFAULT_CONFIG } from "../core/config";
 import { trace } from "../core/trace";
 import type { PairConfig } from "../core/config.types";
+import { isEntryPoint } from "./entry-point";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -80,5 +81,8 @@ async function run(): Promise<number> {
   }
 }
 
-const code = await run();
-process.exit(code);
+// Only runs the hook when this file is the process entry point, not when a test imports this module.
+if (isEntryPoint(import.meta.url)) {
+  const code = await run();
+  process.exit(code);
+}

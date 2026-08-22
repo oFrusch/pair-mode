@@ -62,6 +62,10 @@ export function vimEditor(name: "vim" | "nvim", resolvesOnPath: PathResolver = d
       return extname(sourcePath);
     },
 
+    headerHint(): string[] {
+      return ["# Save and quit both windows with :wqa."];
+    },
+
     prepare(context: EditorContext): EditorLaunch {
       const flags: string[] = [];
 

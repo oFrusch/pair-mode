@@ -24,6 +24,10 @@ function createPassthroughEditor(command: string[]): Editor {
       return ".diff";
     },
 
+    headerHint(): string[] {
+      return ["# Save the right pane before you quit."];
+    },
+
     prepare(context: EditorContext): EditorLaunch {
       return { argv: [...command, context.leftFile, context.rightFile], env: {} };
     },

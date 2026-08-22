@@ -1,4 +1,4 @@
-import { existsSync, openSync, closeSync, readFileSync } from "node:fs";
+import { existsSync, openSync, closeSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { loadConfig, configPath } from "../core/config";
@@ -103,14 +103,36 @@ function checkClis(home: string, root: string): DoctorCheck[] {
   ];
 }
 
+// A registered hook is invoked as a bare path, so a built file with no executable bit fails with EACCES at run time.
+function isExecutable(path: string): boolean {
+  try {
+    return (statSync(path).mode & 0o111) !== 0;
+  } catch {
+    return false;
+  }
+}
+
 function checkEntryPoints(root: string): DoctorCheck {
   const entryPoints = ["cli.js", "claude-code.js", "codex.js", "opencode.js", "pi.js"];
   const missing = entryPoints.filter((entry) => !existsSync(join(root, "dist", entry)));
+  const notExecutable = entryPoints.filter(
+    (entry) => !missing.includes(entry) && !isExecutable(join(root, "dist", entry)),
+  );
+
+  const problems: string[] = [];
+
+  if (missing.length > 0) {
+    problems.push(`missing: ${missing.join(", ")}`);
+  }
+
+  if (notExecutable.length > 0) {
+    problems.push(`not executable: ${notExecutable.join(", ")}`);
+  }
 
   return {
     name: "dist/ entry points",
-    passed: missing.length === 0,
-    detail: missing.length === 0 ? "all built" : `missing: ${missing.join(", ")}`,
+    passed: problems.length === 0,
+    detail: problems.length === 0 ? "all built and executable" : problems.join("; "),
   };
 }
 

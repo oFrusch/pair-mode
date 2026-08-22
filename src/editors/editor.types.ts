@@ -18,6 +18,7 @@ export interface Editor {
   available(): boolean;
   prepare(context: EditorContext): EditorLaunch;
   bufferSuffix(sourcePath: string): string;
+  headerHint(): string[];
 }
 
 export type PathResolver = (command: string) => boolean;

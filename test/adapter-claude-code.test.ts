@@ -1,6 +1,6 @@
 import { build } from "esbuild";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, chmodSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -84,9 +84,29 @@ function writeEditorScript(dir: string, appendLine: string | null): string {
   return scriptPath;
 }
 
-function runAdapter(payload: string, harness: Harness, editorScript: string | null): { status: number | null; stdout: string; stderr: string } {
+function writeEditorScriptForArg(dir: string, argIndex: 1 | 2, appendLine: string): string {
+  const scriptPath = join(dir, `editor-arg${argIndex}.sh`);
+  const body = `#!/bin/sh\nprintf '%s\\n' ${JSON.stringify(appendLine)} >> "$${argIndex}"\n`;
+
+  writeFileSync(scriptPath, body, "utf-8");
+  chmodSync(scriptPath, 0o755);
+  return scriptPath;
+}
+
+function runAdapter(
+  payload: string,
+  harness: Harness,
+  editorScript: string | null,
+  layout: "split" | "inline" = "split",
+): { status: number | null; stdout: string; stderr: string } {
   const configHome = mkdtempSync(join(tmpdir(), "pair-mode-config-"));
   const fakeHome = mkdtempSync(join(tmpdir(), "pair-mode-home-"));
+
+  if (layout === "inline") {
+    const configDir = join(configHome, "pair-mode");
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(join(configDir, "config.json"), JSON.stringify({ layout: "inline" }), "utf-8");
+  }
 
   const env: Record<string, string | undefined> = {
     ...process.env,
@@ -174,6 +194,64 @@ test("malformed JSON on stdin exits 0", () => {
   const harness = setupHarness();
 
   const outcome = runAdapter("{not json", harness, null);
+
+  expect(outcome.status).toBe(0);
+});
+
+test("importing the module as a library does not read stdin or call process.exit", async () => {
+  // Before the entry-point guard, importing this file read fd 0 (blocking here) and called process.exit, killing the test runner.
+  await expect(import("../src/adapters/claude-code")).resolves.toBeDefined();
+});
+
+test("the rendered header carries the resolved editor's own key hint, not micro's hardcoded one", () => {
+  const harness = setupHarness();
+  const scriptPath = join(harness.targetDir, "check-header.sh");
+  const script = [
+    "#!/bin/sh",
+    'if grep -qF "# Save the right pane before you quit." "$2" && ! grep -qF "F3 moves between panes" "$2"; then',
+    "  printf 'header ok\\n' >> \"$2\"",
+    "fi",
+    "",
+  ].join("\n");
+  writeFileSync(scriptPath, script, "utf-8");
+  chmodSync(scriptPath, 0o755);
+
+  const payload = JSON.stringify({
+    tool_name: "Write",
+    tool_input: { file_path: harness.filePath, content: "hello\nworld\n" },
+  });
+
+  const outcome = runAdapter(payload, harness, scriptPath);
+
+  expect(outcome.status).toBe(2);
+  expect(outcome.stderr).toContain("header ok");
+});
+
+test("inline layout: a question written into the first buffer argument is not lost", () => {
+  const harness = setupHarness();
+  const editorScript = writeEditorScriptForArg(harness.targetDir, 1, "why does this work?");
+
+  const payload = JSON.stringify({
+    tool_name: "Write",
+    tool_input: { file_path: harness.filePath, content: "hello\nworld\n" },
+  });
+
+  const outcome = runAdapter(payload, harness, editorScript, "inline");
+
+  expect(outcome.status).toBe(2);
+  expect(outcome.stderr).toContain("why does this work?");
+});
+
+test("split layout: annotating the first (left, reference) buffer argument produces no question", () => {
+  const harness = setupHarness();
+  const editorScript = writeEditorScriptForArg(harness.targetDir, 1, "why does this work?");
+
+  const payload = JSON.stringify({
+    tool_name: "Write",
+    tool_input: { file_path: harness.filePath, content: "hello\nworld\n" },
+  });
+
+  const outcome = runAdapter(payload, harness, editorScript, "split");
 
   expect(outcome.status).toBe(0);
 });

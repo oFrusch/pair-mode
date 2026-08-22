@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync, openSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, openSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, expect, beforeEach, afterEach } from "vitest";
@@ -90,7 +90,9 @@ test("doctor on a fully configured temporary home exits 0", () => {
   const distDir = join(installDir, "dist");
   mkdirSync(distDir, { recursive: true });
   for (const entry of ["cli.js", "claude-code.js", "codex.js", "opencode.js", "pi.js"]) {
-    writeFileSync(join(distDir, entry), "// stub\n", "utf-8");
+    const entryPath = join(distDir, entry);
+    writeFileSync(entryPath, "#!/usr/bin/env node\n// stub\n", "utf-8");
+    chmodSync(entryPath, 0o755);
   }
 
   const tmuxMultiplexer = {
@@ -113,4 +115,55 @@ test("doctor on a fully configured temporary home exits 0", () => {
   const failing = report.checks.filter((check) => !check.passed);
   expect(failing).toEqual([]);
   expect(report.exitCode).toBe(0);
+});
+
+test("doctor fails the entry points check when a built file is not executable", () => {
+  const config: PairConfig = {
+    editor: "micro",
+    multiplexer: "tmux",
+    layout: "split",
+    context: 5,
+    minFold: 3,
+    pane: { width: "90%", height: "90%" },
+    theme: { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a" },
+    trace: false,
+  };
+  saveConfig(config);
+
+  registerClaudeCode(homeDir, installDir);
+  registerCodex(homeDir, installDir);
+  registerOpencode(homeDir, installDir);
+  registerPi(homeDir, installDir);
+
+  const distDir = join(installDir, "dist");
+  mkdirSync(distDir, { recursive: true });
+
+  for (const entry of ["cli.js", "claude-code.js", "codex.js", "opencode.js", "pi.js"]) {
+    const entryPath = join(distDir, entry);
+    writeFileSync(entryPath, "#!/usr/bin/env node\n// stub\n", "utf-8");
+    chmodSync(entryPath, entry === "claude-code.js" ? 0o644 : 0o755);
+  }
+
+  const tmuxMultiplexer = {
+    name: "tmux" as const,
+    available: () => true,
+    run: () => ({ ok: true, detail: "" }),
+  };
+
+  const fakeTtyPath = join(homeDir, "fake-tty");
+  writeFileSync(fakeTtyPath, "", "utf-8");
+
+  const report = runDoctor({
+    homeDir: homeDir,
+    installRoot: installDir,
+    resolvesOnPath: () => true,
+    openTty: () => openSync(fakeTtyPath, "r+"),
+    multiplexerAdapters: { tmux: tmuxMultiplexer },
+  });
+
+  expect(report.exitCode).toBe(1);
+
+  const entryCheck = report.checks.find((check) => check.name === "dist/ entry points");
+  expect(entryCheck?.passed).toBe(false);
+  expect(entryCheck?.detail).toContain("not executable: claude-code.js");
 });

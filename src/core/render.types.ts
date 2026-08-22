@@ -5,6 +5,7 @@ export interface RenderInput {
   path: string;
   context: number;
   minFold: number;
+  headerHint: string[];
 }
 
 export interface RenderResult {

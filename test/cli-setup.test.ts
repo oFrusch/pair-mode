@@ -13,6 +13,8 @@ import {
 import { runSetup } from "../src/cli/setup";
 import { pairOn, pairOff, pairStatus } from "../src/cli/toggle";
 import type { Prompter } from "../src/cli/setup.types";
+import { configPath, loadConfig, saveConfig } from "../src/core/config";
+import type { PairConfig } from "../src/core/config.types";
 
 let homeDir: string;
 let installDir: string;
@@ -249,4 +251,65 @@ test("runSetup warns and stops when no multiplexer is found and Claude Code is s
 
   expect(result.stopped).toBe(true);
   expect(existsSync(claudeCodeSettingsPath(homeDir))).toBe(false);
+});
+
+test("runSetup honours options.homeDir for the config path, not the process's real home", async () => {
+  const previousXdgConfigHome = process.env["XDG_CONFIG_HOME"];
+  delete process.env["XDG_CONFIG_HOME"];
+
+  try {
+    const prompter = scriptedPrompter(["micro", "tmux", "split", ""]);
+
+    await runSetup({
+      prompter,
+      homeDir: homeDir,
+      installRoot: installDir,
+      resolvesOnPath: (command) => command === "tmux",
+    });
+
+    const expectedPath = join(homeDir, ".config", "pair-mode", "config.json");
+    expect(existsSync(expectedPath)).toBe(true);
+  } finally {
+    if (previousXdgConfigHome === undefined) {
+      delete process.env["XDG_CONFIG_HOME"];
+    } else {
+      process.env["XDG_CONFIG_HOME"] = previousXdgConfigHome;
+    }
+  }
+});
+
+test("a re-run backs up the existing config and preserves fields the wizard never asks about", async () => {
+  const configFilePath = configPath(homeDir);
+  const customized: PairConfig = {
+    editor: "nano",
+    multiplexer: "tmux",
+    layout: "split",
+    context: 9,
+    minFold: 7,
+    pane: { width: "70%", height: "60%" },
+    theme: { add: "#111111", del: "#222222", fold: "#333333" },
+    trace: true,
+  };
+  saveConfig(customized, configFilePath);
+
+  const prompter = scriptedPrompter(["micro", "tmux", "split", ""]);
+
+  const result = await runSetup({
+    prompter,
+    homeDir: homeDir,
+    installRoot: installDir,
+    resolvesOnPath: (command) => command === "tmux",
+  });
+
+  expect(existsSync(`${configFilePath}.pair-backup`)).toBe(true);
+  expect(JSON.parse(readFileSync(`${configFilePath}.pair-backup`, "utf-8"))).toMatchObject({ editor: "nano" });
+  expect(result.changedFiles).toContain(configFilePath);
+
+  const written = loadConfig(configFilePath).config;
+  expect(written.editor).toBe("micro");
+  expect(written.context).toBe(9);
+  expect(written.minFold).toBe(7);
+  expect(written.pane).toEqual({ width: "70%", height: "60%" });
+  expect(written.theme).toEqual({ add: "#111111", del: "#222222", fold: "#333333" });
+  expect(written.trace).toBe(true);
 });

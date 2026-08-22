@@ -31,6 +31,10 @@ export function createNanoEditor(resolvesOnPath: PathResolver = defaultResolvesO
       return ".diff";
     },
 
+    headerHint(): string[] {
+      return ["# Save with Ctrl+O, then exit with Ctrl+X."];
+    },
+
     prepare(context: EditorContext): EditorLaunch {
       mkdirSync(context.configDir, { recursive: true });
       const rcfile = writeNanorc(context.configDir, context.theme);

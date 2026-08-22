@@ -71,6 +71,11 @@ export async function runPair(request: EditRequest, config: PairConfig): Promise
     return { decision: "allow" };
   }
 
+  const override = process.env["CC_PAIR_EDITOR"] || process.env["VISUAL"] || process.env["EDITOR"];
+  const preference = override ? splitCommand(override) : config.editor;
+  const editor = resolve(preference);
+  const multiplexer = detect(config.multiplexer);
+
   const renderInput: RenderInput = {
     before: request.before,
     after: request.after,
@@ -78,24 +83,27 @@ export async function runPair(request: EditRequest, config: PairConfig): Promise
     path: request.filePath,
     context: config.context,
     minFold: config.minFold,
+    headerHint: editor.headerHint(),
   };
 
-  const rendered = config.layout === "inline" ? renderInline(renderInput) : renderSplit(renderInput);
-
-  const override = process.env["CC_PAIR_EDITOR"] || process.env["VISUAL"] || process.env["EDITOR"];
-  const preference = override ? splitCommand(override) : config.editor;
-  const editor = resolve(preference);
-  const multiplexer = detect(config.multiplexer);
+  const isInline = config.layout === "inline";
+  const rendered = isInline ? renderInline(renderInput) : renderSplit(renderInput);
 
   const suffix = editor.bufferSuffix(request.filePath);
   const configDir = join(stateDir(), "editor");
 
+  // Inline has one logical buffer: left and right are the same content, so both panes point at the same file.
   let leftFile: string | null = null;
   let rightFile: string | null = null;
 
   try {
-    leftFile = tempFile("pair-current-", suffix, rendered.left.join("\n") + "\n");
-    rightFile = tempFile("pair-proposed-", suffix, rendered.right.join("\n") + "\n");
+    if (isInline) {
+      leftFile = tempFile("pair-inline-", suffix, rendered.left.join("\n") + "\n");
+      rightFile = leftFile;
+    } else {
+      leftFile = tempFile("pair-current-", suffix, rendered.left.join("\n") + "\n");
+      rightFile = tempFile("pair-proposed-", suffix, rendered.right.join("\n") + "\n");
+    }
 
     const launch = editor.prepare({
       leftFile,
@@ -127,7 +135,7 @@ export async function runPair(request: EditRequest, config: PairConfig): Promise
 
     return { decision: "deny", reason: formatQuestions(questions, request.filePath) };
   } finally {
-    if (leftFile !== null) {
+    if (leftFile !== null && leftFile !== rightFile) {
       removeQuietly(leftFile);
     }
 

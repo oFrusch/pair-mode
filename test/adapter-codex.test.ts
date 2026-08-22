@@ -260,6 +260,41 @@ test("parsePatch reconstructs the exact content for an Add File patch", () => {
   expect(parsed?.content).toBe("Hello, world!\n");
 });
 
+test("parsePatch keeps a trimmed blank context line in an Update File hunk, not drops it", () => {
+  const patch = [
+    "*** Begin Patch",
+    "*** Update File: /tmp/example.ts",
+    "@@",
+    " line one",
+    "",
+    " line three",
+    "*** End Patch",
+    "",
+  ].join("\n");
+
+  const parsed = parsePatch(patch);
+
+  expect(parsed).not.toBeNull();
+  expect(parsed?.edits).toEqual([{ old_string: "line one\n\nline three", new_string: "line one\n\nline three" }]);
+});
+
+test("parsePatch keeps a trimmed blank added line in an Add File patch, not drops it", () => {
+  const patch = [
+    "*** Begin Patch",
+    "*** Add File: /tmp/hello.txt",
+    "+Hello, world!",
+    "",
+    "+Goodbye.",
+    "*** End Patch",
+    "",
+  ].join("\n");
+
+  const parsed = parsePatch(patch);
+
+  expect(parsed).not.toBeNull();
+  expect(parsed?.content).toBe("Hello, world!\n\nGoodbye.\n");
+});
+
 test("parsePatch reconstructs empty content for a Delete File patch", () => {
   const patch = ["*** Begin Patch", "*** Delete File: /tmp/obsolete.txt", "*** End Patch", ""].join("\n");
 

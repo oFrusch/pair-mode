@@ -59,7 +59,7 @@ function readJsonObject(path: string): Record<string, unknown> {
 }
 
 // Never overwrite a user file without a backup of what was there first.
-function backupIfPresent(path: string): string | null {
+export function backupIfPresent(path: string): string | null {
   if (!existsSync(path)) {
     return null;
   }
@@ -67,6 +67,23 @@ function backupIfPresent(path: string): string | null {
   const backupPath = `${path}.pair-backup`;
   copyFileSync(path, backupPath);
   return backupPath;
+}
+
+// A shape this module cannot safely coerce: overwriting it with {} or [] would destroy whatever the user put there.
+function describeShapeError(root: Record<string, unknown>, path: string): string | null {
+  if ("hooks" in root && !isRecord(root["hooks"])) {
+    const found = Array.isArray(root["hooks"]) ? "an array" : typeof root["hooks"];
+    return `${path}: "hooks" must be an object, found ${found}. Fix it by hand, then re-run this command.`;
+  }
+
+  const hooks = root["hooks"];
+
+  if (isRecord(hooks) && "PreToolUse" in hooks && !Array.isArray(hooks["PreToolUse"])) {
+    const found = typeof hooks["PreToolUse"];
+    return `${path}: "hooks.PreToolUse" must be an array, found ${found}. Fix it by hand, then re-run this command.`;
+  }
+
+  return null;
 }
 
 function preToolUseGroups(root: Record<string, unknown>): unknown[] {
@@ -98,6 +115,12 @@ function writeJsonObject(path: string, root: Record<string, unknown>): void {
 
 function registerPreToolUseHook(path: string, matcher: string, command: string, timeout: number): RegisterResult {
   const root = readJsonObject(path);
+  const shapeError = describeShapeError(root, path);
+
+  if (shapeError !== null) {
+    return { path, changed: false, backupPath: null, error: shapeError };
+  }
+
   const groups = preToolUseGroups(root);
 
   if (hasCommand(groups, command)) {
@@ -175,31 +198,59 @@ export function findMultiEditMatchers(homeDir: string): string[] {
 export function correctMultiEditMatchers(homeDir: string): RegisterResult {
   const path = codexHooksPath(homeDir);
   const root = readJsonObject(path);
+  const shapeError = describeShapeError(root, path);
+
+  if (shapeError !== null) {
+    return { path, changed: false, backupPath: null, error: shapeError };
+  }
+
   const groups = preToolUseGroups(root);
   let changed = false;
+  const droppedMatchers: string[] = [];
+  const next: unknown[] = [];
 
   for (const group of groups) {
     if (!isHookGroup(group) || group.matcher === undefined) {
+      next.push(group);
       continue;
     }
 
     const tokens = group.matcher.split("|");
     const kept = tokens.filter((token) => token !== "MultiEdit");
 
-    if (kept.length !== tokens.length) {
-      group.matcher = kept.join("|");
-      changed = true;
+    if (kept.length === tokens.length) {
+      next.push(group);
+      continue;
     }
+
+    changed = true;
+
+    // Stripping every token would leave a matcher of "", which matches every tool. Drop the whole group instead.
+    if (kept.length === 0) {
+      droppedMatchers.push(group.matcher);
+      continue;
+    }
+
+    group.matcher = kept.join("|");
+    next.push(group);
   }
 
   if (!changed) {
     return { path, changed: false, backupPath: null };
   }
 
+  groups.length = 0;
+  groups.push(...next);
+
   const backupPath = backupIfPresent(path);
   writeJsonObject(path, root);
 
-  return { path, changed: true, backupPath };
+  const note =
+    droppedMatchers.length > 0
+      ? `removed ${droppedMatchers.length} hook group(s) whose matcher would otherwise have become empty and matched every tool: ${droppedMatchers.join(", ")}`
+      : undefined;
+
+  return { path, changed: true, backupPath, note };
 }
 
 function writeReExport(path: string, target: string): RegisterResult {

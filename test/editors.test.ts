@@ -114,3 +114,18 @@ test("resolve(auto) falls back to vim when nothing is available", () => {
 
   expect(editor.name).toBe("vim");
 });
+
+test("vim and nvim tell the user to save and quit with :wqa", () => {
+  expect(vimEditor("vim").headerHint()).toEqual(["# Save and quit both windows with :wqa."]);
+  expect(vimEditor("nvim").headerHint()).toEqual(["# Save and quit both windows with :wqa."]);
+});
+
+test("nano tells the user to save with Ctrl+O and exit with Ctrl+X", () => {
+  const nano = createNanoEditor();
+  expect(nano.headerHint()).toEqual(["# Save with Ctrl+O, then exit with Ctrl+X."]);
+});
+
+test("a passthrough custom editor gives a generic save hint", () => {
+  const editor = resolve(["kak", "-e", "x"]);
+  expect(editor.headerHint()).toEqual(["# Save the right pane before you quit."]);
+});

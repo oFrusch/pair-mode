@@ -1,5 +1,4 @@
-import { readFileSync, realpathSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 import { isEnabled } from "../core/state";
 import { simulate } from "../core/simulate";
 import { runPair } from "../core/run";
@@ -8,6 +7,7 @@ import { trace } from "../core/trace";
 import type { PairConfig } from "../core/config.types";
 import type { EditItem } from "../core/simulate.types";
 import type { ParsedPatch } from "./codex.types";
+import { isEntryPoint } from "./entry-point";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -87,12 +87,13 @@ function pathFromHeader(header: string, marker: string): string | null {
   return path === "" ? null : path;
 }
 
-// A pure addition: every line must be prefixed with "+".
+// A pure addition: every line must be prefixed with "+". A trimmed blank line is a blank content line, not a line to drop.
 function parseAddFile(body: string[]): string | null {
   const contentLines: string[] = [];
 
   for (const line of body) {
     if (line === "") {
+      contentLines.push("");
       continue;
     }
 
@@ -128,7 +129,10 @@ function hunkToEdit(hunkLines: string[]): EditItem | null {
       continue;
     }
 
+    // A patch generator that trims trailing whitespace turns a blank " " context line into "".
     if (line === "") {
+      oldLines.push("");
+      newLines.push("");
       continue;
     }
 
@@ -321,21 +325,7 @@ async function run(): Promise<number> {
 }
 
 // Only runs the hook when this file is the process entry point, not when a test imports parsePatch.
-function isEntryPoint(): boolean {
-  const entryArg = process.argv[1];
-
-  if (entryArg === undefined) {
-    return false;
-  }
-
-  try {
-    return realpathSync(entryArg) === realpathSync(fileURLToPath(import.meta.url));
-  } catch {
-    return false;
-  }
-}
-
-if (isEntryPoint()) {
+if (isEntryPoint(import.meta.url)) {
   const code = await run();
   process.exit(code);
 }
