@@ -153,16 +153,24 @@ function validatePane(raw: Record<string, unknown>, errors: ConfigError[]): Pane
     return DEFAULT_CONFIG.pane;
   }
 
-  const width = typeof value["width"] === "string" ? value["width"] : null;
+  let width: string | null = DEFAULT_CONFIG.pane.width;
 
-  if (width === null) {
-    errors.push({ path: "pane.width", message: "must be a string" });
+  if ("width" in value) {
+    width = typeof value["width"] === "string" ? value["width"] : null;
+
+    if (width === null) {
+      errors.push({ path: "pane.width", message: "must be a string" });
+    }
   }
 
-  const height = typeof value["height"] === "string" ? value["height"] : null;
+  let height: string | null = DEFAULT_CONFIG.pane.height;
 
-  if (height === null) {
-    errors.push({ path: "pane.height", message: "must be a string" });
+  if ("height" in value) {
+    height = typeof value["height"] === "string" ? value["height"] : null;
+
+    if (height === null) {
+      errors.push({ path: "pane.height", message: "must be a string" });
+    }
   }
 
   return {

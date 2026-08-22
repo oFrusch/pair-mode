@@ -6,12 +6,16 @@ import { stateDir, flagPath, isEnabled, enable, disable } from "../src/core/stat
 
 let xdgStateHome: string;
 let originalXdgStateHome: string | undefined;
+let originalHome: string | undefined;
 let repoRoot: string;
 
 beforeEach(() => {
   xdgStateHome = mkdtempSync(join(tmpdir(), "pair-mode-state-"));
   originalXdgStateHome = process.env["XDG_STATE_HOME"];
   process.env["XDG_STATE_HOME"] = xdgStateHome;
+
+  originalHome = process.env["HOME"];
+  process.env["HOME"] = mkdtempSync(join(tmpdir(), "pair-mode-home-"));
 
   const scratch = mkdtempSync(join(tmpdir(), "pair-mode-repo-"));
   repoRoot = realpathSync(scratch);
@@ -22,6 +26,12 @@ afterEach(() => {
     delete process.env["XDG_STATE_HOME"];
   } else {
     process.env["XDG_STATE_HOME"] = originalXdgStateHome;
+  }
+
+  if (originalHome === undefined) {
+    delete process.env["HOME"];
+  } else {
+    process.env["HOME"] = originalHome;
   }
 });
 
@@ -52,6 +62,14 @@ test("enable on a parent directory makes isEnabled true for a file three levels 
   enable(repoRoot);
 
   expect(isEnabled(filePath)).toBe(true);
+});
+
+test("isEnabled is true for a nonexistent nested path under an enabled parent directory", () => {
+  enable(repoRoot);
+
+  const missingPath = join(repoRoot, "a", "b", "c", "not-yet-written.txt");
+
+  expect(isEnabled(missingPath)).toBe(true);
 });
 
 test("enable returns the flag path and disable removes it", () => {

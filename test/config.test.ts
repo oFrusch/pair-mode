@@ -6,11 +6,15 @@ import { DEFAULT_CONFIG, configPath, loadConfig, saveConfig } from "../src/core/
 
 let xdgConfigHome: string;
 let originalXdgConfigHome: string | undefined;
+let originalHome: string | undefined;
 
 beforeEach(() => {
   xdgConfigHome = mkdtempSync(join(tmpdir(), "pair-mode-config-"));
   originalXdgConfigHome = process.env["XDG_CONFIG_HOME"];
   process.env["XDG_CONFIG_HOME"] = xdgConfigHome;
+
+  originalHome = process.env["HOME"];
+  process.env["HOME"] = mkdtempSync(join(tmpdir(), "pair-mode-home-"));
 });
 
 afterEach(() => {
@@ -18,6 +22,12 @@ afterEach(() => {
     delete process.env["XDG_CONFIG_HOME"];
   } else {
     process.env["XDG_CONFIG_HOME"] = originalXdgConfigHome;
+  }
+
+  if (originalHome === undefined) {
+    delete process.env["HOME"];
+  } else {
+    process.env["HOME"] = originalHome;
   }
 });
 
@@ -87,6 +97,16 @@ test("saveConfig then loadConfig round-trips", () => {
   const result = loadConfig(path);
 
   expect(result.config).toEqual(custom);
+  expect(result.errors).toEqual([]);
+});
+
+test("a partial pane object only errors on the field that is actually invalid", () => {
+  const path = join(xdgConfigHome, "pane.json");
+  writeFileSync(path, JSON.stringify({ pane: { width: "50%" } }), "utf-8");
+
+  const result = loadConfig(path);
+
+  expect(result.config.pane).toEqual({ width: "50%", height: DEFAULT_CONFIG.pane.height });
   expect(result.errors).toEqual([]);
 });
 
