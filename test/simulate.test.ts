@@ -19,6 +19,12 @@ test("applyEdit honours replace_all", () => {
   expect(result).toBe("b b b");
 });
 
+test("applyEdit with an empty old_string and replace_all matches Python's str.replace(\"\", x)", () => {
+  const result = applyEdit("abc", { old_string: "", new_string: "X", replace_all: true });
+
+  expect(result).toBe("XaXbXcX");
+});
+
 function readFile(files: Record<string, string>): (path: string) => string {
   return (path: string) => files[path] ?? "";
 }

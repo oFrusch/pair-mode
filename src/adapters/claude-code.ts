@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { isEnabled } from "../core/state";
 import { simulate } from "../core/simulate";
 import { runPair } from "../core/run";
-import { loadConfig } from "../core/config";
+import { loadConfig, DEFAULT_CONFIG } from "../core/config";
 import { trace } from "../core/trace";
 import type { PairConfig } from "../core/config.types";
 
@@ -68,9 +68,10 @@ async function main(config: PairConfig): Promise<number> {
 
 // A hook that fails must never block the user's work, so every error path exits 0.
 async function run(): Promise<number> {
-  const config = loadConfig().config;
+  let config: PairConfig = DEFAULT_CONFIG;
 
   try {
+    config = loadConfig().config;
     return await main(config);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -1,10 +1,5 @@
 import type { EditRequest } from "./run.types";
-
-interface EditItem {
-  old_string?: string;
-  new_string?: string;
-  replace_all?: boolean;
-}
+import type { EditItem } from "./simulate.types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -49,6 +44,17 @@ function replaceFirst(text: string, old: string, next: string): string {
   return text.slice(0, index) + next + text.slice(index + old.length);
 }
 
+// Python's str.replace("", x) inserts x before every character and once more at the end.
+function replaceAllEmptyOld(text: string, next: string): string {
+  let result = next;
+
+  for (const char of text) {
+    result += char + next;
+  }
+
+  return result;
+}
+
 export function applyEdit(text: string, edit: EditItem): string | null {
   const old = edit.old_string ?? "";
   const next = edit.new_string ?? "";
@@ -58,7 +64,7 @@ export function applyEdit(text: string, edit: EditItem): string | null {
   }
 
   if (edit.replace_all) {
-    return text.split(old).join(next);
+    return old === "" ? replaceAllEmptyOld(text, next) : text.split(old).join(next);
   }
 
   return replaceFirst(text, old, next);
