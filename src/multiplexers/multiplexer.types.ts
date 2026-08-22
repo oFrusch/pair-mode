@@ -20,3 +20,15 @@ export interface SpawnResult {
 }
 
 export type Spawn = (command: string, args: string[]) => SpawnResult;
+
+export type PathResolver = (command: string) => boolean;
+
+export type TtyOpen = () => number;
+
+export type TtyRunner = (command: string, args: string[], fd: number) => RunResult;
+
+export interface DetectAdapters {
+  zellij?: Multiplexer;
+  tmux?: Multiplexer;
+  tty?: Multiplexer;
+}

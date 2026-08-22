@@ -1,14 +1,36 @@
 import { openSync, closeSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import type { Multiplexer, PaneSize, RunResult } from "./multiplexer.types";
+import type { Multiplexer, PaneSize, RunResult, TtyOpen, TtyRunner } from "./multiplexer.types";
 
-export function createTtyMultiplexer(): Multiplexer {
+// The default open reaches the real controlling terminal, or throws ENXIO without one.
+const defaultOpen: TtyOpen = () => openSync("/dev/tty", "r+");
+
+// The default runner shells out for real, bound to the tty file descriptor.
+const defaultRunner: TtyRunner = (command, args, fd): RunResult => {
+  const result = spawnSync(command, args, { stdio: [fd, fd, fd] });
+  const detail = result.status === 0 ? "" : String(result.error?.message ?? result.stderr ?? "");
+  return { ok: result.status === 0, detail };
+};
+
+// Cleanup only. A close failure on a fake fd in a test must not fail the run.
+function closeQuietly(fd: number): void {
+  try {
+    closeSync(fd);
+  } catch {
+    // ignore
+  }
+}
+
+export function createTtyMultiplexer(
+  open: TtyOpen = defaultOpen,
+  runner: TtyRunner = defaultRunner,
+): Multiplexer {
   return {
     name: "none",
 
     available(): boolean {
       try {
-        closeSync(openSync("/dev/tty", "r+"));
+        closeQuietly(open());
         return true;
       } catch {
         return false;
@@ -19,7 +41,7 @@ export function createTtyMultiplexer(): Multiplexer {
       let fd: number;
 
       try {
-        fd = openSync("/dev/tty", "r+");
+        fd = open();
       } catch {
         return { ok: false, detail: "no controlling terminal (ENXIO)" };
       }
@@ -27,14 +49,14 @@ export function createTtyMultiplexer(): Multiplexer {
       const [command, ...args] = argv;
 
       if (!command) {
-        closeSync(fd);
+        closeQuietly(fd);
         return { ok: false, detail: "no command given" };
       }
 
-      const result = spawnSync(command, args, { stdio: [fd, fd, fd] });
-      closeSync(fd);
+      const result = runner(command, args, fd);
+      closeQuietly(fd);
 
-      return { ok: result.status === 0, detail: result.status === 0 ? "" : String(result.error?.message ?? "") };
+      return result;
     },
   };
 }

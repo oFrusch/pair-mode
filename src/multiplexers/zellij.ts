@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import type { Multiplexer, PaneSize, RunResult, Spawn, SpawnResult } from "./multiplexer.types";
+import type { Multiplexer, PaneSize, PathResolver, RunResult, Spawn, SpawnResult } from "./multiplexer.types";
 
 // The default spawn shells out for real and captures stderr for a failure report.
 const defaultSpawn: Spawn = (command, args): SpawnResult => {
@@ -8,12 +8,16 @@ const defaultSpawn: Spawn = (command, args): SpawnResult => {
   return { status: result.status, stderr };
 };
 
-function resolvesOnPath(command: string): boolean {
+// The default resolver shells out to `which` for a real PATH lookup.
+const defaultResolvesOnPath: PathResolver = (command) => {
   const result = spawnSync("which", [command], { stdio: "ignore" });
   return result.status === 0;
-}
+};
 
-export function createZellijMultiplexer(spawn: Spawn = defaultSpawn): Multiplexer {
+export function createZellijMultiplexer(
+  spawn: Spawn = defaultSpawn,
+  resolvesOnPath: PathResolver = defaultResolvesOnPath,
+): Multiplexer {
   return {
     name: "zellij",
 

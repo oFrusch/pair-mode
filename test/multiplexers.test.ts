@@ -3,7 +3,7 @@ import { createZellijMultiplexer } from "../src/multiplexers/zellij";
 import { createTmuxMultiplexer } from "../src/multiplexers/tmux";
 import { createTtyMultiplexer } from "../src/multiplexers/tty";
 import { detect, describe as describeAdapters } from "../src/multiplexers/index";
-import type { Spawn, SpawnResult } from "../src/multiplexers/multiplexer.types";
+import type { Spawn, SpawnResult, TtyOpen, TtyRunner } from "../src/multiplexers/multiplexer.types";
 
 let originalZellij: string | undefined;
 let originalTmux: string | undefined;
@@ -69,6 +69,13 @@ test("zellij run reports the failure detail on a nonzero exit", () => {
   expect(result.detail).toBe("boom");
 });
 
+test("zellij available consults the injected PATH resolver, not the real PATH", () => {
+  process.env["ZELLIJ"] = "0";
+  const zellij = createZellijMultiplexer(recordingSpawn().spawn, () => false);
+
+  expect(zellij.available()).toBe(false);
+});
+
 test("tmux run signals a wait channel and blocks on the same channel", () => {
   const { spawn, calls } = recordingSpawn();
   const tmux = createTmuxMultiplexer(spawn);
@@ -114,53 +121,95 @@ test("tmux run reports ok:false when the popup command fails", () => {
   expect(result.detail).toBe("no server");
 });
 
-test("detect(auto) picks zellij when ZELLIJ is set", () => {
+test("tmux available consults the injected PATH resolver, not the real PATH", () => {
+  process.env["TMUX"] = "/tmp/tmux-0/default,123,0";
+  const tmux = createTmuxMultiplexer(recordingSpawn().spawn, () => false);
+
+  expect(tmux.available()).toBe(false);
+});
+
+test("detect(auto) picks zellij when ZELLIJ is set and the resolver reports it on PATH", () => {
   process.env["ZELLIJ"] = "0";
   delete process.env["TMUX"];
 
-  const adapter = detect("auto");
+  const zellij = createZellijMultiplexer(recordingSpawn().spawn, () => true);
+  const tmux = createTmuxMultiplexer(recordingSpawn().spawn, () => true);
+  const tty = createTtyMultiplexer();
 
-  expect(adapter.name).toBe("zellij");
+  const adapter = detect("auto", { zellij, tmux, tty });
+
+  expect(adapter).toBe(zellij);
 });
 
-test("detect(auto) picks tmux when only TMUX is set", () => {
+test("detect(auto) picks tmux when only TMUX is set and the resolver reports it on PATH", () => {
   delete process.env["ZELLIJ"];
   process.env["TMUX"] = "/tmp/tmux-0/default,123,0";
 
-  const adapter = detect("auto");
+  const zellij = createZellijMultiplexer(recordingSpawn().spawn, () => false);
+  const tmux = createTmuxMultiplexer(recordingSpawn().spawn, () => true);
+  const tty = createTtyMultiplexer();
 
-  expect(adapter.name).toBe("tmux");
+  const adapter = detect("auto", { zellij, tmux, tty });
+
+  expect(adapter).toBe(tmux);
 });
 
 test("detect(auto) returns the tty adapter when neither ZELLIJ nor TMUX is set", () => {
   delete process.env["ZELLIJ"];
   delete process.env["TMUX"];
 
-  const adapter = detect("auto");
+  const zellij = createZellijMultiplexer(recordingSpawn().spawn, () => false);
+  const tmux = createTmuxMultiplexer(recordingSpawn().spawn, () => false);
+  const tty = createTtyMultiplexer();
 
-  expect(adapter.name).toBe("none");
+  const adapter = detect("auto", { zellij, tmux, tty });
+
+  expect(adapter).toBe(tty);
 });
 
 test("detect returns the named adapter regardless of availability", () => {
-  delete process.env["ZELLIJ"];
-  delete process.env["TMUX"];
-
-  expect(detect("zellij").name).toBe("zellij");
-  expect(detect("tmux").name).toBe("tmux");
-  expect(detect("none").name).toBe("none");
-});
-
-test("tty adapter returns ok:false with the ENXIO detail when /dev/tty cannot be opened", () => {
+  const zellij = createZellijMultiplexer(recordingSpawn().spawn, () => false);
+  const tmux = createTmuxMultiplexer(recordingSpawn().spawn, () => false);
   const tty = createTtyMultiplexer();
 
-  if (tty.available()) {
-    return;
-  }
+  expect(detect("zellij", { zellij, tmux, tty })).toBe(zellij);
+  expect(detect("tmux", { zellij, tmux, tty })).toBe(tmux);
+  expect(detect("none", { zellij, tmux, tty })).toBe(tty);
+});
+
+test("tty adapter returns ok:false with the ENXIO detail when the open fails", () => {
+  const open: TtyOpen = () => {
+    throw Object.assign(new Error("ENXIO"), { code: "ENXIO" });
+  };
+  const tty = createTtyMultiplexer(open);
 
   const result = tty.run(["micro", "file.txt"], { width: "90%", height: "90%" });
 
   expect(result.ok).toBe(false);
   expect(result.detail).toBe("no controlling terminal (ENXIO)");
+});
+
+test("tty adapter availability is false when the open fails", () => {
+  const open: TtyOpen = () => {
+    throw new Error("ENXIO");
+  };
+  const tty = createTtyMultiplexer(open);
+
+  expect(tty.available()).toBe(false);
+});
+
+test("tty adapter run reports the runner's failure detail", () => {
+  const open: TtyOpen = () => 99;
+  const runner: TtyRunner = (): { ok: boolean; detail: string } => ({
+    ok: false,
+    detail: "exit code 1: no such editor",
+  });
+  const tty = createTtyMultiplexer(open, runner);
+
+  const result = tty.run(["missing-editor"], { width: "90%", height: "90%" });
+
+  expect(result.ok).toBe(false);
+  expect(result.detail).toBe("exit code 1: no such editor");
 });
 
 test("describe returns one line per adapter", () => {

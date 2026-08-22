@@ -1,35 +1,35 @@
 import type { MultiplexerName } from "../core/config.types";
-import type { Multiplexer } from "./multiplexer.types";
+import type { DetectAdapters, Multiplexer } from "./multiplexer.types";
 import { createZellijMultiplexer } from "./zellij";
 import { createTmuxMultiplexer } from "./tmux";
 import { createTtyMultiplexer } from "./tty";
 
-export function detect(preference: MultiplexerName): Multiplexer {
+export function detect(preference: MultiplexerName, adapters: DetectAdapters = {}): Multiplexer {
+  const zellij = adapters.zellij ?? createZellijMultiplexer();
+  const tmux = adapters.tmux ?? createTmuxMultiplexer();
+  const tty = adapters.tty ?? createTtyMultiplexer();
+
   if (preference === "zellij") {
-    return createZellijMultiplexer();
+    return zellij;
   }
 
   if (preference === "tmux") {
-    return createTmuxMultiplexer();
+    return tmux;
   }
 
   if (preference === "none") {
-    return createTtyMultiplexer();
+    return tty;
   }
-
-  const zellij = createZellijMultiplexer();
 
   if (zellij.available()) {
     return zellij;
   }
 
-  const tmux = createTmuxMultiplexer();
-
   if (tmux.available()) {
     return tmux;
   }
 
-  return createTtyMultiplexer();
+  return tty;
 }
 
 export function describe(): string[] {
