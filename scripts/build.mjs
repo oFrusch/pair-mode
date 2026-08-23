@@ -20,6 +20,7 @@ const entryPoints = [
   { src: "src/adapters/codex/codex.ts", out: "dist/codex.js" },
   { src: "src/adapters/opencode/opencode.ts", out: "dist/opencode.js" },
   { src: "src/adapters/pi/pi.ts", out: "dist/pi.js" },
+  { src: "src/tui/cli.ts", out: "dist/pair-tui.js", external: ["shiki"] },
 ];
 
 // Check which entry points exist.
@@ -55,6 +56,7 @@ for (const entry of tooBuild) {
       format: "esm",
       target: "node20",
       sourcemap: false,
+      external: entry.external ?? [],
       banner: { js: `${SHEBANG}\n${REQUIRE_SHIM}` },
     });
 

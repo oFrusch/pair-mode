@@ -1,4 +1,5 @@
 import { existsSync, openSync, closeSync, readFileSync, statSync } from "node:fs";
+import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { loadConfig, configPath } from "../../core/config";
@@ -121,6 +122,9 @@ function checkClis(home: string, root: string): DoctorCheck[] {
   ];
 }
 
+// The build script prepends this exact line, so a mismatch means the entry point was not built by scripts/build.mjs.
+const SHEBANG_LINE = "#!/usr/bin/env node\n";
+
 // A registered hook is invoked as a bare path, so a built file with no executable bit fails with EACCES at run time.
 function isExecutable(path: string): boolean {
   try {
@@ -130,12 +134,20 @@ function isExecutable(path: string): boolean {
   }
 }
 
+function hasShebang(path: string): boolean {
+  try {
+    return readFileSync(path, "utf-8").startsWith(SHEBANG_LINE);
+  } catch {
+    return false;
+  }
+}
+
 function checkEntryPoints(root: string): DoctorCheck {
-  const entryPoints = ["cli.js", "claude-code.js", "codex.js", "opencode.js", "pi.js"];
+  const entryPoints = ["cli.js", "claude-code.js", "codex.js", "opencode.js", "pi.js", "pair-tui.js"];
   const missing = entryPoints.filter((entry) => !existsSync(join(root, "dist", entry)));
-  const notExecutable = entryPoints.filter(
-    (entry) => !missing.includes(entry) && !isExecutable(join(root, "dist", entry)),
-  );
+  const present = entryPoints.filter((entry) => !missing.includes(entry));
+  const notExecutable = present.filter((entry) => !isExecutable(join(root, "dist", entry)));
+  const missingShebang = present.filter((entry) => !hasShebang(join(root, "dist", entry)));
 
   const problems: string[] = [];
 
@@ -147,10 +159,37 @@ function checkEntryPoints(root: string): DoctorCheck {
     problems.push(`not executable: ${notExecutable.join(", ")}`);
   }
 
+  if (missingShebang.length > 0) {
+    problems.push(`missing shebang: ${missingShebang.join(", ")}`);
+  }
+
   return {
     name: "dist/ entry points",
     passed: problems.length === 0,
     detail: problems.length === 0 ? "all built and executable" : problems.join("; "),
+  };
+}
+
+// dist/pair-tui.js marks shiki external, so Node resolves it dynamically from node_modules at run time rather than from the bundle.
+function checkShiki(resolvesShiki?: () => boolean): DoctorCheck {
+  const resolve =
+    resolvesShiki ??
+    ((): boolean => {
+      try {
+        createRequire(import.meta.url).resolve("shiki");
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+  const resolved = resolve();
+
+  return {
+    name: "shiki (syntax colour)",
+    passed: resolved,
+    warnOnly: true,
+    detail: resolved ? "resolves from node_modules" : "not found in node_modules; syntax colour disabled",
   };
 }
 
@@ -193,6 +232,7 @@ export function runDoctor(options: DoctorOptions = {}): DoctorReport {
     checkControllingTerminal(openTty),
     ...checkClis(home, root),
     checkEntryPoints(root),
+    checkShiki(options.resolvesShiki),
   ];
 
   const traceCheck = checkTrace();
@@ -201,9 +241,9 @@ export function runDoctor(options: DoctorOptions = {}): DoctorReport {
     checks.push(traceCheck);
   }
 
-  const exitCode = checks.every((check) => check.passed) ? 0 : 1;
+  const exitCode = checks.every((check) => check.passed || check.warnOnly) ? 0 : 1;
   const text = checks
-    .map((check) => `[${check.passed ? "PASS" : "FAIL"}] ${check.name}: ${check.detail}`)
+    .map((check) => `[${check.passed ? "PASS" : check.warnOnly ? "WARN" : "FAIL"}] ${check.name}: ${check.detail}`)
     .join("\n");
 
   return { checks, exitCode, text };

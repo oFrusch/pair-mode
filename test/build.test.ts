@@ -16,7 +16,7 @@ beforeAll(() => {
   expect(result.status).toBe(0);
 });
 
-const entryPoints = ["cli.js", "claude-code.js", "codex.js", "opencode.js", "pi.js"];
+const entryPoints = ["cli.js", "claude-code.js", "codex.js", "opencode.js", "pi.js", "pair-tui.js"];
 
 for (const entry of entryPoints) {
   test(`dist/${entry} carries the node shebang and the executable bit`, () => {
@@ -29,3 +29,13 @@ for (const entry of entryPoints) {
     expect(mode & 0o111).not.toBe(0);
   });
 }
+
+// shiki is marked external for this entry, so its bundled grammars must never land inside pair-tui.js.
+const SHIKI_BUNDLE_SIZE_CEILING_BYTES = 500_000;
+
+test("dist/pair-tui.js stays small because shiki is external, not bundled", () => {
+  const path = join(repoRoot, "dist", "pair-tui.js");
+  const size = statSync(path).size;
+
+  expect(size).toBeLessThan(SHIKI_BUNDLE_SIZE_CEILING_BYTES);
+});
