@@ -47,21 +47,21 @@ function removeQuietly(path: string): void {
 }
 
 function applyEnv(env: Record<string, string>): () => void {
-  const previous = new Map<string, string | undefined>();
+  const entries = Object.entries(env);
+  const previous = new Map(entries.map(([key]) => [key, process.env[key]] as const));
 
-  for (const [key, value] of Object.entries(env)) {
-    previous.set(key, process.env[key]);
+  entries.forEach(([key, value]) => {
     process.env[key] = value;
-  }
+  });
 
   return () => {
-    for (const [key, value] of previous) {
+    previous.forEach((value, key) => {
       if (value === undefined) {
         delete process.env[key];
       } else {
         process.env[key] = value;
       }
-    }
+    });
   };
 }
 

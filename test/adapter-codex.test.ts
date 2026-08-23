@@ -6,7 +6,7 @@ import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test, expect, beforeAll } from "vitest";
 import { enable } from "../src/core/state";
-import { parsePatch } from "../src/adapters/codex";
+import { parsePatch, extractPatchText } from "../src/adapters/codex";
 import { applyEdit } from "../src/core/simulate";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -315,6 +315,12 @@ test("parsePatch reconstructs empty content for a Delete File patch", () => {
   expect(parsed?.filePath).toBe("/tmp/obsolete.txt");
   expect(parsed?.tool).toBe("Write");
   expect(parsed?.content).toBe("");
+});
+
+test("extractPatchText returns null for a command array whose elements contain no marker", () => {
+  const patchText = extractPatchText({ command: ["ls", "-la", "/tmp"] });
+
+  expect(patchText).toBeNull();
 });
 
 test("an editor that changes nothing allows and prints nothing on stdout", () => {

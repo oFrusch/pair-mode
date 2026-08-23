@@ -184,19 +184,14 @@ export function findMultiEditMatchers(homeDir: string): string[] {
 
   const root = readJsonObject(path);
   const groups = preToolUseGroups(root);
-  const matchers: string[] = [];
 
-  for (const group of groups) {
+  return groups.flatMap((group) => {
     if (!isHookGroup(group) || group.matcher === undefined) {
-      continue;
+      return [];
     }
 
-    if (group.matcher.split("|").includes("MultiEdit")) {
-      matchers.push(group.matcher);
-    }
-  }
-
-  return matchers;
+    return group.matcher.split("|").includes("MultiEdit") ? [group.matcher] : [];
+  });
 }
 
 export function correctMultiEditMatchers(homeDir: string): RegisterResult {

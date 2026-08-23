@@ -6,16 +6,15 @@ export function anchor(
   numbers: (number | null)[],
   index: number,
 ): { line: number | null; code: string } {
-  for (let i = index; i >= 0; i -= 1) {
-    const number = numbers[i];
+  const preceding = numbers.slice(0, index + 1);
+  const i = preceding.findLastIndex((number) => number !== undefined && number !== null);
 
-    if (number !== undefined && number !== null) {
-      const code = original[i];
-      return { line: number, code: code ?? "" };
-    }
+  if (i === -1) {
+    return { line: null, code: "" };
   }
 
-  return { line: null, code: "" };
+  const code = original[i];
+  return { line: preceding[i] ?? null, code: code ?? "" };
 }
 
 export function collect(
@@ -23,44 +22,31 @@ export function collect(
   numbers: (number | null)[],
   saved: string[],
 ): Question[] {
-  const questions: Question[] = [];
+  return opcodes(original, saved)
+    .filter((op) => op.tag !== "equal" && op.tag !== "delete")
+    .flatMap((op) => {
+      const { line, code } = anchor(original, numbers, op.i1 - 1);
 
-  for (const op of opcodes(original, saved)) {
-    if (op.tag === "equal" || op.tag === "delete") {
-      continue;
-    }
-
-    const { line, code } = anchor(original, numbers, op.i1 - 1);
-
-    for (let j = op.j1; j < op.j2; j += 1) {
-      const raw = saved[j];
-      const text = raw?.trim() ?? "";
-
-      if (text !== "") {
-        questions.push({ line, code, text });
-      }
-    }
-  }
-
-  return questions;
+      return Array.from({ length: op.j2 - op.j1 }, (_, offset) => op.j1 + offset)
+        .map((j) => ({ line, code, text: (saved[j] ?? "").trim() }))
+        .filter((question) => question.text !== "");
+    });
 }
 
 export function formatQuestions(questions: Question[], path: string): string {
-  const out: string[] = [
+  const header: string[] = [
     `PAIR MODE. The user annotated your proposed change to ${path}.`,
     "The edit was NOT applied. Answer every question below.",
     "Do not re-attempt the edit until the user tells you to.",
     "",
   ];
 
-  for (const question of questions) {
-    if (question.line !== null) {
-      out.push(`  line ${question.line}: ${question.code}`);
-    }
+  const body = questions.flatMap((question) => {
+    const lineText =
+      question.line !== null ? [`  line ${question.line}: ${question.code}`] : [];
 
-    out.push(`       Q: ${question.text}`);
-    out.push("");
-  }
+    return [...lineText, `       Q: ${question.text}`, ""];
+  });
 
-  return out.join("\n");
+  return [...header, ...body].join("\n");
 }

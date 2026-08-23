@@ -6,3 +6,8 @@ export interface ParsedPatch {
   content?: string;
   edits?: EditItem[];
 }
+
+export interface HunkLine {
+  old: string | null;
+  new: string | null;
+}

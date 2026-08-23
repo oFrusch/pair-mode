@@ -69,19 +69,19 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
 
     console.log("Detected on this machine:");
 
-    for (const cli of report.clis) {
+    report.clis.forEach((cli) => {
       console.log(`  ${cli.name}: ${cli.present ? "present" : "not found"} (${cli.configPath})`);
-    }
+    });
 
-    for (const multiplexer of report.multiplexers) {
+    report.multiplexers.forEach((multiplexer) => {
       console.log(`  ${multiplexer.name}: ${multiplexer.onPath ? "on PATH" : "not on PATH"}`);
-    }
+    });
 
     console.log(`  inside multiplexer: ${report.insideMultiplexer ?? "none"}`);
 
-    for (const editor of report.editors) {
+    report.editors.forEach((editor) => {
       console.log(`  ${editor.name}: ${editor.onPath ? "on PATH" : "not on PATH"}`);
-    }
+    });
 
     // Seed every default from the existing config, not just from what's on PATH, so a re-run doesn't quietly reset a prior choice.
     const configFilePath = configPath(home);
@@ -246,9 +246,9 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
 
     console.log("Files changed:");
 
-    for (const file of changedFiles) {
+    changedFiles.forEach((file) => {
       console.log(`  ${file}`);
-    }
+    });
 
     const doctorReport = runDoctor({
       homeDir: home,

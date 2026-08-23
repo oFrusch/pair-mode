@@ -28,26 +28,30 @@ function toSimulateCall(toolName: string, input: unknown): SimulateCall | null {
   }
 
   switch (toolName) {
-    case 'write':
+    case "write": {
       const contentValue = input["content"];
       const content = typeof contentValue === "string" ? contentValue : "";
 
       return { tool: "Write", input: { file_path: filePath, content }, filePath };
-    case 'edit':
+    }
+    case "edit": {
       const editsValue = input["edits"];
 
       if (!Array.isArray(editsValue)) {
         return null;
       }
 
-      const edits: Record<string, unknown>[] = editsValue
-        .filter(isEditItemInput)
-        .map(({ oldText, newText }) => ({ old_string: oldText, new_string: newText }))
+      if (!editsValue.every(isEditItemInput)) return null;
+
+      const edits = editsValue.map(({ oldText, newText }) => ({
+        old_string: oldText,
+        new_string: newText,
+      }));
 
       return { tool: "MultiEdit", input: { file_path: filePath, edits }, filePath };
+    }
     default:
-      return null
-
+      return null;
   }
 }
 

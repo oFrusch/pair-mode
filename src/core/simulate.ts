@@ -43,13 +43,7 @@ function replaceFirst(text: string, old: string, next: string): string {
 
 // Python's str.replace("", x) inserts x before every character and once more at the end.
 function replaceAllEmptyOld(text: string, next: string): string {
-  let result = next;
-
-  for (const char of text) {
-    result += char + next;
-  }
-
-  return result;
+  return next + Array.from(text, (char) => char + next).join("");
 }
 
 export function applyEdit(text: string, edit: EditItem): string | null {
@@ -94,20 +88,17 @@ export function simulate(
     const editsRaw = input["edits"];
     const edits = Array.isArray(editsRaw) ? editsRaw : [input];
     const before = readFile(filePath);
-    let after = before;
 
-    for (const rawEdit of edits) {
-      if (!isEditItem(rawEdit)) {
+    const after = edits.reduce<string | null>((current, rawEdit) => {
+      if (current === null || !isEditItem(rawEdit)) {
         return null;
       }
 
-      const applied = applyEdit(after, rawEdit);
+      return applyEdit(current, rawEdit);
+    }, before);
 
-      if (applied === null) {
-        return null;
-      }
-
-      after = applied;
+    if (after === null) {
+      return null;
     }
 
     return { tool, filePath, before, after };

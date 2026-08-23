@@ -40,26 +40,21 @@ export function renderInline(input: RenderInput): RenderResult {
   const header = buildHeader(input.tool, input.path, input.headerHint);
   const rows = align(before, after);
 
-  const lines = [...header];
-  const numbers: (number | null)[] = header.map(() => null);
+  const headerNumbers: (number | null)[] = header.map(() => null);
 
-  for (const row of rows) {
+  const entries = rows.flatMap((row): { line: string; number: number | null }[] => {
     if (!row.changed) {
-      lines.push(row.left);
-      numbers.push(row.number);
-      continue;
+      return [{ line: row.left, number: row.number }];
     }
 
-    if (row.left !== "") {
-      lines.push(row.left);
-      numbers.push(null);
-    }
+    const left = row.left !== "" ? [{ line: row.left, number: null }] : [];
+    const right = row.right !== "" ? [{ line: row.right, number: row.number }] : [];
 
-    if (row.right !== "") {
-      lines.push(row.right);
-      numbers.push(row.number);
-    }
-  }
+    return [...left, ...right];
+  });
+
+  const lines = [...header, ...entries.map((entry) => entry.line)];
+  const numbers = [...headerNumbers, ...entries.map((entry) => entry.number)];
 
   return { left: lines, right: lines, numbers };
 }

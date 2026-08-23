@@ -102,7 +102,7 @@ export function align(before: string[], after: string[]): Row[] {
 }
 
 export function fold(rows: Row[], header: string[], context: number, minFold: number): Panes {
-  const keep = new Array<boolean>(rows.length).fill(false);
+  const keep = Array.from<boolean>({ length: rows.length }).fill(false);
 
   rows.forEach((row, index) => {
     if (!row.changed) {
@@ -112,9 +112,7 @@ export function fold(rows: Row[], header: string[], context: number, minFold: nu
     const start = Math.max(0, index - context);
     const end = Math.min(rows.length, index + context + 1);
 
-    for (let near = start; near < end; near += 1) {
-      keep[near] = true;
-    }
+    keep.fill(true, start, end);
   });
 
   if (!keep.some((value) => value)) {

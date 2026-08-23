@@ -57,13 +57,9 @@ export function resolve(
     return createNanoEditor(resolvesOnPath);
   }
 
-  for (const candidate of candidates(resolvesOnPath)) {
-    if (candidate.available()) {
-      return candidate;
-    }
-  }
+  const available = candidates(resolvesOnPath).find((candidate) => candidate.available());
 
-  return vimEditor("vim", resolvesOnPath);
+  return available ?? vimEditor("vim", resolvesOnPath);
 }
 
 export function describe(resolvesOnPath: PathResolver = defaultResolvesOnPath): string[] {

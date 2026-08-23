@@ -68,11 +68,7 @@ export function vimEditor(
     },
 
     prepare(context: EditorContext): EditorLaunch {
-      const flags: string[] = [];
-
-      for (const command of launchCommands(context)) {
-        flags.push("-c", command);
-      }
+      const flags = launchCommands(context).flatMap((command) => ["-c", command]);
 
       return {
         argv: [name, "-O", ...flags, context.leftFile, context.rightFile],

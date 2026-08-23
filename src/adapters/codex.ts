@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { isEnabled } from "../core/state";
 import { simulate } from "../core/simulate";
 import { runPair } from "../core/run";
@@ -6,49 +5,30 @@ import { loadConfig, DEFAULT_CONFIG } from "../core/config";
 import { trace } from "../core/trace";
 import type { PairConfig } from "../core/config.types";
 import type { EditItem } from "../core/simulate.types";
-import type { ParsedPatch } from "./codex.types";
+import type { ParsedPatch, HunkLine } from "./codex.types";
 import { isEntryPoint } from "./entry-point";
+import { isRecord, readFileOrEmpty, readPayload } from "../helpers";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+const BEGIN_PATCH = "*** Begin Patch";
 
-function readPayload(): unknown {
-  const text = readFileSync(0, "utf-8");
-  return JSON.parse(text);
-}
-
-function readFileOrEmpty(path: string): string {
-  try {
-    return readFileSync(path, "utf-8");
-  } catch {
-    return "";
-  }
-}
+const hasPatchMarker = (value: unknown): value is string =>
+  typeof value === "string" && value.includes(BEGIN_PATCH);
 
 // Accepts the patch body as a plain command string or as one element of a command array.
-function extractPatchText(toolInput: Record<string, unknown>): string | null {
+export function extractPatchText(toolInput: Record<string, unknown>): string | null {
   const command = toolInput["command"];
 
-  if (typeof command === "string" && command.includes("*** Begin Patch")) {
-    return command;
-  }
+  if (hasPatchMarker(command)) return command;
 
-  if (Array.isArray(command)) {
-    for (const part of command) {
-      if (typeof part === "string" && part.includes("*** Begin Patch")) {
-        return part;
-      }
-    }
-  }
+  if (!Array.isArray(command)) return null;
 
-  return null;
+  return command.find(hasPatchMarker) ?? null;
 }
 
 // Extracts the single file section between the Begin/End markers, or null when unsupported.
 function extractSection(patchText: string): { header: string; body: string[] } | null {
   const lines = patchText.split("\n");
-  const beginIndex = lines.findIndex((line) => line.trim() === "*** Begin Patch");
+  const beginIndex = lines.findIndex((line) => line.trim() === BEGIN_PATCH);
   const endIndex = lines.findIndex((line) => line.trim() === "*** End Patch");
 
   if (beginIndex === -1 || endIndex === -1 || endIndex <= beginIndex) {
@@ -89,55 +69,46 @@ function pathFromHeader(header: string, marker: string): string | null {
 
 // A pure addition: every line must be prefixed with "+". A trimmed blank line is a blank content line, not a line to drop.
 function parseAddFile(body: string[]): string | null {
-  const contentLines: string[] = [];
-
-  for (const line of body) {
-    if (line === "") {
-      contentLines.push("");
-      continue;
-    }
-
-    if (!line.startsWith("+")) {
-      return null;
-    }
-
-    contentLines.push(line.slice(1));
+  if (!body.every((line) => line === "" || line.startsWith("+"))) {
+    return null;
   }
+
+  const contentLines = body.map((line) => (line === "" ? "" : line.slice(1)));
 
   return contentLines.join("\n") + "\n";
 }
 
+// A patch generator that trims trailing whitespace turns a blank " " context line into "".
+function classifyHunkLine(line: string): HunkLine | null {
+  if (line.startsWith(" ")) {
+    return { old: line.slice(1), new: line.slice(1) };
+  }
+
+  if (line.startsWith("-")) {
+    return { old: line.slice(1), new: null };
+  }
+
+  if (line.startsWith("+")) {
+    return { old: null, new: line.slice(1) };
+  }
+
+  if (line === "") {
+    return { old: "", new: "" };
+  }
+
+  return null;
+}
+
 // One hunk: context and removed lines form old_string, context and added lines form new_string.
 function hunkToEdit(hunkLines: string[]): EditItem | null {
-  const oldLines: string[] = [];
-  const newLines: string[] = [];
+  const classified = hunkLines.map(classifyHunkLine);
 
-  for (const line of hunkLines) {
-    if (line.startsWith(" ")) {
-      oldLines.push(line.slice(1));
-      newLines.push(line.slice(1));
-      continue;
-    }
-
-    if (line.startsWith("-")) {
-      oldLines.push(line.slice(1));
-      continue;
-    }
-
-    if (line.startsWith("+")) {
-      newLines.push(line.slice(1));
-      continue;
-    }
-
-    // A patch generator that trims trailing whitespace turns a blank " " context line into "".
-    if (line === "") {
-      oldLines.push("");
-      newLines.push("");
-      continue;
-    }
-
+  if (!classified.every((entry): entry is HunkLine => entry !== null)) {
     return null;
   }
+
+  const oldLines = classified.flatMap((entry) => (entry.old !== null ? [entry.old] : []));
+  const newLines = classified.flatMap((entry) => (entry.new !== null ? [entry.new] : []));
 
   // A hunk with no context or removed line has no anchor, so its position is a guess.
   if (oldLines.length === 0) {
@@ -170,16 +141,10 @@ function parseUpdateFile(body: string[]): EditItem[] | null {
     return null;
   }
 
-  const edits: EditItem[] = [];
+  const edits = hunks.map(hunkToEdit);
 
-  for (const hunk of hunks) {
-    const edit = hunkToEdit(hunk);
-
-    if (edit === null) {
-      return null;
-    }
-
-    edits.push(edit);
+  if (!edits.every((edit): edit is EditItem => edit !== null)) {
+    return null;
   }
 
   return edits;

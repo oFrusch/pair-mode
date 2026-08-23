@@ -73,6 +73,21 @@ test("an edit tool call reaches runPair with translated old/new text", async () 
   expect(result).toEqual({ block: true, reason: "edit denied" });
 });
 
+test("an edit tool call with one malformed item drops the whole call, not just that item", async () => {
+  const result = await handleToolCall(
+    {
+      toolName: "edit",
+      input: {
+        path: filePath,
+        edits: [{ oldText: "before", newText: "after" }, { oldText: "before" }],
+      },
+    },
+    denyingRunPair("should not run"),
+  );
+
+  expect(result).toEqual({ block: false });
+});
+
 test("a thrown internal error in runPair never propagates and resolves block: false", async () => {
   await expect(
     handleToolCall(
