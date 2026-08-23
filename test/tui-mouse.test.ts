@@ -449,6 +449,7 @@ describe("paintSplit — selection layer", () => {
       draft: "",
       notes: [],
       focusedNote: null,
+      notePosition: "panel",
     });
 
     expect(lines[2]).toContain(SELECTION_BG_TRUECOLOR);
@@ -472,6 +473,7 @@ describe("paintSplit — selection layer", () => {
       draft: "",
       notes: [],
       focusedNote: null,
+      notePosition: "panel",
     });
 
     expect(lines[3]).not.toContain(SELECTION_BG_TRUECOLOR);

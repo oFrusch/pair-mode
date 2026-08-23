@@ -6,21 +6,23 @@ import { buildModel, moveCursor, toggleFold, visibleRows } from "./model";
 import type { DiffModel, VisibleRow } from "./model";
 import { noteFromSelection, toQuestions, writeResult } from "./notes";
 import { bodyHeight, noTokens, paint } from "./paint";
+import type { NotePosition } from "./paint";
 import { applyMouse, cursorRowIndex, moveSelectionHead, startSelection, wholeRowSelection } from "./selection";
 import type { TuiIo, TuiOptions, TuiResult, TuiState } from "./tui.types";
 
 const OVERLAP_ROWS = 1;
 const MIN_PAGE = 1;
 const NOTE_PANE = "right";
+const NOTE_POSITION: NotePosition = "panel";
 
 export { bodyHeight };
 
 function pageSize(state: TuiState, height: number): number {
-  return Math.max(bodyHeight(height, state.notes.length, state.mode) - OVERLAP_ROWS, MIN_PAGE);
+  return Math.max(bodyHeight(height, state.notes.length, state.mode, NOTE_POSITION) - OVERLAP_ROWS, MIN_PAGE);
 }
 
 function followScroll(state: TuiState, model: DiffModel, scrollTop: number, height: number): number {
-  const bodyRows = bodyHeight(height, state.notes.length, state.mode);
+  const bodyRows = bodyHeight(height, state.notes.length, state.mode, NOTE_POSITION);
   const lastBodyRow = scrollTop + bodyRows - 1;
 
   if (model.cursor < scrollTop) {
@@ -369,6 +371,7 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
         draft: state.draft,
         notes: state.notes,
         focusedNote: state.focusedNote,
+        notePosition: NOTE_POSITION,
       });
 
       state = { ...state, map: result.map };

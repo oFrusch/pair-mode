@@ -8,6 +8,7 @@ import type { Mode } from "../tui.types";
 import { changedSpans, layoutStatusMessage } from "./paint";
 import { bg, DEFAULT_BG, DEFAULT_FG, fg, RESET, theme } from "./theme";
 import type {
+  NotePosition,
   PaintOptions,
   PaintResult,
   SignBarStyle,
@@ -38,6 +39,10 @@ const PANEL_DRAFT_ROWS = 1;
 const PANEL_MAX_HEIGHT = 6;
 const CONFIRM_PANEL_HEIGHT = 2;
 const CURSOR_WIDTH = 1;
+const NO_PANEL_HEIGHT = 0;
+const ANCHORED_CONNECTOR = "╰─";
+const ANCHORED_FOCUSED_CONNECTOR = "╰▸";
+const ANCHORED_CONNECTOR_GAP = " ";
 
 const SIGN_BAR: Record<RowKind, SignBarStyle> = {
   context: { leftChar: " ", leftColor: null, rightChar: " ", rightColor: null },
@@ -46,9 +51,13 @@ const SIGN_BAR: Record<RowKind, SignBarStyle> = {
   replace: { leftChar: "▌", leftColor: theme.delBar, rightChar: "▌", rightColor: theme.addBar },
 };
 
-export function panelHeight(noteCount: number, mode: Mode): number {
+export function panelHeight(noteCount: number, mode: Mode, notePosition: NotePosition): number {
   if (mode === "confirm") {
     return CONFIRM_PANEL_HEIGHT;
+  }
+
+  if (notePosition === "anchored") {
+    return NO_PANEL_HEIGHT;
   }
 
   const draftRows = mode === "note" ? PANEL_DRAFT_ROWS : 0;
@@ -57,8 +66,8 @@ export function panelHeight(noteCount: number, mode: Mode): number {
   return rowCount === 0 ? 0 : Math.min(rowCount + PANEL_TITLE_ROWS, PANEL_MAX_HEIGHT);
 }
 
-export function bodyHeight(height: number, noteCount: number, mode: Mode): number {
-  return Math.max(height - HEADER_ROWS - STATUS_ROWS - panelHeight(noteCount, mode), MIN_BODY_HEIGHT);
+export function bodyHeight(height: number, noteCount: number, mode: Mode, notePosition: NotePosition): number {
+  return Math.max(height - HEADER_ROWS - STATUS_ROWS - panelHeight(noteCount, mode, notePosition), MIN_BODY_HEIGHT);
 }
 
 function hasPaneNotes(notes: Note[], pane: "left" | "right"): boolean {
@@ -313,6 +322,58 @@ function paintDraftRow(draft: string, width: number, truecolor: boolean): string
   return padPanelLine(text + cursor, text.length + CURSOR_WIDTH, width);
 }
 
+function paintAnchoredNoteRow(note: Note, focused: boolean, width: number, truecolor: boolean): string {
+  const connector = focused ? ANCHORED_FOCUSED_CONNECTOR : ANCHORED_CONNECTOR;
+  const maxTextWidth = Math.max(0, width - connector.length - ANCHORED_CONNECTOR_GAP.length);
+  const text = note.text.slice(0, maxTextWidth);
+  const content = fg(theme.fold, truecolor) + connector + DEFAULT_FG + ANCHORED_CONNECTOR_GAP + fg(theme.note, truecolor) + text + DEFAULT_FG;
+  const plainLength = connector.length + ANCHORED_CONNECTOR_GAP.length + text.length;
+
+  return padPanelLine(content, plainLength, width);
+}
+
+function paintAnchoredDraftRow(draft: string, width: number, truecolor: boolean): string {
+  const connector = ANCHORED_CONNECTOR;
+  const maxTextWidth = Math.max(0, width - connector.length - ANCHORED_CONNECTOR_GAP.length - CURSOR_WIDTH);
+  const text = draft.slice(0, maxTextWidth);
+  const cursor = bg(theme.chrome, truecolor) + " " + DEFAULT_BG;
+  const content = fg(theme.fold, truecolor) + connector + DEFAULT_FG + ANCHORED_CONNECTOR_GAP + text + cursor;
+  const plainLength = connector.length + ANCHORED_CONNECTOR_GAP.length + text.length + CURSOR_WIDTH;
+
+  return padPanelLine(content, plainLength, width);
+}
+
+function draftAnchorRowFor(selection: Selection | null): number | null {
+  return selection === null ? null : Math.min(selection.anchorRow, selection.headRow);
+}
+
+function anchoredNoteRowsFor(rowIndex: number, notes: Note[], focusedNote: number | null, width: number, truecolor: boolean): UnifiedBodyEntry {
+  const rowNotes = notes.filter((note) => note.rowIndex === rowIndex).sort((left, right) => left.id - right.id);
+  const chromeRow: ScreenRow = { kind: "chrome", index: null };
+
+  return {
+    lines: rowNotes.map((note) => paintAnchoredNoteRow(note, note.id === focusedNote, width, truecolor)),
+    screenRows: rowNotes.map(() => chromeRow),
+  };
+}
+
+function anchoredExtrasFor(rowIndex: number, options: PaintOptions, width: number, truecolor: boolean): UnifiedBodyEntry {
+  const { notes, focusedNote, mode, draft, selection } = options;
+  const noteEntries = anchoredNoteRowsFor(rowIndex, notes, focusedNote, width, truecolor);
+  const showDraft = mode === "note" && draftAnchorRowFor(selection) === rowIndex;
+
+  if (!showDraft) {
+    return noteEntries;
+  }
+
+  const chromeRow: ScreenRow = { kind: "chrome", index: null };
+
+  return {
+    lines: [...noteEntries.lines, paintAnchoredDraftRow(draft, width, truecolor)],
+    screenRows: [...noteEntries.screenRows, chromeRow],
+  };
+}
+
 function paintConfirmSummary(noteCount: number, width: number, truecolor: boolean): string {
   const text = `${noteCount} notes are not sent.`.slice(0, width);
 
@@ -333,8 +394,8 @@ function paintConfirmChoices(width: number, truecolor: boolean): string {
 }
 
 function buildPanel(options: PaintOptions, width: number, truecolor: boolean): UnifiedBodyEntry {
-  const { notes, focusedNote, mode, draft } = options;
-  const height = panelHeight(notes.length, mode);
+  const { notes, focusedNote, mode, draft, notePosition } = options;
+  const height = panelHeight(notes.length, mode, notePosition);
 
   if (height === 0) {
     return { lines: [], screenRows: [] };
@@ -402,7 +463,7 @@ function assembleScreen(
 }
 
 export function paintSplit(options: PaintOptions): PaintResult {
-  const { model, width, height, path, tokens, truecolor, rowBand, scrollTop, selection, notes, mode } = options;
+  const { model, width, height, path, tokens, truecolor, rowBand, scrollTop, selection, notes, mode, notePosition } = options;
 
   const numberWidth = computeNumberWidth(model);
   const hasLeftMarkerColumn = hasPaneNotes(notes, "left");
@@ -433,31 +494,39 @@ export function paintSplit(options: PaintOptions): PaintResult {
   const addCount = model.rows.filter((row) => row.kind === "add" || row.kind === "replace").length;
   const delCount = model.rows.filter((row) => row.kind === "del" || row.kind === "replace").length;
 
-  const bodyRows = bodyHeight(height, notes.length, mode);
+  const bodyRows = bodyHeight(height, notes.length, mode, notePosition);
   const visible = visibleRows(model).slice(scrollTop, scrollTop + bodyRows);
 
-  const bodyLines = visible.map((entry) =>
-    entry.kind === "fold"
-      ? paintFoldRow(lookupFold(model, entry.foldIndex), width, truecolor)
-      : paintModelRow(
-          lookupRow(model, entry.index),
-          entry.index,
-          leftBounds,
-          rightBounds,
-          numberWidth,
-          tokens,
-          rowBand,
-          truecolor,
-          selection,
-          notes,
-          hasLeftMarkerColumn,
-          hasRightMarkerColumn,
-        ),
-  );
+  const bodyEntries: UnifiedBodyEntry[] = visible.map((entry) => {
+    if (entry.kind === "fold") {
+      return {
+        lines: [paintFoldRow(lookupFold(model, entry.foldIndex), width, truecolor)],
+        screenRows: [{ kind: "fold", index: entry.foldIndex }],
+      };
+    }
 
-  const bodyScreenRows: ScreenRow[] = visible.map((entry) =>
-    entry.kind === "fold" ? { kind: "fold", index: entry.foldIndex } : { kind: "row", index: entry.index },
-  );
+    const line = paintModelRow(
+      lookupRow(model, entry.index),
+      entry.index,
+      leftBounds,
+      rightBounds,
+      numberWidth,
+      tokens,
+      rowBand,
+      truecolor,
+      selection,
+      notes,
+      hasLeftMarkerColumn,
+      hasRightMarkerColumn,
+    );
+    const screenRow: ScreenRow = { kind: "row", index: entry.index };
+    const extras = notePosition === "anchored" ? anchoredExtrasFor(entry.index, options, width, truecolor) : { lines: [], screenRows: [] };
+
+    return { lines: [line, ...extras.lines], screenRows: [screenRow, ...extras.screenRows] };
+  });
+
+  const bodyLines = bodyEntries.flatMap((entry) => entry.lines).slice(0, bodyRows);
+  const bodyScreenRows = bodyEntries.flatMap((entry) => entry.screenRows).slice(0, bodyRows);
 
   const panel = buildPanel(options, width, truecolor);
 
@@ -643,7 +712,7 @@ function paintUnifiedBodyEntry(
 }
 
 export function paintUnified(options: PaintOptions): PaintResult {
-  const { model, width, height, path, tokens, truecolor, rowBand, scrollTop, selection, notes, mode } = options;
+  const { model, width, height, path, tokens, truecolor, rowBand, scrollTop, selection, notes, mode, notePosition } = options;
 
   const numberWidth = computeNumberWidth(model);
   const hasMarkerColumn = notes.length > 0;
@@ -659,12 +728,20 @@ export function paintUnified(options: PaintOptions): PaintResult {
   const addCount = model.rows.filter((row) => row.kind === "add" || row.kind === "replace").length;
   const delCount = model.rows.filter((row) => row.kind === "del" || row.kind === "replace").length;
 
-  const bodyRows = bodyHeight(height, notes.length, mode);
+  const bodyRows = bodyHeight(height, notes.length, mode, notePosition);
   const visible = visibleRows(model).slice(scrollTop, scrollTop + bodyRows);
 
-  const entries = visible.map((entry) =>
-    paintUnifiedBodyEntry(entry, model, numberWidth, textWidth, width, tokens, rowBand, truecolor, selection, notes, hasMarkerColumn),
-  );
+  const entries = visible.map((entry) => {
+    const base = paintUnifiedBodyEntry(entry, model, numberWidth, textWidth, width, tokens, rowBand, truecolor, selection, notes, hasMarkerColumn);
+
+    if (notePosition !== "anchored" || entry.kind === "fold") {
+      return base;
+    }
+
+    const extras = anchoredExtrasFor(entry.index, options, width, truecolor);
+
+    return { lines: [...base.lines, ...extras.lines], screenRows: [...base.screenRows, ...extras.screenRows] };
+  });
 
   const rawBodyLines = entries.flatMap((entry) => entry.lines);
   const rawBodyScreenRows = entries.flatMap((entry) => entry.screenRows);

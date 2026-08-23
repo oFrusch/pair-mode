@@ -377,11 +377,11 @@ describe("applyMouse — double click opens a note", () => {
 
 describe("panelHeight", () => {
   test("returns 0 with no notes", () => {
-    expect(panelHeight(0, "browse")).toBe(0);
+    expect(panelHeight(0, "browse", "panel")).toBe(0);
   });
 
   test("caps at 6", () => {
-    expect(panelHeight(50, "browse")).toBe(6);
+    expect(panelHeight(50, "browse", "panel")).toBe(6);
   });
 });
 
@@ -401,6 +401,7 @@ function paintOptions(overrides: Partial<Parameters<typeof paintSplit>[0]> = {})
     draft: "",
     notes: [] as Note[],
     focusedNote: null as number | null,
+    notePosition: "panel" as const,
     ...overrides,
   };
 }
@@ -446,7 +447,7 @@ describe("paint — the docked panel and the row marker", () => {
     const notes = [makeNote()];
     const { map } = paintSplit(paintOptions({ notes }));
 
-    const height = panelHeight(notes.length, "browse");
+    const height = panelHeight(notes.length, "browse", "panel");
     const panelRows = map.rows.slice(-1 - height, -1);
 
     expect(panelRows).toHaveLength(height);
@@ -463,8 +464,8 @@ describe("paint — the docked panel and the row marker", () => {
   });
 
   test("bodyHeight shrinks when notes exist", () => {
-    const withoutNotes = bodyHeight(24, 0, "browse");
-    const withNotes = bodyHeight(24, 3, "browse");
+    const withoutNotes = bodyHeight(24, 0, "browse", "panel");
+    const withNotes = bodyHeight(24, 3, "browse", "panel");
 
     expect(withNotes).toBeLessThan(withoutNotes);
   });

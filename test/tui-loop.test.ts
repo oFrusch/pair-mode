@@ -62,7 +62,7 @@ describe("applyKey — cursor movement", () => {
 
     const next = applyKey(state, key("d", true), 10);
 
-    expect(next.model.cursor).toBe(bodyHeight(10, 0, "browse") - 1);
+    expect(next.model.cursor).toBe(bodyHeight(10, 0, "browse", "panel") - 1);
   });
 });
 
@@ -207,7 +207,7 @@ describe("applyKey — scrollTop follows the cursor", () => {
     );
     let state = makeState({ model });
     const height = 10;
-    const rows = bodyHeight(height, 0, "browse");
+    const rows = bodyHeight(height, 0, "browse", "panel");
 
     for (let step = 0; step < rows; step += 1) {
       state = applyKey(state, key("j"), height);

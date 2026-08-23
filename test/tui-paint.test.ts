@@ -85,6 +85,7 @@ describe("paintSplit — split layout", () => {
       draft: "",
       notes: [],
       focusedNote: null,
+      notePosition: "panel",
     });
 
     expect(lines).toHaveLength(HEIGHT);
@@ -106,6 +107,7 @@ describe("paintSplit — split layout", () => {
       draft: "",
       notes: [],
       focusedNote: null,
+      notePosition: "panel",
     });
 
     const addRowLine = lines[3];
@@ -129,6 +131,7 @@ describe("paintSplit — split layout", () => {
       draft: "",
       notes: [],
       focusedNote: null,
+      notePosition: "panel",
     });
 
     const delRowLine = lines[4];
@@ -152,6 +155,7 @@ describe("paintSplit — split layout", () => {
       draft: "",
       notes: [],
       focusedNote: null,
+      notePosition: "panel",
     });
 
     const replaceRowLine = lines[5];
@@ -178,6 +182,7 @@ describe("paintSplit — split layout", () => {
       draft: "",
       notes: [],
       focusedNote: null,
+      notePosition: "panel",
     });
 
     const addRowLine = lines[3];
@@ -206,6 +211,7 @@ describe("paintSplit — split layout", () => {
       draft: "",
       notes: [],
       focusedNote: null,
+      notePosition: "panel",
     });
 
     const addRowLine = lines[3];
@@ -234,6 +240,7 @@ describe("paintSplit — split layout", () => {
       draft: "",
       notes: [],
       focusedNote: null,
+      notePosition: "panel",
     });
 
     const foldRowLine = lines[6];
@@ -258,6 +265,7 @@ describe("paintSplit — split layout", () => {
       draft: "",
       notes: [],
       focusedNote: null,
+      notePosition: "panel",
     });
 
     expect(map.rows).toHaveLength(lines.length);
@@ -279,6 +287,7 @@ describe("paintSplit — split layout", () => {
       draft: "",
       notes: [],
       focusedNote: null,
+      notePosition: "panel",
     });
 
     const rightPane = map.panes.find((pane) => pane.pane === "right");
@@ -326,6 +335,7 @@ describe("paintSplit — split layout", () => {
       draft: "",
       notes: [],
       focusedNote: null,
+      notePosition: "panel",
     });
 
     expect(lines).toHaveLength(height);
@@ -361,6 +371,7 @@ describe("paintSplit — split layout", () => {
       draft: "",
       notes: [],
       focusedNote: null,
+      notePosition: "panel",
     });
 
     expect(lines).toHaveLength(height);
@@ -385,6 +396,7 @@ describe("paintSplit — split layout", () => {
       draft: "",
       notes: [],
       focusedNote: null,
+      notePosition: "panel",
     });
 
     expect(lines).toHaveLength(height);

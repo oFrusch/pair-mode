@@ -60,6 +60,7 @@ function baseOptions(overrides: Partial<PaintOptions> = {}): PaintOptions {
     draft: "",
     notes: [],
     focusedNote: null,
+    notePosition: "panel",
     ...overrides,
   };
 }

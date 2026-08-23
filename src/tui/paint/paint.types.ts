@@ -32,6 +32,8 @@ export interface SyntaxToken {
 
 export type TokenProvider = (line: string, lineNumber: number | null) => SyntaxToken[];
 
+export type NotePosition = "panel" | "anchored";
+
 export interface PaintOptions {
   model: DiffModel;
   width: number;
@@ -47,6 +49,7 @@ export interface PaintOptions {
   draft: string;
   notes: Note[];
   focusedNote: number | null;
+  notePosition: NotePosition;
 }
 
 export interface PaintResult {

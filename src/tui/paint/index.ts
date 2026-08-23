@@ -3,6 +3,7 @@ export { bodyHeight, panelHeight, paintSplit, paintUnified } from "./layout";
 export { bg, fg, RESET, supportsTruecolor, theme } from "./theme";
 export type {
   ChangedSpans,
+  NotePosition,
   PaintOptions,
   PaintResult,
   Span,
