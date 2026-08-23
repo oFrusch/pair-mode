@@ -75,20 +75,6 @@ when `XDG_CONFIG_HOME` is not set.
 An `editor` array lists editor names in order of preference. Pair mode tries each in
 turn and uses the first one it finds on the machine.
 
-`autoApprove` controls what happens on a clean quit: you reviewed the diff in the pane
-and typed no questions. With `autoApprove` on, the Claude Code hook approves the edit
-itself, so Claude Code's own permission prompt does not appear a second time. With
-`autoApprove` off, the hook stays silent and Claude Code's normal permission flow runs.
-Pair mode never approves an edit it did not show you: a disabled path, an unsupported
-tool, or a multiplexer failure all fall through to Claude Code's normal prompt too.
-
-## Known limits
-
-- Pair mode opens one editor pane per `Edit` call, not one pane per changeset.
-- opencode hooks do not fire for subagent tool calls or MCP tool calls.
-- Claude Code cannot add a choice to its permission menu. Pair mode opens on every
-  edit while it is enabled.
-
 ## License
 
 MIT. See `LICENSE`.
