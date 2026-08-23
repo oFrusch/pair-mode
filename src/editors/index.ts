@@ -1,5 +1,6 @@
 import type { PairConfig } from "../core/config";
 import type { Editor, EditorContext, EditorLaunch, PathResolver } from "./editor.types";
+import type { BundleExistsChecker } from "./pair.types";
 import { createMicroEditor } from "./micro";
 import { vimEditor } from "./vim";
 import { createNanoEditor } from "./nano";
@@ -30,9 +31,9 @@ function createPassthroughEditor(command: string[]): Editor {
   };
 }
 
-function candidates(resolvesOnPath: PathResolver): Editor[] {
+function candidates(resolvesOnPath: PathResolver, checkPairBundle?: BundleExistsChecker): Editor[] {
   return [
-    createPairEditor(),
+    checkPairBundle ? createPairEditor(undefined, checkPairBundle) : createPairEditor(),
     createMicroEditor(resolvesOnPath),
     vimEditor("nvim", resolvesOnPath),
     vimEditor("vim", resolvesOnPath),
@@ -43,11 +44,13 @@ function candidates(resolvesOnPath: PathResolver): Editor[] {
 export function resolve(
   preference: PairConfig["editor"],
   resolvesOnPath: PathResolver = defaultResolvesOnPath,
+  checkPairBundle?: BundleExistsChecker,
 ): Editor {
   if (Array.isArray(preference)) {
     return createPassthroughEditor(preference);
   }
 
+  // An explicit editor: "pair" resolves unconditionally, so a misconfigured install fails loudly instead of silently downgrading.
   if (preference === "pair") {
     return createPairEditor();
   }
@@ -64,7 +67,7 @@ export function resolve(
     return createNanoEditor(resolvesOnPath);
   }
 
-  const available = candidates(resolvesOnPath).find((candidate) => candidate.available());
+  const available = candidates(resolvesOnPath, checkPairBundle).find((candidate) => candidate.available());
 
   return available ?? vimEditor("vim", resolvesOnPath);
 }

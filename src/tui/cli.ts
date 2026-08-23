@@ -89,6 +89,21 @@ function toBoolean(value: string | undefined, fallback: boolean): boolean {
   return fallback;
 }
 
+// A missing, non-numeric, or non-positive value falls back to the caller's default rather than reaching the model as NaN or zero.
+export function toPositiveInteger(value: string | undefined, fallback: number): number {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
 function readTerminalSize(stdout: NodeJS.WriteStream): { width: number; height: number } {
   return {
     width: stdout.columns ?? DEFAULT_TERMINAL_WIDTH,
@@ -106,6 +121,8 @@ async function run(): Promise<number> {
   const notePosition = toNotePosition(args["notes"]);
   const rowBand = toBoolean(args["row-band"], false);
   const syntaxEnabled = toBoolean(args["syntax"], true);
+  const context = toPositiveInteger(args["context"], DEFAULT_CONTEXT);
+  const minFold = toPositiveInteger(args["min-fold"], DEFAULT_MIN_FOLD);
   const resultFile = args["result"] ?? fallbackResultFile();
   const truecolor = supportsTruecolor(process.env);
   const { width, height } = readTerminalSize(process.stdout);
@@ -116,8 +133,8 @@ async function run(): Promise<number> {
     before,
     after,
     path,
-    context: DEFAULT_CONTEXT,
-    minFold: DEFAULT_MIN_FOLD,
+    context,
+    minFold,
     layout,
     notePosition,
     rowBand,

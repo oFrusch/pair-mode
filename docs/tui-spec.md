@@ -187,7 +187,7 @@ the behaviour every terminal already trains people to expect.
 | `^d` `^u` | none | Page down and page up. |
 | `n` `N` | none | Jump to the next and the previous hunk. |
 | `v` then a motion | drag | Select a span. |
-| `a` | double click | Open a note on the selection or the current row. |
+| `a` | none | Open a note on the selection or the current row. |
 | `⏎` | none | Save the note. `esc` discards it. |
 | `tab` | click a note | Cycle the focused note. The diff scrolls to its anchor. |
 | `d` | none | Delete the focused note. |

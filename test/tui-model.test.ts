@@ -89,6 +89,47 @@ describe("buildModel — row construction", () => {
   });
 });
 
+describe("buildModel — line sanitising", () => {
+  test("a leading tab expands to the next 8-column tab stop", () => {
+    const before = ["a"];
+    const after = ["\tx"];
+
+    const model = buildModel(before, after, 5, 4);
+    const added = model.rows.find((row) => row.kind === "add" || row.kind === "replace");
+
+    expect(added?.right).toBe(" ".repeat(8) + "x");
+  });
+
+  test("a tab after two characters expands to the next stop, not a fixed width", () => {
+    const before = ["a"];
+    const after = ["ab\tx"];
+
+    const model = buildModel(before, after, 5, 4);
+    const changed = model.rows.find((row) => row.kind === "replace");
+
+    expect(changed?.right).toBe("ab" + " ".repeat(6) + "x");
+  });
+
+  test("an ESC byte becomes a visible placeholder rather than the raw byte", () => {
+    const before = ["a"];
+    const after = ["x\x1by"];
+
+    const model = buildModel(before, after, 5, 4);
+    const changed = model.rows.find((row) => row.kind === "replace");
+
+    expect(changed?.right).toBe("x?y");
+  });
+
+  test("diffing still matches lines that are equal before sanitising", () => {
+    const before = ["\tsame"];
+    const after = ["\tsame"];
+
+    const model = buildModel(before, after, 5, 4);
+
+    expect(model.rows.every((row) => row.kind === "context")).toBe(true);
+  });
+});
+
 describe("buildModel — folds", () => {
   test("two hunks far apart produce one fold between them", () => {
     const before = ["c0", "c1", "c2", "old", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12"];

@@ -1,7 +1,8 @@
+import { existsSync } from "node:fs";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Editor, EditorContext, EditorLaunch } from "./editor.types";
-import type { TuiEntryResolver } from "./pair.types";
+import type { BundleExistsChecker, TuiEntryResolver } from "./pair.types";
 
 // runTui speaks "split" | "unified". PairConfig.layout speaks "split" | "inline", because "inline" already names the one-column layout there. This is the only place the two vocabularies meet.
 function paintLayout(layout: EditorContext["config"]["layout"]): "split" | "unified" {
@@ -14,13 +15,19 @@ const defaultResolveTuiEntry: TuiEntryResolver = () => {
   return join(here, "pair-tui.js");
 };
 
-export function createPairEditor(resolveTuiEntry: TuiEntryResolver = defaultResolveTuiEntry): Editor {
+const defaultCheckBundleExists: BundleExistsChecker = existsSync;
+
+export function createPairEditor(
+  resolveTuiEntry: TuiEntryResolver = defaultResolveTuiEntry,
+  checkBundleExists: BundleExistsChecker = defaultCheckBundleExists,
+): Editor {
   return {
     name: "pair",
     collectMode: "result-file",
 
+    // auto falls through to the next candidate when the bundle is missing. An explicit editor: "pair" bypasses this and never calls available().
     available(): boolean {
-      return true;
+      return checkBundleExists(resolveTuiEntry());
     },
 
     headerHint(): string[] {
@@ -53,6 +60,10 @@ export function createPairEditor(resolveTuiEntry: TuiEntryResolver = defaultReso
           String(config.theme.rowBand),
           "--syntax",
           String(config.syntax),
+          "--context",
+          String(config.context),
+          "--min-fold",
+          String(config.minFold),
         ],
         env: {},
       };

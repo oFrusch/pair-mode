@@ -1,4 +1,4 @@
-import { readFileSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
@@ -9,11 +9,10 @@ import type { DiffModel } from "../src/tui/model";
 import { noteFromSelection, toQuestions, writeResult } from "../src/tui/notes";
 import type { Note } from "../src/tui/notes";
 import { bodyHeight, noTokens, paintSplit, panelHeight } from "../src/tui/paint";
-import { applyMouse } from "../src/tui/selection";
 import type { Selection } from "../src/tui/selection";
 import { applyKey, deleteNote, runTui } from "../src/tui/tui";
 import type { TuiIo, TuiOptions, TuiState } from "../src/tui/tui.types";
-import type { KeyEvent, MouseEvent } from "../src/tui/input/input.types";
+import type { KeyEvent } from "../src/tui/input/input.types";
 
 function tempPath(): string {
   return join(tmpdir(), `pair-mode-notes-test-${randomBytes(6).toString("hex")}.json`);
@@ -334,48 +333,6 @@ describe("applyKey — quit and confirm", () => {
   });
 });
 
-function buildMouseMap() {
-  return {
-    rows: [
-      { kind: "chrome" as const, index: null },
-      { kind: "row" as const, index: 0 },
-      { kind: "row" as const, index: 1 },
-    ],
-    panes: [
-      { pane: "left" as const, gutterStart: 0, textStart: 3, textEnd: 13 },
-      { pane: "right" as const, gutterStart: 14, textStart: 17, textEnd: 27 },
-    ],
-  };
-}
-
-function mouseEvent(overrides: Partial<MouseEvent> = {}): MouseEvent {
-  return { kind: "down", button: 0, row: 2, column: 20, shift: false, ...overrides };
-}
-
-describe("applyMouse — double click opens a note", () => {
-  test("a double press on the same row in one chunk opens a note", () => {
-    const state = makeState({ map: buildMouseMap() });
-
-    const firstDown = applyMouse(state, mouseEvent());
-    expect(firstDown.mode).toBe("select");
-
-    const secondDown = applyMouse(firstDown, mouseEvent());
-
-    expect(secondDown.mode).toBe("note");
-    expect(secondDown.draft).toBe("");
-    expect(secondDown.selection).not.toBeNull();
-  });
-
-  test("no function in this describe block mutates its input state", () => {
-    const state = makeState({ map: buildMouseMap() });
-    const clone = structuredClone(state);
-
-    applyMouse(state, mouseEvent());
-
-    expect(state).toEqual(clone);
-  });
-});
-
 describe("panelHeight", () => {
   test("returns 0 with no notes", () => {
     expect(panelHeight(0, "browse", "panel")).toBe(0);
@@ -568,5 +525,45 @@ describe("runTui — the result file", () => {
 
     expect(result.quit).toBe("clean");
     expect(() => readFileSync(resultFile, "utf-8")).toThrow();
+  });
+
+  test("a teardown write that throws still leaves the result file written with the note", async () => {
+    const box: { handler: ((chunk: string) => void) | null } = { handler: null };
+
+    const throwingIo: TuiIo = {
+      onKey(nextHandler) {
+        box.handler = nextHandler;
+      },
+      write(text) {
+        if (text === "\x1b[?1049l") {
+          throw new Error("teardown write failed");
+        }
+      },
+      size() {
+        return { width: 80, height: 24 };
+      },
+      cleanup() {},
+    };
+
+    const resultFile = tempPath();
+    const options = makeOptions({ resultFile });
+
+    const resultPromise = runTui(options, throwingIo);
+
+    box.handler?.("a");
+    box.handler?.("why though");
+    box.handler?.("\r");
+    box.handler?.("\x13");
+
+    await expect(resultPromise).rejects.toThrow("teardown write failed");
+
+    expect(existsSync(resultFile)).toBe(true);
+
+    const parsed = parseNoteResult(readFileSync(resultFile, "utf-8"));
+
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]?.text).toBe("why though");
+
+    unlinkSync(resultFile);
   });
 });

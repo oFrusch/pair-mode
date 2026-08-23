@@ -9,6 +9,38 @@ import type {
   VisibleRow,
 } from "./model.types";
 
+const TAB_WIDTH = 8;
+const CONTROL_BYTE_CEILING = 0x20;
+const CONTROL_BYTE_PLACEHOLDER = "?";
+
+// Runs once when the model is built, so the painter and resolveClick always agree on the same sanitised string and its column math.
+function sanitizeLine(text: string): string {
+  let output = "";
+  let column = 0;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index]!;
+
+    if (char === "\t") {
+      const width = TAB_WIDTH - (column % TAB_WIDTH);
+      output += " ".repeat(width);
+      column += width;
+      continue;
+    }
+
+    if (char.charCodeAt(0) < CONTROL_BYTE_CEILING) {
+      output += CONTROL_BYTE_PLACEHOLDER;
+      column += 1;
+      continue;
+    }
+
+    output += char;
+    column += 1;
+  }
+
+  return output;
+}
+
 function buildRows(before: string[], after: string[]): ModelRow[] {
   const rows: ModelRow[] = [];
   let leftCounter = 0;
@@ -23,8 +55,8 @@ function buildRows(before: string[], after: string[]): ModelRow[] {
       const removedLine = removed[row];
       const addedLine = added[row];
 
-      const left = removedLine === undefined ? "" : removedLine;
-      const right = addedLine === undefined ? "" : addedLine;
+      const left = removedLine === undefined ? "" : sanitizeLine(removedLine);
+      const right = addedLine === undefined ? "" : sanitizeLine(addedLine);
 
       const leftNumber = removedLine === undefined ? null : (leftCounter += 1);
       const rightNumber = addedLine === undefined ? null : (rightCounter += 1);

@@ -256,6 +256,15 @@ describe("applyMouse", () => {
     expect(next.mode).toBe("browse");
   });
 
+  test("two plain clicks on the same spot, with the release SGR always delivers between them, never opens a note", () => {
+    const firstDown = applyMouse(buildMouseState(), mouseEvent({ kind: "down", row: 3, column: 20 }));
+    const firstUp = applyMouse(firstDown, mouseEvent({ kind: "up", row: 3, column: 20 }));
+
+    const secondDown = applyMouse(firstUp, mouseEvent({ kind: "down", row: 3, column: 20 }));
+
+    expect(secondDown.mode).toBe("select");
+  });
+
   test("a release after a real drag normalises a backwards selection and returns to browse", () => {
     const backwards = buildMouseState({
       mode: "select",

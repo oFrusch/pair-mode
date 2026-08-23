@@ -104,16 +104,16 @@ test("resolve of a custom command array returns a passthrough editor", () => {
   expect(editor.name).toBe("custom");
 });
 
-test("resolve(auto) returns the pair editor even when every other binary is available", () => {
+test("resolve(auto) returns the pair editor, when the bundle is present, even when every other binary is available", () => {
   const alwaysAvailable: PathResolver = () => true;
-  const editor = resolve("auto", alwaysAvailable);
+  const editor = resolve("auto", alwaysAvailable, () => true);
 
   expect(editor.name).toBe("pair");
 });
 
-test("resolve(auto) returns the pair editor even when nothing else is available", () => {
+test("resolve(auto) returns the pair editor, when the bundle is present, even when nothing else is available", () => {
   const neverAvailable: PathResolver = () => false;
-  const editor = resolve("auto", neverAvailable);
+  const editor = resolve("auto", neverAvailable, () => true);
 
   expect(editor.name).toBe("pair");
 });

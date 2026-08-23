@@ -8,6 +8,7 @@ export interface SetupOptions {
   homeDir?: string;
   installRoot?: string;
   resolvesOnPath?: (command: string) => boolean;
+  checkPairBundle?: (entryPath: string) => boolean;
 }
 
 export interface SetupResult {

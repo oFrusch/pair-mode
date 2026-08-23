@@ -14,6 +14,7 @@ let originalXdgStateHome: string | undefined;
 let originalHome: string | undefined;
 let originalEditorOverride: string | undefined;
 let originalVisual: string | undefined;
+let originalEditor: string | undefined;
 let repoRoot: string;
 
 beforeEach(() => {
@@ -29,6 +30,9 @@ beforeEach(() => {
 
   originalVisual = process.env["VISUAL"];
   delete process.env["VISUAL"];
+
+  originalEditor = process.env["EDITOR"];
+  delete process.env["EDITOR"];
 
   const scratch = mkdtempSync(join(tmpdir(), "pair-mode-repo-"));
   repoRoot = realpathSync(scratch);
@@ -58,6 +62,12 @@ afterEach(() => {
     delete process.env["VISUAL"];
   } else {
     process.env["VISUAL"] = originalVisual;
+  }
+
+  if (originalEditor === undefined) {
+    delete process.env["EDITOR"];
+  } else {
+    process.env["EDITOR"] = originalEditor;
   }
 });
 

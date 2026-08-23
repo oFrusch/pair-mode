@@ -129,33 +129,9 @@ function paneLineLength(model: DiffModel, rowIndex: number, pane: "left" | "righ
   return pane === "left" ? row.left.length : row.right.length;
 }
 
-function isRepeatDown(state: TuiState, target: ClickTarget & { kind: "row" }): boolean {
-  const selection = state.selection;
-
-  return (
-    state.mode === "select" &&
-    selection !== null &&
-    selection.pane === target.pane &&
-    selection.anchorRow === target.index &&
-    selection.headRow === target.index &&
-    selection.anchorColumn === selection.headColumn
-  );
-}
-
-function openNoteAtRow(state: TuiState, target: ClickTarget & { kind: "row" }): TuiState {
-  const selection = wholeRowSelection(state.model, target.index, target.pane);
-  const model = { ...state.model, cursor: visibleIndexForRow(state.model, target.index) };
-
-  return { ...state, selection, mode: "note", draft: "", model };
-}
-
 function applyMouseDown(state: TuiState, target: ClickTarget): TuiState {
   if (target.kind === "fold") {
     return { ...state, model: toggleFold(state.model, target.foldIndex) };
-  }
-
-  if (isRepeatDown(state, target)) {
-    return openNoteAtRow(state, target);
   }
 
   const selection: Selection = {

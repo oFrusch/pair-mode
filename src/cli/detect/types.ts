@@ -1,4 +1,5 @@
 import type { PathResolver } from "../../helpers/types";
+import type { BundleExistsChecker } from "../../editors/pair.types";
 
 export type CliName = "claude-code" | "codex" | "opencode" | "pi";
 
@@ -30,4 +31,5 @@ export interface InstallReport {
 export interface DetectAdapters {
   resolvesOnPath?: PathResolver;
   homeDir?: string;
+  checkPairBundle?: BundleExistsChecker;
 }

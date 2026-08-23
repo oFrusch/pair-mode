@@ -58,7 +58,7 @@ keyboard only.
 | `Ctrl+d` `Ctrl+u`   | —                 | Page down and page up.                                                              |
 | `n` `N`             | —                 | Jump to the next and the previous changed run.                                      |
 | `v`, then a motion  | click and drag    | Select a span.                                                                      |
-| `a`                 | double click      | Open a note on the current selection, or on the current row if nothing is selected. |
+| `a`                 | —                 | Open a note on the current selection, or on the current row if nothing is selected. |
 | `Enter`             | —                 | Save the note.                                                                      |
 | `Esc`               | —                 | Discard the note draft, or clear the current selection.                             |
 | `Tab`               | —                 | Cycle the focused note.                                                             |

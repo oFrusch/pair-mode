@@ -401,15 +401,15 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
     const finishQuit = (quit: "clean" | "send") => {
       finished = true;
 
+      if (quit === "send") {
+        writeResult(options.resultFile, state.notes);
+      }
+
       const teardownError = attemptTeardown();
 
       if (teardownError !== null) {
         reject(teardownError);
         return;
-      }
-
-      if (quit === "send") {
-        writeResult(options.resultFile, state.notes);
       }
 
       const questions: Question[] = quit === "send" ? toQuestions(state.notes) : [];

@@ -1,6 +1,6 @@
 import { test, expect, describe } from "vitest";
 import { changedSpans, noTokens, paintSplit, SPAN_SIMILARITY_FLOOR } from "../src/tui/paint";
-import { resolveClick } from "../src/tui/model";
+import { buildModel, resolveClick } from "../src/tui/model";
 import type { DiffModel } from "../src/tui/model";
 
 const ADD_BAR_FG = "\x1b[38;2;63;185;80m";
@@ -401,5 +401,72 @@ describe("paintSplit — split layout", () => {
 
     expect(lines).toHaveLength(height);
     expect(map.rows).toHaveLength(height);
+  });
+});
+
+describe("paintSplit — sanitised source text", () => {
+  test("a leading tab paints at its expanded width and resolveClick maps the same column back", () => {
+    const model = buildModel(["a"], ["\tx"], 5, 4);
+    const width = 80;
+    const height = 4;
+
+    const { map } = paintSplit({
+      model,
+      width,
+      height,
+      path: "src/example.ts",
+      tokens: noTokens,
+      truecolor: true,
+      rowBand: false,
+      scrollTop: 0,
+      layout: "split",
+      selection: null,
+      mode: "browse",
+      draft: "",
+      notes: [],
+      focusedNote: null,
+      notePosition: "panel",
+    });
+
+    const rightPane = map.panes.find((pane) => pane.pane === "right");
+    expect(rightPane).toBeDefined();
+
+    const row = model.rows[0];
+    expect(row?.right).toBe(" ".repeat(8) + "x");
+
+    const terminalRow = 3;
+    const sourceColumn = 8;
+    const terminalColumn = (rightPane?.textStart ?? 0) + 1 + sourceColumn;
+
+    const target = resolveClick(map, terminalRow, terminalColumn);
+
+    expect(target).toEqual({ kind: "row", index: 0, pane: "right", column: sourceColumn });
+  });
+
+  test("an ESC byte in the source paints a placeholder rather than the raw byte", () => {
+    const model = buildModel(["a"], ["x\x1by"], 5, 4);
+
+    const { lines } = paintSplit({
+      model,
+      width: 80,
+      height: 4,
+      path: "src/example.ts",
+      tokens: noTokens,
+      truecolor: true,
+      rowBand: false,
+      scrollTop: 0,
+      layout: "split",
+      selection: null,
+      mode: "browse",
+      draft: "",
+      notes: [],
+      focusedNote: null,
+      notePosition: "panel",
+    });
+
+    const rendered = stripAnsi(lines.join("\n"));
+
+    expect(rendered).not.toContain(ESCAPE_CHAR);
+    expect(rendered).toContain("x?y");
   });
 });
