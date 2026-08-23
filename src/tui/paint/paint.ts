@@ -1,8 +1,14 @@
 import { diffWordsWithSpace } from "diff";
-import { paintSplit } from "./layout";
-import type { ChangedSpans, PaintOptions, PaintResult, Span, TokenProvider } from "./paint.types";
+import { paintSplit, paintUnified } from "./layout";
+import type { ChangedSpans, LayoutDecision, PaintOptions, PaintResult, Span, TokenProvider } from "./paint.types";
 
 export const SPAN_SIMILARITY_FLOOR = 0.3;
+export const MIN_SPLIT_WIDTH = 90;
+
+const DEFAULT_LAYOUT = "split";
+
+const NEW_FILE_REASON = "whole file is new · unified";
+const NARROW_REASON = "narrow · unified";
 
 export const noTokens: TokenProvider = () => [];
 
@@ -48,6 +54,29 @@ export function changedSpans(before: string, after: string): ChangedSpans {
   return { left, right };
 }
 
+function decideLayout(options: PaintOptions): LayoutDecision {
+  const preferred = options.layout ?? DEFAULT_LAYOUT;
+  const hasRemoval = options.model.rows.some((row) => row.kind === "del" || row.kind === "replace");
+
+  const forcedReason = !hasRemoval ? NEW_FILE_REASON : options.width < MIN_SPLIT_WIDTH ? NARROW_REASON : null;
+
+  if (forcedReason === null) {
+    return { layout: preferred, overrideReason: null };
+  }
+
+  return { layout: "unified", overrideReason: preferred === "split" ? forcedReason : null };
+}
+
+export function chooseLayout(options: PaintOptions): "split" | "unified" {
+  return decideLayout(options).layout;
+}
+
+export function layoutStatusMessage(options: PaintOptions): string | null {
+  return decideLayout(options).overrideReason;
+}
+
 export function paint(options: PaintOptions): PaintResult {
-  return paintSplit(options);
+  const { layout } = decideLayout(options);
+
+  return layout === "unified" ? paintUnified(options) : paintSplit(options);
 }

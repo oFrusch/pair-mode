@@ -1,4 +1,4 @@
-import type { DiffModel, ScreenMap } from "../model/model.types";
+import type { DiffModel, ScreenMap, ScreenRow } from "../model/model.types";
 
 export interface TuiTheme {
   addBar: string;
@@ -38,6 +38,7 @@ export interface PaintOptions {
   truecolor: boolean;
   rowBand: boolean;
   scrollTop: number;
+  layout?: "split" | "unified";
 }
 
 export interface PaintResult {
@@ -61,4 +62,21 @@ export interface SignBarStyle {
   leftColor: string | null;
   rightChar: string;
   rightColor: string | null;
+}
+
+export type UnifiedHalfKind = "context" | "add" | "del";
+
+export interface UnifiedBarStyle {
+  char: string;
+  color: string | null;
+}
+
+export interface UnifiedBodyEntry {
+  lines: string[];
+  screenRows: ScreenRow[];
+}
+
+export interface LayoutDecision {
+  layout: "split" | "unified";
+  overrideReason: string | null;
 }

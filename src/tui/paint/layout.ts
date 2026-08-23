@@ -1,9 +1,19 @@
 import { basename } from "node:path";
 import { visibleRows } from "../model/model";
-import type { DiffModel, FoldGroup, ModelRow, PaneBounds, RowKind, ScreenMap, ScreenRow } from "../model/model.types";
-import { changedSpans } from "./paint";
+import type { DiffModel, FoldGroup, ModelRow, PaneBounds, RowKind, ScreenMap, ScreenRow, VisibleRow } from "../model/model.types";
+import { changedSpans, layoutStatusMessage } from "./paint";
 import { bg, DEFAULT_BG, DEFAULT_FG, fg, RESET, theme } from "./theme";
-import type { PaintOptions, PaintResult, SignBarStyle, Span, SyntaxToken, TokenProvider } from "./paint.types";
+import type {
+  PaintOptions,
+  PaintResult,
+  SignBarStyle,
+  Span,
+  SyntaxToken,
+  TokenProvider,
+  UnifiedBarStyle,
+  UnifiedBodyEntry,
+  UnifiedHalfKind,
+} from "./paint.types";
 
 const NUMBER_WIDTH_FLOOR = 2;
 const GUTTER_SPACE_WIDTH = 1;
@@ -13,6 +23,7 @@ const PANE_COUNT = 2;
 const HEADER_ROWS = 2;
 const STATUS_ROWS = 1;
 const HEADER_COUNT_GAP_WIDTH = 1;
+const UNIFIED_PANE_COUNT = 1;
 
 const SIGN_BAR: Record<RowKind, SignBarStyle> = {
   context: { leftChar: " ", leftColor: null, rightChar: " ", rightColor: null },
@@ -187,8 +198,11 @@ function paintRule(width: number, truecolor: boolean): string {
   return fg(theme.fold, truecolor) + "─".repeat(width) + RESET;
 }
 
-function paintStatus(width: number, truecolor: boolean): string {
-  return bg(theme.chrome, truecolor) + " ".repeat(width) + RESET;
+function paintStatus(width: number, truecolor: boolean, message: string | null): string {
+  const text = message === null ? "" : message.slice(0, width);
+  const padding = " ".repeat(Math.max(0, width - text.length));
+
+  return bg(theme.chrome, truecolor) + text + padding + RESET;
 }
 
 function paintBlankLine(width: number): string {
@@ -244,7 +258,7 @@ export function paintSplit(options: PaintOptions): PaintResult {
     paintRule(width, truecolor),
     ...bodyLines,
     ...padLines,
-    paintStatus(width, truecolor),
+    paintStatus(width, truecolor, null),
   ].slice(0, height);
 
   const allRows: ScreenRow[] = [
@@ -258,6 +272,193 @@ export function paintSplit(options: PaintOptions): PaintResult {
   const rows = allRows.slice(0, height);
 
   const map: ScreenMap = { rows, panes: [leftBounds, rightBounds] };
+
+  return { lines, map };
+}
+
+const UNIFIED_SIGN_BAR: Record<UnifiedHalfKind, UnifiedBarStyle> = {
+  context: { char: " ", color: null },
+  add: { char: "▌", color: theme.addBar },
+  del: { char: "▌", color: theme.delBar },
+};
+
+function paintUnifiedHalf(
+  halfKind: UnifiedHalfKind,
+  lineNumber: number | null,
+  text: string,
+  tokens: SyntaxToken[],
+  spans: Span[],
+  changeColor: string | null,
+  numberWidth: number,
+  textWidth: number,
+  rowBand: boolean,
+  truecolor: boolean,
+): string {
+  const bar = UNIFIED_SIGN_BAR[halfKind];
+  const rendered = renderPaneText(text, tokens, spans, changeColor, textWidth, rowBand, truecolor);
+
+  return (
+    paintGutter(lineNumber, numberWidth, truecolor) +
+    paintSignBar(bar.char, bar.color, truecolor) +
+    rendered +
+    RESET
+  );
+}
+
+function paintUnifiedBodyEntry(
+  entry: VisibleRow,
+  model: DiffModel,
+  numberWidth: number,
+  textWidth: number,
+  width: number,
+  tokens: TokenProvider,
+  rowBand: boolean,
+  truecolor: boolean,
+): UnifiedBodyEntry {
+  if (entry.kind === "fold") {
+    return {
+      lines: [paintFoldRow(lookupFold(model, entry.foldIndex), width, truecolor)],
+      screenRows: [{ kind: "fold", index: entry.foldIndex }],
+    };
+  }
+
+  const row = lookupRow(model, entry.index);
+  const spans = changedSpans(row.left, row.right);
+  const screenRow: ScreenRow = { kind: "row", index: entry.index };
+
+  if (row.kind === "context") {
+    const line = paintUnifiedHalf(
+      "context",
+      row.rightNumber,
+      row.right,
+      tokens(row.right, row.rightNumber),
+      [],
+      null,
+      numberWidth,
+      textWidth,
+      rowBand,
+      truecolor,
+    );
+
+    return { lines: [line], screenRows: [screenRow] };
+  }
+
+  if (row.kind === "add") {
+    const line = paintUnifiedHalf(
+      "add",
+      row.rightNumber,
+      row.right,
+      tokens(row.right, row.rightNumber),
+      spans.right,
+      theme.addSpan,
+      numberWidth,
+      textWidth,
+      rowBand,
+      truecolor,
+    );
+
+    return { lines: [line], screenRows: [screenRow] };
+  }
+
+  if (row.kind === "del") {
+    const line = paintUnifiedHalf(
+      "del",
+      row.leftNumber,
+      row.left,
+      tokens(row.left, row.leftNumber),
+      spans.left,
+      theme.delSpan,
+      numberWidth,
+      textWidth,
+      rowBand,
+      truecolor,
+    );
+
+    return { lines: [line], screenRows: [screenRow] };
+  }
+
+  const delLine = paintUnifiedHalf(
+    "del",
+    row.leftNumber,
+    row.left,
+    tokens(row.left, row.leftNumber),
+    spans.left,
+    theme.delSpan,
+    numberWidth,
+    textWidth,
+    rowBand,
+    truecolor,
+  );
+
+  const addLine = paintUnifiedHalf(
+    "add",
+    row.rightNumber,
+    row.right,
+    tokens(row.right, row.rightNumber),
+    spans.right,
+    theme.addSpan,
+    numberWidth,
+    textWidth,
+    rowBand,
+    truecolor,
+  );
+
+  return { lines: [delLine, addLine], screenRows: [screenRow, screenRow] };
+}
+
+export function paintUnified(options: PaintOptions): PaintResult {
+  const { model, width, height, path, tokens, truecolor, rowBand, scrollTop } = options;
+
+  const numberWidth = computeNumberWidth(model);
+
+  const fixedWidth = UNIFIED_PANE_COUNT * (numberWidth + GUTTER_SPACE_WIDTH + SIGN_BAR_WIDTH);
+  const textStart = fixedWidth;
+  const textWidth = Math.max(0, width - fixedWidth);
+  const textEnd = textStart + textWidth;
+
+  const rightBounds: PaneBounds = { pane: "right", gutterStart: 0, textStart, textEnd };
+
+  const addCount = model.rows.filter((row) => row.kind === "add" || row.kind === "replace").length;
+  const delCount = model.rows.filter((row) => row.kind === "del" || row.kind === "replace").length;
+
+  const bodyHeight = Math.max(0, height - HEADER_ROWS - STATUS_ROWS);
+  const visible = visibleRows(model).slice(scrollTop, scrollTop + bodyHeight);
+
+  const entries = visible.map((entry) =>
+    paintUnifiedBodyEntry(entry, model, numberWidth, textWidth, width, tokens, rowBand, truecolor),
+  );
+
+  const rawBodyLines = entries.flatMap((entry) => entry.lines);
+  const rawBodyScreenRows = entries.flatMap((entry) => entry.screenRows);
+
+  const bodyLines = rawBodyLines.slice(0, bodyHeight);
+  const bodyScreenRows = rawBodyScreenRows.slice(0, bodyHeight);
+
+  const padCount = Math.max(0, bodyHeight - bodyLines.length);
+  const padLines = Array.from({ length: padCount }, () => paintBlankLine(width));
+  const padScreenRows: ScreenRow[] = Array.from({ length: padCount }, () => ({ kind: "chrome" as const, index: null }));
+
+  const statusMessage = layoutStatusMessage(options);
+
+  const lines = [
+    paintHeader(path, addCount, delCount, width, truecolor),
+    paintRule(width, truecolor),
+    ...bodyLines,
+    ...padLines,
+    paintStatus(width, truecolor, statusMessage),
+  ].slice(0, height);
+
+  const allRows: ScreenRow[] = [
+    { kind: "chrome", index: null },
+    { kind: "chrome", index: null },
+    ...bodyScreenRows,
+    ...padScreenRows,
+    { kind: "chrome", index: null },
+  ];
+
+  const rows = allRows.slice(0, height);
+
+  const map: ScreenMap = { rows, panes: [rightBounds] };
 
   return { lines, map };
 }
