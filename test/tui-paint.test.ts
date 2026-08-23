@@ -79,6 +79,7 @@ describe("paintSplit — split layout", () => {
       truecolor: true,
       rowBand: false,
       scrollTop: 0,
+      layout: "split",
     });
 
     expect(lines).toHaveLength(HEIGHT);
@@ -94,6 +95,7 @@ describe("paintSplit — split layout", () => {
       truecolor: true,
       rowBand: false,
       scrollTop: 0,
+      layout: "split",
     });
 
     const addRowLine = lines[3];
@@ -111,6 +113,7 @@ describe("paintSplit — split layout", () => {
       truecolor: true,
       rowBand: false,
       scrollTop: 0,
+      layout: "split",
     });
 
     const delRowLine = lines[4];
@@ -128,6 +131,7 @@ describe("paintSplit — split layout", () => {
       truecolor: true,
       rowBand: false,
       scrollTop: 0,
+      layout: "split",
     });
 
     const replaceRowLine = lines[5];
@@ -148,6 +152,7 @@ describe("paintSplit — split layout", () => {
       truecolor: true,
       rowBand: true,
       scrollTop: 0,
+      layout: "split",
     });
 
     const addRowLine = lines[3];
@@ -170,6 +175,7 @@ describe("paintSplit — split layout", () => {
       truecolor: true,
       rowBand: false,
       scrollTop: 0,
+      layout: "split",
     });
 
     const addRowLine = lines[3];
@@ -192,6 +198,7 @@ describe("paintSplit — split layout", () => {
       truecolor: true,
       rowBand: false,
       scrollTop: 0,
+      layout: "split",
     });
 
     const foldRowLine = lines[6];
@@ -210,6 +217,7 @@ describe("paintSplit — split layout", () => {
       truecolor: true,
       rowBand: false,
       scrollTop: 0,
+      layout: "split",
     });
 
     expect(map.rows).toHaveLength(lines.length);
@@ -225,6 +233,7 @@ describe("paintSplit — split layout", () => {
       truecolor: true,
       rowBand: false,
       scrollTop: 0,
+      layout: "split",
     });
 
     const rightPane = map.panes.find((pane) => pane.pane === "right");
@@ -266,6 +275,7 @@ describe("paintSplit — split layout", () => {
       truecolor: true,
       rowBand: false,
       scrollTop: 0,
+      layout: "split",
     });
 
     expect(lines).toHaveLength(height);
@@ -295,6 +305,7 @@ describe("paintSplit — split layout", () => {
       truecolor: true,
       rowBand: false,
       scrollTop: 0,
+      layout: "split",
     });
 
     expect(lines).toHaveLength(height);
@@ -313,6 +324,7 @@ describe("paintSplit — split layout", () => {
       truecolor: true,
       rowBand: false,
       scrollTop: 0,
+      layout: "split",
     });
 
     expect(lines).toHaveLength(height);

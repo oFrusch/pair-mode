@@ -5,8 +5,6 @@ import type { ChangedSpans, LayoutDecision, PaintOptions, PaintResult, Span, Tok
 export const SPAN_SIMILARITY_FLOOR = 0.3;
 export const MIN_SPLIT_WIDTH = 90;
 
-const DEFAULT_LAYOUT = "split";
-
 const NEW_FILE_REASON = "whole file is new · unified";
 const NARROW_REASON = "narrow · unified";
 
@@ -55,7 +53,7 @@ export function changedSpans(before: string, after: string): ChangedSpans {
 }
 
 function decideLayout(options: PaintOptions): LayoutDecision {
-  const preferred = options.layout ?? DEFAULT_LAYOUT;
+  const preferred = options.layout;
   const hasRemoval = options.model.rows.some((row) => row.kind === "del" || row.kind === "replace");
 
   const forcedReason = !hasRemoval ? NEW_FILE_REASON : options.width < MIN_SPLIT_WIDTH ? NARROW_REASON : null;

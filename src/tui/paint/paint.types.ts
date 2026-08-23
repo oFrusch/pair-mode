@@ -38,7 +38,7 @@ export interface PaintOptions {
   truecolor: boolean;
   rowBand: boolean;
   scrollTop: number;
-  layout?: "split" | "unified";
+  layout: "split" | "unified";
 }
 
 export interface PaintResult {

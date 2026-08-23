@@ -24,6 +24,7 @@ const HEADER_ROWS = 2;
 const STATUS_ROWS = 1;
 const HEADER_COUNT_GAP_WIDTH = 1;
 const UNIFIED_PANE_COUNT = 1;
+const TEXT_GAP_WIDTH = 1;
 
 const SIGN_BAR: Record<RowKind, SignBarStyle> = {
   context: { leftChar: " ", leftColor: null, rightChar: " ", rightColor: null },
@@ -209,6 +210,39 @@ function paintBlankLine(width: number): string {
   return " ".repeat(width) + RESET;
 }
 
+function assembleScreen(
+  header: string,
+  rule: string,
+  bodyLines: string[],
+  bodyScreenRows: ScreenRow[],
+  bodyHeight: number,
+  statusMessage: string | null,
+  width: number,
+  height: number,
+  truecolor: boolean,
+  panes: PaneBounds[],
+): PaintResult {
+  const padCount = Math.max(0, bodyHeight - bodyLines.length);
+  const padLines = Array.from({ length: padCount }, () => paintBlankLine(width));
+  const padScreenRows: ScreenRow[] = Array.from({ length: padCount }, () => ({ kind: "chrome" as const, index: null }));
+
+  const lines = [header, rule, ...bodyLines, ...padLines, paintStatus(width, truecolor, statusMessage)].slice(0, height);
+
+  const allRows: ScreenRow[] = [
+    { kind: "chrome", index: null },
+    { kind: "chrome", index: null },
+    ...bodyScreenRows,
+    ...padScreenRows,
+    { kind: "chrome", index: null },
+  ];
+
+  const rows = allRows.slice(0, height);
+
+  const map: ScreenMap = { rows, panes };
+
+  return { lines, map };
+}
+
 export function paintSplit(options: PaintOptions): PaintResult {
   const { model, width, height, path, tokens, truecolor, rowBand, scrollTop } = options;
 
@@ -249,31 +283,18 @@ export function paintSplit(options: PaintOptions): PaintResult {
     entry.kind === "fold" ? { kind: "fold", index: entry.foldIndex } : { kind: "row", index: entry.index },
   );
 
-  const padCount = bodyHeight - bodyLines.length;
-  const padLines = Array.from({ length: padCount }, () => paintBlankLine(width));
-  const padScreenRows: ScreenRow[] = Array.from({ length: padCount }, () => ({ kind: "chrome" as const, index: null }));
-
-  const lines = [
+  return assembleScreen(
     paintHeader(path, addCount, delCount, width, truecolor),
     paintRule(width, truecolor),
-    ...bodyLines,
-    ...padLines,
-    paintStatus(width, truecolor, null),
-  ].slice(0, height);
-
-  const allRows: ScreenRow[] = [
-    { kind: "chrome", index: null },
-    { kind: "chrome", index: null },
-    ...bodyScreenRows,
-    ...padScreenRows,
-    { kind: "chrome", index: null },
-  ];
-
-  const rows = allRows.slice(0, height);
-
-  const map: ScreenMap = { rows, panes: [leftBounds, rightBounds] };
-
-  return { lines, map };
+    bodyLines,
+    bodyScreenRows,
+    bodyHeight,
+    null,
+    width,
+    height,
+    truecolor,
+    [leftBounds, rightBounds],
+  );
 }
 
 const UNIFIED_SIGN_BAR: Record<UnifiedHalfKind, UnifiedBarStyle> = {
@@ -300,6 +321,7 @@ function paintUnifiedHalf(
   return (
     paintGutter(lineNumber, numberWidth, truecolor) +
     paintSignBar(bar.char, bar.color, truecolor) +
+    " ".repeat(TEXT_GAP_WIDTH) +
     rendered +
     RESET
   );
@@ -411,7 +433,7 @@ export function paintUnified(options: PaintOptions): PaintResult {
 
   const numberWidth = computeNumberWidth(model);
 
-  const fixedWidth = UNIFIED_PANE_COUNT * (numberWidth + GUTTER_SPACE_WIDTH + SIGN_BAR_WIDTH);
+  const fixedWidth = UNIFIED_PANE_COUNT * (numberWidth + GUTTER_SPACE_WIDTH + SIGN_BAR_WIDTH) + TEXT_GAP_WIDTH;
   const textStart = fixedWidth;
   const textWidth = Math.max(0, width - fixedWidth);
   const textEnd = textStart + textWidth;
@@ -434,31 +456,18 @@ export function paintUnified(options: PaintOptions): PaintResult {
   const bodyLines = rawBodyLines.slice(0, bodyHeight);
   const bodyScreenRows = rawBodyScreenRows.slice(0, bodyHeight);
 
-  const padCount = Math.max(0, bodyHeight - bodyLines.length);
-  const padLines = Array.from({ length: padCount }, () => paintBlankLine(width));
-  const padScreenRows: ScreenRow[] = Array.from({ length: padCount }, () => ({ kind: "chrome" as const, index: null }));
-
   const statusMessage = layoutStatusMessage(options);
 
-  const lines = [
+  return assembleScreen(
     paintHeader(path, addCount, delCount, width, truecolor),
     paintRule(width, truecolor),
-    ...bodyLines,
-    ...padLines,
-    paintStatus(width, truecolor, statusMessage),
-  ].slice(0, height);
-
-  const allRows: ScreenRow[] = [
-    { kind: "chrome", index: null },
-    { kind: "chrome", index: null },
-    ...bodyScreenRows,
-    ...padScreenRows,
-    { kind: "chrome", index: null },
-  ];
-
-  const rows = allRows.slice(0, height);
-
-  const map: ScreenMap = { rows, panes: [rightBounds] };
-
-  return { lines, map };
+    bodyLines,
+    bodyScreenRows,
+    bodyHeight,
+    statusMessage,
+    width,
+    height,
+    truecolor,
+    [rightBounds],
+  );
 }

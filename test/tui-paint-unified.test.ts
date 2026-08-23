@@ -7,6 +7,11 @@ import type { PaintOptions } from "../src/tui/paint";
 const ADD_BAR_FG = "\x1b[38;2;63;185;80m";
 const DEL_BAR_FG = "\x1b[38;2;248;81;73m";
 
+const NUMBER_WIDTH_FLOOR = 2;
+const GUTTER_SPACE_WIDTH = 1;
+const SIGN_BAR_WIDTH = 1;
+const TEXT_GAP_WIDTH = 1;
+
 const ESCAPE_CHAR = String.fromCharCode(27);
 const CSI_PATTERN = "\\[[0-9;]*m";
 const ANSI_ESCAPE_PATTERN = new RegExp(ESCAPE_CHAR + CSI_PATTERN, "g");
@@ -171,7 +176,7 @@ describe("paintUnified — one-column layout", () => {
     const width = 40;
     const height = 4;
 
-    const { lines, map } = paintUnified(baseOptions({ model: longModel, width, height }));
+    const { lines } = paintUnified(baseOptions({ model: longModel, width, height }));
 
     expect(lines).toHaveLength(height);
 
@@ -181,11 +186,11 @@ describe("paintUnified — one-column layout", () => {
 
     expect(plain).toHaveLength(width);
 
-    const rightPane = map.panes[0];
-    const paneWidth = (rightPane?.textEnd ?? 0) - (rightPane?.textStart ?? 0);
+    const numberWidth = NUMBER_WIDTH_FLOOR;
+    const expectedPaneWidth = width - numberWidth - GUTTER_SPACE_WIDTH - SIGN_BAR_WIDTH - TEXT_GAP_WIDTH;
 
-    expect(plain).toContain("y".repeat(paneWidth));
-    expect(plain).not.toContain("y".repeat(paneWidth + 1));
+    expect(plain).toContain("y".repeat(expectedPaneWidth));
+    expect(plain).not.toContain("y".repeat(expectedPaneWidth + 1));
   });
 });
 
