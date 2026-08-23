@@ -17,7 +17,7 @@ export function bodyHeight(height: number): number {
 }
 
 function pageSize(height: number): number {
-  return Math.max(height - HEADER_ROWS - STATUS_ROWS - OVERLAP_ROWS, MIN_PAGE);
+  return Math.max(bodyHeight(height) - OVERLAP_ROWS, MIN_PAGE);
 }
 
 function followScroll(model: DiffModel, scrollTop: number, height: number): number {
@@ -172,7 +172,7 @@ const HIDE_CURSOR = "\x1b[?25l";
 const SHOW_CURSOR = "\x1b[?25h";
 
 export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const model = buildModel(options.before, options.after, options.context, options.minFold);
 
     let state: TuiState = {
@@ -185,6 +185,7 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
     };
 
     let previousLines: string[] = [];
+    let finished = false;
 
     const repaint = () => {
       const result = paint({
@@ -204,25 +205,57 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
       previousLines = result.lines;
     };
 
-    io.write(ENTER_ALT_SCREEN);
-    io.write(HIDE_CURSOR);
-    repaint();
+    const teardown = () => {
+      io.write(SHOW_CURSOR);
+      io.write(LEAVE_ALT_SCREEN);
+      io.cleanup();
+    };
+
+    const finishQuit = (quit: "clean" | "send") => {
+      finished = true;
+      teardown();
+
+      const questions: Question[] = [];
+
+      resolve({ quit, questions });
+    };
+
+    const finishError = (error: unknown) => {
+      if (finished) {
+        return;
+      }
+
+      finished = true;
+      teardown();
+      reject(error instanceof Error ? error : new Error(String(error)));
+    };
+
+    try {
+      io.write(ENTER_ALT_SCREEN);
+      io.write(HIDE_CURSOR);
+      repaint();
+    } catch (error) {
+      finishError(error);
+      return;
+    }
 
     io.onKey((chunk: string) => {
-      const events = parseKeys(chunk);
+      if (finished) {
+        return;
+      }
 
-      state = events.reduce((current, event) => applyKey(current, event, options.height), state);
+      try {
+        const events = parseKeys(chunk);
 
-      repaint();
+        state = events.reduce((current, event) => applyKey(current, event, options.height), state);
 
-      if (state.quit !== "none") {
-        io.write(SHOW_CURSOR);
-        io.write(LEAVE_ALT_SCREEN);
-        io.cleanup();
+        repaint();
 
-        const questions: Question[] = [];
-
-        resolve({ quit: state.quit, questions });
+        if (state.quit !== "none") {
+          finishQuit(state.quit);
+        }
+      } catch (error) {
+        finishError(error);
       }
     });
   });

@@ -317,4 +317,52 @@ describe("runTui", () => {
     expect(fake.writes[0]).toBe("\x1b[?1049h");
     expect(fake.writes[fake.writes.length - 1]).toBe("\x1b[?1049l");
   });
+
+  test("two ctrl q chunks call cleanup exactly once", async () => {
+    const fake = makeFakeIo();
+
+    const resultPromise = runTui(makeOptions(), fake.io);
+
+    fake.feed("\x11");
+    fake.feed("\x11");
+
+    await resultPromise;
+
+    expect(fake.cleanupCalls()).toBe(1);
+  });
+
+  test("a write that throws on the second call rejects, tears down once, and leaves the alt screen", async () => {
+    let handler: ((chunk: string) => void) | null = null;
+    const writes: string[] = [];
+    let callCount = 0;
+    let cleanupCalls = 0;
+
+    const throwingIo: TuiIo = {
+      onKey(nextHandler) {
+        handler = nextHandler;
+      },
+      write(text) {
+        callCount += 1;
+
+        if (callCount === 2) {
+          throw new Error("write failed");
+        }
+
+        writes.push(text);
+      },
+      size() {
+        return { width: 80, height: 24 };
+      },
+      cleanup() {
+        cleanupCalls += 1;
+      },
+    };
+
+    const resultPromise = runTui(makeOptions(), throwingIo);
+
+    await expect(resultPromise).rejects.toThrow("write failed");
+    expect(cleanupCalls).toBe(1);
+    expect(writes).toContain("\x1b[?1049l");
+    expect(handler).toBeNull();
+  });
 });
