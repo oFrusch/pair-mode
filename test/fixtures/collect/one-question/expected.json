@@ -1,0 +1,7 @@
+[
+  {
+    "line": 12,
+    "code": "\tfmt.Println(x)",
+    "text": "why print x here?"
+  }
+]

@@ -1,0 +1,15 @@
+export {
+  backupIfPresent,
+  isPreToolUseRegistered,
+  claudeCodeSettingsPath,
+  registerClaudeCode,
+  codexHooksPath,
+  registerCodex,
+  findMultiEditMatchers,
+  correctMultiEditMatchers,
+  isReExportRegistered,
+  opencodePluginPath,
+  registerOpencode,
+  piExtensionPath,
+  registerPi,
+} from "./register";

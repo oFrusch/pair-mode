@@ -1,0 +1,13 @@
+import type { EditItem } from "../../core/simulate";
+
+export interface ParsedPatch {
+  filePath: string;
+  tool: "Write" | "MultiEdit";
+  content?: string;
+  edits?: EditItem[];
+}
+
+export interface HunkLine {
+  old: string | null;
+  new: string | null;
+}
