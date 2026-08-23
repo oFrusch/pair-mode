@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -11,12 +10,7 @@ import type {
   MultiplexerDetection,
   PathResolver,
 } from "./detect.types";
-
-// The default resolver shells out to `which` for a real PATH lookup.
-const defaultResolvesOnPath: PathResolver = (command) => {
-  const result = spawnSync("which", [command], { stdio: "ignore" });
-  return result.status === 0;
-};
+import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
 
 interface CliSpec {
   name: CliName;

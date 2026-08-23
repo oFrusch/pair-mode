@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { isEnabled } from "../core/state";
 import { simulate } from "../core/simulate";
 import { runPair } from "../core/run";
@@ -6,23 +5,7 @@ import { loadConfig, DEFAULT_CONFIG } from "../core/config";
 import { trace } from "../core/trace";
 import type { PairConfig } from "../core/config.types";
 import { isEntryPoint } from "./entry-point";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function readPayload(): unknown {
-  const text = readFileSync(0, "utf-8");
-  return JSON.parse(text);
-}
-
-function readFileOrEmpty(path: string): string {
-  try {
-    return readFileSync(path, "utf-8");
-  } catch {
-    return "";
-  }
-}
+import { isRecord, readFileOrEmpty, readPayload } from "../helpers";
 
 async function main(config: PairConfig): Promise<number> {
   const payload = readPayload();

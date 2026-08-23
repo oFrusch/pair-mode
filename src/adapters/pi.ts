@@ -1,21 +1,10 @@
-import { readFileSync } from "node:fs";
 import { isEnabled } from "../core/state";
 import { simulate } from "../core/simulate";
 import { runPair as defaultRunPair } from "../core/run";
 import { loadConfig } from "../core/config";
 import type { PiExtensionAPI, PiToolCallEvent, PiToolCallResult, RunPairFn } from "./pi.types";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function readFileOrEmpty(path: string): string {
-  try {
-    return readFileSync(path, "utf-8");
-  } catch {
-    return "";
-  }
-}
+import type { SimulateCall } from "./adapter.types";
+import { isRecord, readFileOrEmpty } from "../helpers";
 
 function isEditItemInput(value: unknown): value is { oldText: string; newText: string } {
   if (!isRecord(value)) {
@@ -23,12 +12,6 @@ function isEditItemInput(value: unknown): value is { oldText: string; newText: s
   }
 
   return typeof value["oldText"] === "string" && typeof value["newText"] === "string";
-}
-
-interface SimulateCall {
-  tool: string;
-  input: Record<string, unknown>;
-  filePath: string;
 }
 
 // Translates pi's "write" and "edit" tool input into the tool name and shape simulate() understands.
@@ -44,34 +27,28 @@ function toSimulateCall(toolName: string, input: unknown): SimulateCall | null {
     return null;
   }
 
-  if (toolName === "write") {
-    const contentValue = input["content"];
-    const content = typeof contentValue === "string" ? contentValue : "";
+  switch (toolName) {
+    case 'write':
+      const contentValue = input["content"];
+      const content = typeof contentValue === "string" ? contentValue : "";
 
-    return { tool: "Write", input: { file_path: filePath, content }, filePath };
-  }
+      return { tool: "Write", input: { file_path: filePath, content }, filePath };
+    case 'edit':
+      const editsValue = input["edits"];
 
-  if (toolName === "edit") {
-    const editsValue = input["edits"];
-
-    if (!Array.isArray(editsValue)) {
-      return null;
-    }
-
-    const edits: Record<string, unknown>[] = [];
-
-    for (const item of editsValue) {
-      if (!isEditItemInput(item)) {
+      if (!Array.isArray(editsValue)) {
         return null;
       }
 
-      edits.push({ old_string: item.oldText, new_string: item.newText });
-    }
+      const edits: Record<string, unknown>[] = editsValue
+        .filter(isEditItemInput)
+        .map(({ oldText, newText }) => ({ old_string: oldText, new_string: newText }))
 
-    return { tool: "MultiEdit", input: { file_path: filePath, edits }, filePath };
+      return { tool: "MultiEdit", input: { file_path: filePath, edits }, filePath };
+    default:
+      return null
+
   }
-
-  return null;
 }
 
 // The pi extension's tool_call hook. Every failure resolves to { block: false } so a broken pair mode never blocks a write.

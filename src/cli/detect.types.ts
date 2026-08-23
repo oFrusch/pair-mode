@@ -1,6 +1,8 @@
+import type { PathResolver } from "../helpers/helpers.types";
+
 export type CliName = "claude-code" | "codex" | "opencode" | "pi";
 
-export type PathResolver = (command: string) => boolean;
+export type { PathResolver };
 
 export interface CliDetection {
   name: CliName;

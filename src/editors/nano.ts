@@ -1,14 +1,8 @@
 // nano has no syntax engine here, so a changed row gets only the background band, no language colour.
 import { mkdirSync, writeFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import type { Editor, EditorContext, EditorLaunch, PathResolver } from "./editor.types";
-
-// The default resolver shells out to `which` for a real PATH lookup.
-const defaultResolvesOnPath: PathResolver = (command) => {
-  const result = spawnSync("which", [command], { stdio: "ignore" });
-  return result.status === 0;
-};
+import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
 
 function writeNanorc(configDir: string, theme: EditorContext["theme"]): string {
   const text =

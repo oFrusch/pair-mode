@@ -1,4 +1,5 @@
 import type { Theme } from "../core/config.types";
+import type { PathResolver } from "../helpers/helpers.types";
 
 export interface EditorLaunch {
   argv: string[];
@@ -21,4 +22,4 @@ export interface Editor {
   headerHint(): string[];
 }
 
-export type PathResolver = (command: string) => boolean;
+export type { PathResolver };

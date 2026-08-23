@@ -4,6 +4,7 @@ import { runSetup } from "./setup";
 import { runDoctor } from "./doctor";
 import { pairOn, pairOff, pairStatus } from "./toggle";
 import { installRoot } from "./install-root";
+import { isRecord } from "../helpers";
 
 const USAGE = `pair-mode <command> [directory]
 
@@ -16,10 +17,6 @@ Commands:
   --version print the installed version
   --help    print this message
 `;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function readVersion(): string {
   const pkgPath = join(installRoot(), "package.json");

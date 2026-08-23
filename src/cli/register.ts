@@ -1,10 +1,9 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { HookEntry, HookGroup, RegisterResult } from "./register.types";
+import { isRecord } from "../helpers";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+const HOOK_TIMEOUT_SECONDS = 1800;
 
 function isHookEntry(value: unknown): value is HookEntry {
   if (!isRecord(value)) {
@@ -162,7 +161,7 @@ export function claudeCodeSettingsPath(homeDir: string): string {
 export function registerClaudeCode(homeDir: string, installRoot: string): RegisterResult {
   const path = claudeCodeSettingsPath(homeDir);
   const command = join(installRoot, "dist", "claude-code.js");
-  return registerPreToolUseHook(path, "Write|Edit|MultiEdit", command, 1800);
+  return registerPreToolUseHook(path, "Write|Edit|MultiEdit", command, HOOK_TIMEOUT_SECONDS);
 }
 
 export function codexHooksPath(homeDir: string): string {
@@ -172,7 +171,7 @@ export function codexHooksPath(homeDir: string): string {
 export function registerCodex(homeDir: string, installRoot: string): RegisterResult {
   const path = codexHooksPath(homeDir);
   const command = join(installRoot, "dist", "codex.js");
-  return registerPreToolUseHook(path, "apply_patch|Edit|Write", command, 1800);
+  return registerPreToolUseHook(path, "apply_patch|Edit|Write", command, HOOK_TIMEOUT_SECONDS);
 }
 
 // Codex has no MultiEdit alias, so a matcher carrying that token matches nothing there.

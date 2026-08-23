@@ -1,9 +1,6 @@
 import type { EditRequest } from "./run.types";
 import type { EditItem } from "./simulate.types";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+import { isRecord } from "../helpers/isRecord";
 
 function isEditItem(value: unknown): value is EditItem {
   if (!isRecord(value)) {

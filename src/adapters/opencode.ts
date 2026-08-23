@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { isEnabled } from "../core/state";
 import { simulate } from "../core/simulate";
 import { runPair as defaultRunPair } from "../core/run";
@@ -9,24 +8,8 @@ import type {
   OpencodeToolExecuteBeforeOutput,
   RunPairFn,
 } from "./opencode.types";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function readFileOrEmpty(path: string): string {
-  try {
-    return readFileSync(path, "utf-8");
-  } catch {
-    return "";
-  }
-}
-
-interface SimulateCall {
-  tool: string;
-  input: Record<string, unknown>;
-  filePath: string;
-}
+import type { SimulateCall } from "./adapter.types";
+import { isRecord, readFileOrEmpty } from "../helpers";
 
 // Translates opencode's "write" and "edit" tool args into the tool name and shape simulate() understands.
 function toSimulateCall(tool: string, args: Record<string, unknown>): SimulateCall | null {

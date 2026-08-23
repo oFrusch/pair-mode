@@ -1,7 +1,6 @@
-export interface PaneSize {
-  width: string;
-  height: string;
-}
+import type { Pane } from "../core/config.types";
+
+export type PaneSize = Pane;
 
 export interface RunResult {
   ok: boolean;
@@ -20,8 +19,6 @@ export interface SpawnResult {
 }
 
 export type Spawn = (command: string, args: string[]) => SpawnResult;
-
-export type PathResolver = (command: string) => boolean;
 
 export type TtyOpen = () => number;
 

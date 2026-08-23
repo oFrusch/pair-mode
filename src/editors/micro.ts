@@ -1,9 +1,9 @@
-import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Editor, EditorContext, EditorLaunch, PathResolver } from "./editor.types";
 import { syntaxName } from "./languages";
 import { ruleBody } from "./syntax-cache";
+import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
 
 const MICRO_BINDINGS = {
   F2: "QuitAll",
@@ -34,12 +34,6 @@ function bandRules(): string {
 function syntaxHead(lang: string, suffix: string): string {
   return `filetype: pair-${lang}\n\ndetect:\n    filename: "\\\\${suffix}$"\n\nrules:\n`;
 }
-
-// The default resolver shells out to `which` for a real PATH lookup.
-const defaultResolvesOnPath: PathResolver = (command) => {
-  const result = spawnSync("which", [command], { stdio: "ignore" });
-  return result.status === 0;
-};
 
 function writeColorScheme(configDir: string, theme: EditorContext["theme"]): void {
   const dir = join(configDir, "colorschemes");

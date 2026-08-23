@@ -1,17 +1,11 @@
-import { spawnSync } from "node:child_process";
 import { extname } from "node:path";
 import type { Editor, EditorContext, EditorLaunch, PathResolver } from "./editor.types";
 import { syntaxName } from "./languages";
+import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
 
 // The micro syntax name and the vim filetype name diverge only for these entries.
 const VIM_FILETYPE_OVERRIDES: Record<string, string> = {
   python3: "python",
-};
-
-// The default resolver shells out to `which` for a real PATH lookup.
-const defaultResolvesOnPath: PathResolver = (command) => {
-  const result = spawnSync("which", [command], { stdio: "ignore" });
-  return result.status === 0;
 };
 
 function vimFiletype(sourcePath: string): string | null {

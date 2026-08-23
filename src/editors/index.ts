@@ -1,15 +1,9 @@
-import { spawnSync } from "node:child_process";
 import type { PairConfig } from "../core/config.types";
 import type { Editor, EditorContext, EditorLaunch, PathResolver } from "./editor.types";
 import { createMicroEditor } from "./micro";
 import { vimEditor } from "./vim";
 import { createNanoEditor } from "./nano";
-
-// The default resolver shells out to `which` for a real PATH lookup.
-const defaultResolvesOnPath: PathResolver = (command) => {
-  const result = spawnSync("which", [command], { stdio: "ignore" });
-  return result.status === 0;
-};
+import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
 
 // A string array is a raw command. It bypasses every adapter and every syntax feature.
 function createPassthroughEditor(command: string[]): Editor {

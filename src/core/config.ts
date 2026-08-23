@@ -12,6 +12,7 @@ import type {
   ConfigResult,
 } from "./config.types";
 import { DEFAULT_CONTEXT, DEFAULT_MIN_FOLD } from "./marks";
+import { isRecord } from "../helpers/isRecord";
 
 const EDITOR_NAMES: string[] = ["auto", "micro", "nvim", "vim", "nano"];
 const MULTIPLEXER_NAMES: string[] = ["auto", "zellij", "tmux", "none"];
@@ -33,10 +34,6 @@ export const DEFAULT_CONFIG: PairConfig = {
 export function configPath(homeDir?: string): string {
   const base = process.env["XDG_CONFIG_HOME"] || join(homeDir ?? homedir(), ".config");
   return join(base, "pair-mode", "config.json");
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isEditorName(value: unknown): value is EditorName {
