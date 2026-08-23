@@ -13,10 +13,10 @@ const SHEBANG = "#!/usr/bin/env node";
 // Define all entry points to build.
 const entryPoints = [
   { src: "src/cli/index.ts", out: "dist/cli.js" },
-  { src: "src/adapters/claude-code.ts", out: "dist/claude-code.js" },
-  { src: "src/adapters/codex.ts", out: "dist/codex.js" },
-  { src: "src/adapters/opencode.ts", out: "dist/opencode.js" },
-  { src: "src/adapters/pi.ts", out: "dist/pi.js" },
+  { src: "src/adapters/claude-code/claude-code.ts", out: "dist/claude-code.js" },
+  { src: "src/adapters/codex/codex.ts", out: "dist/codex.js" },
+  { src: "src/adapters/opencode/opencode.ts", out: "dist/opencode.js" },
+  { src: "src/adapters/pi/pi.ts", out: "dist/pi.js" },
 ];
 
 // Check which entry points exist.

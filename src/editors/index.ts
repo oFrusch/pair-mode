@@ -1,4 +1,4 @@
-import type { PairConfig } from "../core/config.types";
+import type { PairConfig } from "../core/config";
 import type { Editor, EditorContext, EditorLaunch, PathResolver } from "./editor.types";
 import { createMicroEditor } from "./micro";
 import { vimEditor } from "./vim";

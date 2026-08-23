@@ -10,7 +10,7 @@ import {
   registerPi,
 } from "../src/cli/register";
 import { saveConfig } from "../src/core/config";
-import type { PairConfig } from "../src/core/config.types";
+import type { PairConfig } from "../src/core/config";
 
 let homeDir: string;
 let installDir: string;

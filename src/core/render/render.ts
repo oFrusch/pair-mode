@@ -1,5 +1,5 @@
-import { align, fold } from "./diff";
-import type { RenderInput, RenderResult } from "./render.types";
+import { align, fold } from "../diff";
+import type { RenderInput, RenderResult } from "./types";
 
 const HEADER_LEAD: string[] = [
   "# PAIR MODE. Left pane is the current file. Right pane is the proposal.",

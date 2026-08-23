@@ -19,7 +19,7 @@ beforeAll(async () => {
   bundlePath = join(outDir, "codex.js");
 
   await build({
-    entryPoints: [join(repoRoot, "src/adapters/codex.ts")],
+    entryPoints: [join(repoRoot, "src/adapters/codex/codex.ts")],
     outfile: bundlePath,
     bundle: true,
     platform: "node",

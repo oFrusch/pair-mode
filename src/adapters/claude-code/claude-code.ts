@@ -1,11 +1,11 @@
-import { isEnabled } from "../core/state";
-import { simulate } from "../core/simulate";
-import { runPair } from "../core/run";
-import { loadConfig, DEFAULT_CONFIG } from "../core/config";
-import { trace } from "../core/trace";
-import type { PairConfig } from "../core/config.types";
-import { isEntryPoint } from "./entry-point";
-import { isRecord, readFileOrEmpty, readPayload } from "../helpers";
+import { isEnabled } from "../../core/state";
+import { simulate } from "../../core/simulate";
+import { runPair } from "../../core/run";
+import { loadConfig, DEFAULT_CONFIG } from "../../core/config";
+import { trace } from "../../core/trace";
+import type { PairConfig } from "../../core/config";
+import { isEntryPoint } from "../entry-point";
+import { isRecord, readFileOrEmpty, readPayload } from "../../helpers";
 
 async function main(config: PairConfig): Promise<number> {
   const payload = readPayload();

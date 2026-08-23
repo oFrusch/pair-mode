@@ -10,9 +10,9 @@ import type {
   PairConfig,
   ConfigError,
   ConfigResult,
-} from "./config.types";
-import { DEFAULT_CONTEXT, DEFAULT_MIN_FOLD } from "./marks";
-import { isRecord } from "../helpers/isRecord";
+} from "./types";
+import { DEFAULT_CONTEXT, DEFAULT_MIN_FOLD } from "../marks";
+import { isRecord } from "../../helpers/isRecord";
 
 const EDITOR_NAMES: string[] = ["auto", "micro", "nvim", "vim", "nano"];
 const MULTIPLEXER_NAMES: string[] = ["auto", "zellij", "tmux", "none"];

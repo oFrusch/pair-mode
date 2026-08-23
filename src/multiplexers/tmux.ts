@@ -6,7 +6,7 @@ import type {
   Spawn,
   SpawnResult,
 } from "./multiplexer.types";
-import type { PathResolver } from "../helpers/helpers.types";
+import type { PathResolver } from "../helpers/types";
 import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
 
 // The default spawn shells out for real and captures stderr for a failure report.

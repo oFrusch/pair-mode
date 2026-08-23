@@ -1,4 +1,4 @@
-import type { DetectAdapters } from "../multiplexers/multiplexer.types";
+import type { DetectAdapters } from "../../multiplexers/multiplexer.types";
 
 export interface DoctorCheck {
   name: string;

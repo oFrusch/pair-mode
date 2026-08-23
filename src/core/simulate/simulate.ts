@@ -1,6 +1,6 @@
-import type { EditRequest } from "./run.types";
-import type { EditItem } from "./simulate.types";
-import { isRecord } from "../helpers/isRecord";
+import type { EditRequest } from "../run";
+import type { EditItem } from "./types";
+import { isRecord } from "../../helpers/isRecord";
 
 function isEditItem(value: unknown): value is EditItem {
   if (!isRecord(value)) {

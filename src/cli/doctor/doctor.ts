@@ -1,11 +1,11 @@
 import { existsSync, openSync, closeSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { loadConfig, configPath } from "../core/config";
-import { stateDir } from "../core/state";
-import { resolve as resolveEditor } from "../editors/index";
-import { detect as detectMultiplexer } from "../multiplexers/index";
-import { installRoot } from "./install-root";
+import { loadConfig, configPath } from "../../core/config";
+import { stateDir } from "../../core/state";
+import { resolve as resolveEditor } from "../../editors/index";
+import { detect as detectMultiplexer } from "../../multiplexers/index";
+import { installRoot } from "../install-root";
 import {
   claudeCodeSettingsPath,
   codexHooksPath,
@@ -13,8 +13,8 @@ import {
   isReExportRegistered,
   opencodePluginPath,
   piExtensionPath,
-} from "./register";
-import type { DoctorCheck, DoctorOptions, DoctorReport } from "./doctor.types";
+} from "../register";
+import type { DoctorCheck, DoctorOptions, DoctorReport } from "./types";
 
 function checkConfig(): DoctorCheck {
   const result = loadConfig();

@@ -1,0 +1,1 @@
+export { detectInstalls } from "./detect";

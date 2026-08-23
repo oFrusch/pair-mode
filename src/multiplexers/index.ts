@@ -1,4 +1,4 @@
-import type { MultiplexerName } from "../core/config.types";
+import type { MultiplexerName } from "../core/config";
 import type { DetectAdapters, Multiplexer } from "./multiplexer.types";
 import { createZellijMultiplexer } from "./zellij";
 import { createTmuxMultiplexer } from "./tmux";

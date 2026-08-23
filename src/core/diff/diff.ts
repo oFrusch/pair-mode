@@ -1,7 +1,7 @@
 import { diffArrays } from "diff";
 import type { ArrayChange } from "diff";
-import type { Opcode, Row, Panes } from "./diff.types";
-import { MARK_OLD, MARK_NEW, MARK_SAME, FOLD_PREFIX } from "./marks";
+import type { Opcode, Row, Panes } from "./types";
+import { MARK_OLD, MARK_NEW, MARK_SAME, FOLD_PREFIX } from "../marks";
 
 export function mergeChangedPair(
   first: ArrayChange<string>,

@@ -1,5 +1,5 @@
-import { opcodes } from "./diff";
-import type { Question } from "./collect.types";
+import { opcodes } from "../diff";
+import type { Question } from "./types";
 
 export function anchor(
   original: string[],

@@ -17,7 +17,7 @@ beforeAll(async () => {
   bundlePath = join(outDir, "claude-code.js");
 
   await build({
-    entryPoints: [join(repoRoot, "src/adapters/claude-code.ts")],
+    entryPoints: [join(repoRoot, "src/adapters/claude-code/claude-code.ts")],
     outfile: bundlePath,
     bundle: true,
     platform: "node",
@@ -203,7 +203,7 @@ test("malformed JSON on stdin exits 0", () => {
 
 test("importing the module as a library does not read stdin or call process.exit", async () => {
   // Before the entry-point guard, importing this file read fd 0 (blocking here) and called process.exit, killing the test runner.
-  await expect(import("../src/adapters/claude-code")).resolves.toBeDefined();
+  await expect(import("../src/adapters/claude-code/claude-code")).resolves.toBeDefined();
 });
 
 test("the rendered header carries the resolved editor's own key hint, not micro's hardcoded one", () => {

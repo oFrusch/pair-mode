@@ -1,6 +1,6 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import type { PairConfig } from "./config.types";
+import type { PairConfig } from "./config";
 import { stateDir } from "./state";
 
 export function trace(message: string, config: PairConfig): void {

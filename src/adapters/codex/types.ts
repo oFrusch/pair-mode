@@ -1,4 +1,4 @@
-import type { EditItem } from "../core/simulate.types";
+import type { EditItem } from "../../core/simulate";
 
 export interface ParsedPatch {
   filePath: string;

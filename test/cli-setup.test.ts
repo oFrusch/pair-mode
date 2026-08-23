@@ -12,9 +12,9 @@ import {
 } from "../src/cli/register";
 import { runSetup } from "../src/cli/setup";
 import { pairOn, pairOff, pairStatus } from "../src/cli/toggle";
-import type { Prompter } from "../src/cli/setup.types";
+import type { Prompter } from "../src/cli/setup";
 import { configPath, loadConfig, saveConfig } from "../src/core/config";
-import type { PairConfig } from "../src/core/config.types";
+import type { PairConfig } from "../src/core/config";
 
 let homeDir: string;
 let installDir: string;

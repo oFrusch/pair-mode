@@ -9,8 +9,8 @@ import type {
   InstallReport,
   MultiplexerDetection,
   PathResolver,
-} from "./detect.types";
-import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
+} from "./types";
+import { defaultResolvesOnPath } from "../../helpers/resolvesOnPath";
 
 interface CliSpec {
   name: CliName;

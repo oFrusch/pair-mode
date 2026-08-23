@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { HookEntry, HookGroup, RegisterResult } from "./register.types";
-import { isRecord } from "../helpers";
+import type { HookEntry, HookGroup, RegisterResult } from "./types";
+import { isRecord } from "../../helpers";
 
 const HOOK_TIMEOUT_SECONDS = 1800;
 

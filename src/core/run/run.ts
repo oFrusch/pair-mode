@@ -2,15 +2,15 @@ import { randomBytes } from "node:crypto";
 import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { PairConfig } from "./config.types";
-import type { EditRequest, RunVerdict } from "./run.types";
-import type { RenderInput } from "./render.types";
-import { renderSplit, renderInline } from "./render";
-import { isEnabled, stateDir } from "./state";
-import { collect, formatQuestions } from "./collect";
-import { resolve } from "../editors";
-import { detect } from "../multiplexers";
-import type { RunResult } from "../multiplexers/multiplexer.types";
+import type { PairConfig } from "../config";
+import type { EditRequest, RunVerdict } from "./types";
+import type { RenderInput } from "../render";
+import { renderSplit, renderInline } from "../render";
+import { isEnabled, stateDir } from "../state";
+import { collect, formatQuestions } from "../collect";
+import { resolve } from "../../editors";
+import { detect } from "../../multiplexers";
+import type { RunResult } from "../../multiplexers/multiplexer.types";
 
 // Same trailing-newline convention as render.ts: a lone trailing empty element is dropped.
 function splitLines(text: string): string[] {

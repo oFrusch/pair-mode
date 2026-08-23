@@ -1,15 +1,15 @@
-import { isEnabled } from "../core/state";
-import { simulate } from "../core/simulate";
-import { runPair as defaultRunPair } from "../core/run";
-import { loadConfig } from "../core/config";
+import { isEnabled } from "../../core/state";
+import { simulate } from "../../core/simulate";
+import { runPair as defaultRunPair } from "../../core/run";
+import { loadConfig } from "../../core/config";
 import type {
   OpencodePlugin,
   OpencodeToolExecuteBeforeInput,
   OpencodeToolExecuteBeforeOutput,
   RunPairFn,
-} from "./opencode.types";
-import type { SimulateCall } from "./adapter.types";
-import { isRecord, readFileOrEmpty } from "../helpers";
+} from "./types";
+import type { SimulateCall } from "../adapter.types";
+import { isRecord, readFileOrEmpty } from "../../helpers";
 
 // Translates opencode's "write" and "edit" tool args into the tool name and shape simulate() understands.
 function toSimulateCall(tool: string, args: Record<string, unknown>): SimulateCall | null {

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect, describe } from "vitest";
 import { anchor, collect, formatQuestions } from "../src/core/collect";
-import type { Question } from "../src/core/collect.types";
+import type { Question } from "../src/core/collect";
 
 const fixturesDir = join(__dirname, "fixtures/collect");
 

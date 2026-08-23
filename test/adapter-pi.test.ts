@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test, expect, beforeEach, afterEach } from "vitest";
 import { enable } from "../src/core/state";
 import { handleToolCall } from "../src/adapters/pi";
-import type { RunPairFn } from "../src/adapters/pi.types";
+import type { RunPairFn } from "../src/adapters/pi";
 
 let xdgStateHome: string;
 let originalXdgStateHome: string | undefined;

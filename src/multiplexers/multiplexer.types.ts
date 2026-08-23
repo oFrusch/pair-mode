@@ -1,4 +1,4 @@
-import type { Pane } from "../core/config.types";
+import type { Pane } from "../core/config";
 
 export type PaneSize = Pane;
 

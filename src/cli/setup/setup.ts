@@ -1,10 +1,10 @@
 import { createInterface } from "node:readline/promises";
 import { homedir } from "node:os";
-import { configPath, loadConfig, saveConfig } from "../core/config";
-import type { EditorName, Layout, MultiplexerName, PairConfig } from "../core/config.types";
-import { detectInstalls } from "./detect";
-import { installRoot } from "./install-root";
-import { runDoctor } from "./doctor";
+import { configPath, loadConfig, saveConfig } from "../../core/config";
+import type { EditorName, Layout, MultiplexerName, PairConfig } from "../../core/config";
+import { detectInstalls } from "../detect";
+import { installRoot } from "../install-root";
+import { runDoctor } from "../doctor";
 import {
   backupIfPresent,
   correctMultiEditMatchers,
@@ -13,8 +13,8 @@ import {
   registerCodex,
   registerOpencode,
   registerPi,
-} from "./register";
-import type { Prompter, SetupOptions, SetupResult } from "./setup.types";
+} from "../register";
+import type { Prompter, SetupOptions, SetupResult } from "./types";
 
 const EDITOR_NAMES: EditorName[] = ["auto", "micro", "nvim", "vim", "nano"];
 const MULTIPLEXER_NAMES: MultiplexerName[] = ["auto", "zellij", "tmux", "none"];

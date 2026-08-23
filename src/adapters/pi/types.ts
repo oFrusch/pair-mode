@@ -1,5 +1,5 @@
-import type { EditRequest, RunVerdict } from "../core/run.types";
-import type { PairConfig } from "../core/config.types";
+import type { EditRequest, RunVerdict } from "../../core/run";
+import type { PairConfig } from "../../core/config";
 
 export type RunPairFn = (request: EditRequest, config: PairConfig) => Promise<RunVerdict>;
 

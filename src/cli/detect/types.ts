@@ -1,4 +1,4 @@
-import type { PathResolver } from "../helpers/helpers.types";
+import type { PathResolver } from "../../helpers/types";
 
 export type CliName = "claude-code" | "codex" | "opencode" | "pi";
 

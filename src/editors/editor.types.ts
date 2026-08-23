@@ -1,5 +1,5 @@
-import type { Theme } from "../core/config.types";
-import type { PathResolver } from "../helpers/helpers.types";
+import type { Theme } from "../core/config";
+import type { PathResolver } from "../helpers/types";
 
 export interface EditorLaunch {
   argv: string[];
