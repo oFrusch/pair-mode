@@ -42,8 +42,7 @@ export function formatQuestions(questions: Question[], path: string): string {
   ];
 
   const body = questions.flatMap((question) => {
-    const lineText =
-      question.line !== null ? [`  line ${question.line}: ${question.code}`] : [];
+    const lineText = question.line !== null ? [`  line ${question.line}: ${question.code}`] : [];
 
     return [...lineText, `       Q: ${question.text}`, ""];
   });

@@ -1,11 +1,5 @@
 import { spawnSync } from "node:child_process";
-import type {
-  Multiplexer,
-  PaneSize,
-  RunResult,
-  Spawn,
-  SpawnResult,
-} from "./multiplexer.types";
+import type { Multiplexer, PaneSize, RunResult, Spawn, SpawnResult } from "./multiplexer.types";
 import type { PathResolver } from "../helpers/types";
 import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
 

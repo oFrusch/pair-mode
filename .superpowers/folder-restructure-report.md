@@ -8,6 +8,7 @@ Every logic module that owned a private `.types.ts` file became a folder:
 file locations, and new barrel files.
 
 Converted:
+
 - `src/adapters/claude-code/` — claude-code.ts and index.ts. This module owns no
   private types file.
 - `src/adapters/codex/` — codex.ts, types.ts, index.ts
