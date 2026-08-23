@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { parse } from "yaml";
 import { test, expect, beforeEach } from "vitest";
 import { createMicroEditor } from "../src/editors/micro";
 import type { EditorContext } from "../src/editors/editor.types";
@@ -63,24 +64,34 @@ test("pair.micro carries the theme background values", () => {
   expect(text).toContain(`color-link pairskip "#6a6a6a,${theme.fold}"`);
 });
 
-test("the generated syntax YAML ends with the band regions", () => {
+test("the generated syntax YAML ends with the band regions, each a region with start and end", () => {
   const editor = createMicroEditor();
   editor.prepare(context());
 
   const text = readFileSync(join(configDir, "syntax", "pair-go.yaml"), "utf-8");
+  const parsed = parse(text);
+  const bandRules = parsed.rules.slice(-4);
+  const names = bandRules.map((rule: Record<string, unknown>) => Object.keys(rule)[0]);
 
-  expect(text.trimEnd().endsWith('- comment:\n      start: "^#"\n      end: "$"')).toBe(true);
-  expect(text).toContain('start: "^▌▌\\\\+"');
+  expect(names).toEqual(["pairadd", "pairdel", "pairskip", "comment"]);
+
+  for (const rule of bandRules) {
+    const body = Object.values(rule)[0] as Record<string, unknown>;
+
+    expect(body).toHaveProperty("start");
+    expect(body).toHaveProperty("end", "$");
+  }
 });
 
-test("the generated syntax YAML has no single backslash before . or + in a quoted string", () => {
+test("the generated syntax YAML round-trips pairadd's start to a single backslash before the plus", () => {
   const editor = createMicroEditor();
   editor.prepare(context());
 
   const text = readFileSync(join(configDir, "syntax", "pair-go.yaml"), "utf-8");
-  const withoutDoubledBackslashes = text.replaceAll("\\\\", "");
+  const parsed = parse(text);
+  const bandRules = parsed.rules.slice(-4);
 
-  expect(withoutDoubledBackslashes).not.toMatch(/\\[.+]/);
+  expect(bandRules[0].pairadd.start).toBe("^▌▌\\+");
 });
 
 test("bufferSuffix returns .pair-go for a .go path and .diff for a .xyz path", () => {

@@ -1,9 +1,12 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Editor, EditorContext, EditorLaunch, PathResolver, SyntaxIndent } from "./editor.types";
+import { parse, stringify } from "yaml";
+import type { Editor, EditorContext, EditorLaunch, PathResolver } from "./editor.types";
+import type { BandRule, MicroSyntaxFile, MicroSyntaxSource } from "./micro.types";
 import { syntaxName } from "./languages";
-import { ruleBody } from "./syntax-cache";
+import { syntaxSource } from "./syntax-cache";
 import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
+import { isRecord } from "../helpers/isRecord";
 
 const MICRO_BINDINGS = {
   F2: "QuitAll",
@@ -21,33 +24,22 @@ const MICRO_SETTINGS = {
   colorscheme: "pair",
 };
 
-// The upstream vendored files indent rules with 2 spaces, but nothing guarantees that stays true.
-function ruleIndent(rules: string): SyntaxIndent {
-  const itemMatch = rules.match(/^( +)-\s/m);
-  const itemIndent = itemMatch?.[1] ?? "  ";
-
-  const nestedMatch = rules.match(/^( +)start:\s/m);
-  const nestedIndent = nestedMatch?.[1] ?? itemIndent + "  " + itemIndent;
-
-  return { itemIndent, nestedIndent };
+function isMicroSyntaxSource(value: unknown): value is MicroSyntaxSource {
+  return isRecord(value) && Array.isArray(value["rules"]);
 }
 
 // pairadd and pairskip need micro regions, not plain rules, or the row loses colour mid-line.
-function bandRules({ itemIndent: indent, nestedIndent: nested }: SyntaxIndent): string {
-  const region = (name: string, start: string): string =>
-    `\n${indent}- ${name}:\n${nested}start: "${start}"\n${nested}end: "$"`;
+function bandRules(): BandRule[] {
+  const region = (name: string, start: string): BandRule => ({
+    [name]: { start, end: "$" },
+  });
 
-  return (
-    region("pairadd", "^▌▌\\\\+") +
-    region("pairdel", "^▌▌-") +
-    region("pairskip", "^⋯") +
-    region("comment", "^#") +
-    "\n"
-  );
-}
-
-function syntaxHead(lang: string, suffix: string): string {
-  return `filetype: pair-${lang}\n\ndetect:\n    filename: "\\\\${suffix}$"\n\nrules:\n`;
+  return [
+    region("pairadd", "^▌▌\\+"),
+    region("pairdel", "^▌▌-"),
+    region("pairskip", "^⋯"),
+    region("comment", "^#"),
+  ];
 }
 
 function writeColorScheme(configDir: string, theme: EditorContext["theme"]): void {
@@ -63,11 +55,23 @@ function writeColorScheme(configDir: string, theme: EditorContext["theme"]): voi
   writeFileSync(join(dir, "pair.micro"), text, "utf-8");
 }
 
-// Pure text builder, split out from the filesystem write so tests can parse it without a fake source path.
-export function syntaxText(lang: string, rules: string): string {
+// Builds a real object, then hands it to the yaml library, so indentation is the serializer's problem, not ours.
+export function syntaxText(lang: string, source: string): string | null {
+  const parsed: unknown = parse(source);
+
+  if (!isMicroSyntaxSource(parsed)) {
+    return null;
+  }
+
   const suffix = `.pair-${lang}`;
 
-  return syntaxHead(lang, suffix) + rules.trimEnd() + "\n" + bandRules(ruleIndent(rules));
+  const file: MicroSyntaxFile = {
+    filetype: `pair-${lang}`,
+    detect: { filename: `\\${suffix}$` },
+    rules: [...parsed.rules, ...bandRules()],
+  };
+
+  return stringify(file, { lineWidth: 0 });
 }
 
 function writeSyntax(configDir: string, sourcePath: string): void {
@@ -77,16 +81,22 @@ function writeSyntax(configDir: string, sourcePath: string): void {
     return;
   }
 
-  const rules = ruleBody(lang);
+  const source = syntaxSource(lang);
 
-  if (rules === null) {
+  if (source === null) {
+    return;
+  }
+
+  const text = syntaxText(lang, source);
+
+  if (text === null) {
     return;
   }
 
   const dir = join(configDir, "syntax");
   mkdirSync(dir, { recursive: true });
 
-  writeFileSync(join(dir, `pair-${lang}.yaml`), syntaxText(lang, rules), "utf-8");
+  writeFileSync(join(dir, `pair-${lang}.yaml`), text, "utf-8");
 }
 
 export function createMicroEditor(resolvesOnPath: PathResolver = defaultResolvesOnPath): Editor {
@@ -108,7 +118,7 @@ export function createMicroEditor(resolvesOnPath: PathResolver = defaultResolves
         return ".diff";
       }
 
-      return ruleBody(lang) === null ? ".diff" : `.pair-${lang}`;
+      return syntaxSource(lang) === null ? ".diff" : `.pair-${lang}`;
     },
 
     prepare(context: EditorContext): EditorLaunch {

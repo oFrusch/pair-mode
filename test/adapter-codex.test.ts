@@ -25,6 +25,9 @@ beforeAll(async () => {
     platform: "node",
     format: "esm",
     target: "node20",
+    banner: {
+      js: 'import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);',
+    },
   });
 });
 

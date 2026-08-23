@@ -10,6 +10,9 @@ const projectRoot = path.resolve(__dirname, "..");
 // Every entry point is a hook or CLI a shell invokes directly, so every one needs the shebang and the executable bit.
 const SHEBANG = "#!/usr/bin/env node";
 
+// esbuild leaves a bundled CJS dep's internal require() calls dynamic, which throws under ESM output unless a real require exists.
+const REQUIRE_SHIM = 'import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);';
+
 // Define all entry points to build.
 const entryPoints = [
   { src: "src/cli/index.ts", out: "dist/cli.js" },
@@ -52,7 +55,7 @@ for (const entry of tooBuild) {
       format: "esm",
       target: "node20",
       sourcemap: false,
-      banner: { js: SHEBANG },
+      banner: { js: `${SHEBANG}\n${REQUIRE_SHIM}` },
     });
 
     chmodSync(outfile, 0o755);

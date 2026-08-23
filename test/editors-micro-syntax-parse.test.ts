@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { parse } from "yaml";
 import { test, expect } from "vitest";
 import { syntaxText } from "../src/editors/micro";
-import { ruleBody } from "../src/editors/syntax-cache";
+import { syntaxSource } from "../src/editors/syntax-cache";
 
 const assetsDir = join(import.meta.dirname, "..", "assets", "syntax");
 const languages = readdirSync(assetsDir)
@@ -15,16 +15,24 @@ test("every vendored language has an asset file", () => {
 });
 
 test.each(languages)("generated syntax file for %s parses as YAML", (lang) => {
-  const rules = ruleBody(lang, assetsDir);
+  const source = syntaxSource(lang, assetsDir);
 
-  expect(rules).not.toBeNull();
+  expect(source).not.toBeNull();
 
-  if (rules === null) {
+  if (source === null) {
     return;
   }
 
-  const text = syntaxText(lang, rules);
+  const text = syntaxText(lang, source);
+
+  expect(text).not.toBeNull();
+
+  if (text === null) {
+    return;
+  }
+
   const parsed = parse(text);
+  const upstream = parse(source);
 
   expect(parsed.rules).toBeInstanceOf(Array);
 
@@ -43,4 +51,10 @@ test.each(languages)("generated syntax file for %s parses as YAML", (lang) => {
   const pairadd = bandRules[0].pairadd;
 
   expect(pairadd.start).toBe("^▌▌\\+");
+  expect(parsed.detect.filename).toBe(`\\.pair-${lang}$`);
+
+  const upstreamRuleCount = upstream.rules.length;
+
+  expect(parsed.rules.length).toBe(upstreamRuleCount + 4);
+  expect(parsed.rules.slice(0, upstreamRuleCount)).toEqual(upstream.rules);
 });

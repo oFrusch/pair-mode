@@ -13,11 +13,11 @@ import type {
 } from "./types";
 import { DEFAULT_CONTEXT, DEFAULT_MIN_FOLD } from "../marks";
 import { isRecord } from "../../helpers/isRecord";
+import { isHexColor as isHexColorString } from "../../helpers/hexColor";
 
 const EDITOR_NAMES: string[] = ["auto", "micro", "nvim", "vim", "nano"];
 const MULTIPLEXER_NAMES: string[] = ["auto", "zellij", "tmux", "none"];
 const LAYOUTS: string[] = ["split", "inline"];
-const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 export const DEFAULT_CONFIG: PairConfig = {
   editor: "auto",
@@ -60,7 +60,7 @@ function isPositiveInteger(value: unknown): value is number {
 }
 
 function isHexColor(value: unknown): value is string {
-  return typeof value === "string" && HEX_COLOR.test(value);
+  return typeof value === "string" && isHexColorString(value);
 }
 
 function validateEditor(
