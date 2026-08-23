@@ -56,6 +56,10 @@ function baseOptions(overrides: Partial<PaintOptions> = {}): PaintOptions {
     scrollTop: 0,
     layout: "split",
     selection: null,
+    mode: "browse",
+    draft: "",
+    notes: [],
+    focusedNote: null,
     ...overrides,
   };
 }

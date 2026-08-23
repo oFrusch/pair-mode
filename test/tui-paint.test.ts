@@ -81,6 +81,10 @@ describe("paintSplit — split layout", () => {
       scrollTop: 0,
       layout: "split",
       selection: null,
+      mode: "browse",
+      draft: "",
+      notes: [],
+      focusedNote: null,
     });
 
     expect(lines).toHaveLength(HEIGHT);
@@ -98,6 +102,10 @@ describe("paintSplit — split layout", () => {
       scrollTop: 0,
       layout: "split",
       selection: null,
+      mode: "browse",
+      draft: "",
+      notes: [],
+      focusedNote: null,
     });
 
     const addRowLine = lines[3];
@@ -117,6 +125,10 @@ describe("paintSplit — split layout", () => {
       scrollTop: 0,
       layout: "split",
       selection: null,
+      mode: "browse",
+      draft: "",
+      notes: [],
+      focusedNote: null,
     });
 
     const delRowLine = lines[4];
@@ -136,6 +148,10 @@ describe("paintSplit — split layout", () => {
       scrollTop: 0,
       layout: "split",
       selection: null,
+      mode: "browse",
+      draft: "",
+      notes: [],
+      focusedNote: null,
     });
 
     const replaceRowLine = lines[5];
@@ -158,6 +174,10 @@ describe("paintSplit — split layout", () => {
       scrollTop: 0,
       layout: "split",
       selection: null,
+      mode: "browse",
+      draft: "",
+      notes: [],
+      focusedNote: null,
     });
 
     const addRowLine = lines[3];
@@ -182,6 +202,10 @@ describe("paintSplit — split layout", () => {
       scrollTop: 0,
       layout: "split",
       selection: null,
+      mode: "browse",
+      draft: "",
+      notes: [],
+      focusedNote: null,
     });
 
     const addRowLine = lines[3];
@@ -206,6 +230,10 @@ describe("paintSplit — split layout", () => {
       scrollTop: 0,
       layout: "split",
       selection: null,
+      mode: "browse",
+      draft: "",
+      notes: [],
+      focusedNote: null,
     });
 
     const foldRowLine = lines[6];
@@ -226,6 +254,10 @@ describe("paintSplit — split layout", () => {
       scrollTop: 0,
       layout: "split",
       selection: null,
+      mode: "browse",
+      draft: "",
+      notes: [],
+      focusedNote: null,
     });
 
     expect(map.rows).toHaveLength(lines.length);
@@ -243,6 +275,10 @@ describe("paintSplit — split layout", () => {
       scrollTop: 0,
       layout: "split",
       selection: null,
+      mode: "browse",
+      draft: "",
+      notes: [],
+      focusedNote: null,
     });
 
     const rightPane = map.panes.find((pane) => pane.pane === "right");
@@ -286,6 +322,10 @@ describe("paintSplit — split layout", () => {
       scrollTop: 0,
       layout: "split",
       selection: null,
+      mode: "browse",
+      draft: "",
+      notes: [],
+      focusedNote: null,
     });
 
     expect(lines).toHaveLength(height);
@@ -317,6 +357,10 @@ describe("paintSplit — split layout", () => {
       scrollTop: 0,
       layout: "split",
       selection: null,
+      mode: "browse",
+      draft: "",
+      notes: [],
+      focusedNote: null,
     });
 
     expect(lines).toHaveLength(height);
@@ -337,6 +381,10 @@ describe("paintSplit — split layout", () => {
       scrollTop: 0,
       layout: "split",
       selection: null,
+      mode: "browse",
+      draft: "",
+      notes: [],
+      focusedNote: null,
     });
 
     expect(lines).toHaveLength(height);

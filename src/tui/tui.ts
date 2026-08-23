@@ -4,26 +4,23 @@ import { parseKeys } from "./input/keys";
 import { MOUSE_OFF, MOUSE_ON, splitInput } from "./input/mouse";
 import { buildModel, moveCursor, toggleFold, visibleRows } from "./model";
 import type { DiffModel, VisibleRow } from "./model";
-import { noTokens, paint } from "./paint";
-import { applyMouse, moveSelectionHead, startSelection } from "./selection";
+import { noteFromSelection, toQuestions, writeResult } from "./notes";
+import { bodyHeight, noTokens, paint } from "./paint";
+import { applyMouse, cursorRowIndex, moveSelectionHead, startSelection, wholeRowSelection } from "./selection";
 import type { TuiIo, TuiOptions, TuiResult, TuiState } from "./tui.types";
 
-const HEADER_ROWS = 2;
-const STATUS_ROWS = 1;
 const OVERLAP_ROWS = 1;
 const MIN_PAGE = 1;
-const MIN_BODY_HEIGHT = 1;
+const NOTE_PANE = "right";
 
-export function bodyHeight(height: number): number {
-  return Math.max(height - HEADER_ROWS - STATUS_ROWS, MIN_BODY_HEIGHT);
+export { bodyHeight };
+
+function pageSize(state: TuiState, height: number): number {
+  return Math.max(bodyHeight(height, state.notes.length, state.mode) - OVERLAP_ROWS, MIN_PAGE);
 }
 
-function pageSize(height: number): number {
-  return Math.max(bodyHeight(height) - OVERLAP_ROWS, MIN_PAGE);
-}
-
-function followScroll(model: DiffModel, scrollTop: number, height: number): number {
-  const bodyRows = bodyHeight(height);
+function followScroll(state: TuiState, model: DiffModel, scrollTop: number, height: number): number {
+  const bodyRows = bodyHeight(height, state.notes.length, state.mode);
   const lastBodyRow = scrollTop + bodyRows - 1;
 
   if (model.cursor < scrollTop) {
@@ -35,6 +32,13 @@ function followScroll(model: DiffModel, scrollTop: number, height: number): numb
   }
 
   return scrollTop;
+}
+
+function visibleIndexForRow(model: DiffModel, rowIndex: number): number {
+  const visible = visibleRows(model);
+  const found = visible.findIndex((entry) => entry.kind === "row" && entry.index === rowIndex);
+
+  return found === -1 ? model.cursor : found;
 }
 
 function isChangedEntry(model: DiffModel, entry: VisibleRow): boolean {
@@ -91,10 +95,131 @@ function toggleFoldAtCursor(model: DiffModel): DiffModel {
 }
 
 function withScroll(state: TuiState, model: DiffModel, height: number): TuiState {
-  return { ...state, model, scrollTop: followScroll(model, state.scrollTop, height) };
+  return { ...state, model, scrollTop: followScroll(state, model, state.scrollTop, height) };
+}
+
+function commitDraft(state: TuiState): TuiState {
+  const cleared: TuiState = { ...state, draft: "", selection: null, mode: "browse" };
+
+  if (state.selection === null) {
+    return cleared;
+  }
+
+  const note = noteFromSelection(state.model, state.selection, state.nextNoteId, state.draft);
+
+  if (note === null) {
+    return cleared;
+  }
+
+  return { ...cleared, notes: [...state.notes, note], nextNoteId: state.nextNoteId + 1 };
+}
+
+function enterNoteMode(state: TuiState): TuiState {
+  if (state.selection !== null) {
+    return { ...state, mode: "note", draft: "" };
+  }
+
+  const rowIndex = cursorRowIndex(state.model);
+
+  if (rowIndex === null) {
+    return state;
+  }
+
+  return { ...state, selection: wholeRowSelection(state.model, rowIndex, NOTE_PANE), mode: "note", draft: "" };
+}
+
+function focusNextNote(state: TuiState): TuiState {
+  if (state.notes.length === 0) {
+    return state;
+  }
+
+  const ids = state.notes.map((note) => note.id);
+  const currentIndex = state.focusedNote === null ? -1 : ids.indexOf(state.focusedNote);
+  const nextId = ids[(currentIndex + 1) % ids.length]!;
+  const note = state.notes.find((candidate) => candidate.id === nextId)!;
+  const model = { ...state.model, cursor: visibleIndexForRow(state.model, note.rowIndex) };
+
+  return { ...state, focusedNote: nextId, model };
+}
+
+export function deleteNote(state: TuiState, id: number): TuiState {
+  const notes = state.notes.filter((note) => note.id !== id);
+
+  if (state.focusedNote !== id) {
+    return { ...state, notes };
+  }
+
+  if (notes.length === 0) {
+    return { ...state, notes, focusedNote: null };
+  }
+
+  const deletedIndex = state.notes.findIndex((note) => note.id === id);
+  const nextIndex = Math.min(deletedIndex, notes.length - 1);
+
+  return { ...state, notes, focusedNote: notes[nextIndex]!.id };
+}
+
+function deleteFocusedNote(state: TuiState): TuiState {
+  return state.focusedNote === null ? state : deleteNote(state, state.focusedNote);
+}
+
+function applyConfirmKey(state: TuiState, key: KeyEvent): TuiState {
+  if (key.ctrl) {
+    return state;
+  }
+
+  if (key.name === "s") {
+    return { ...state, quit: "send" };
+  }
+
+  if (key.name === "d") {
+    return { ...state, quit: "clean" };
+  }
+
+  if (key.name === "escape") {
+    return { ...state, mode: "browse" };
+  }
+
+  return state;
+}
+
+function applyNoteKey(state: TuiState, key: KeyEvent): TuiState {
+  if (key.ctrl) {
+    if (key.name === "s") {
+      return { ...state, quit: "send" };
+    }
+
+    if (key.name === "q" || key.name === "c") {
+      return state.notes.length === 0 ? { ...state, quit: "clean" } : { ...state, mode: "confirm" };
+    }
+
+    return state;
+  }
+
+  if (key.name === "enter") {
+    return commitDraft(state);
+  }
+
+  if (key.name === "escape") {
+    return { ...state, draft: "", mode: "browse" };
+  }
+
+  if (key.name === "backspace") {
+    return { ...state, draft: state.draft.slice(0, -1) };
+  }
+
+  if (key.text !== "") {
+    return { ...state, draft: state.draft + key.text };
+  }
+
+  return state;
 }
 
 export function applyKey(state: TuiState, key: KeyEvent, height: number): TuiState {
+  if (state.mode === "confirm") {
+    return applyConfirmKey(state, key);
+  }
+
   if (state.mode === "help") {
     if (!key.ctrl && key.name === "?") {
       return { ...state, mode: "browse" };
@@ -105,19 +230,23 @@ export function applyKey(state: TuiState, key: KeyEvent, height: number): TuiSta
     }
 
     if (key.ctrl && (key.name === "q" || key.name === "c")) {
-      return { ...state, quit: "clean" };
+      return state.notes.length === 0 ? { ...state, quit: "clean" } : { ...state, mode: "confirm" };
     }
 
     return state;
   }
 
+  if (state.mode === "note") {
+    return applyNoteKey(state, key);
+  }
+
   if (key.ctrl) {
     if (key.name === "d") {
-      return withScroll(state, moveCursor(state.model, pageSize(height)), height);
+      return withScroll(state, moveCursor(state.model, pageSize(state, height)), height);
     }
 
     if (key.name === "u") {
-      return withScroll(state, moveCursor(state.model, -pageSize(height)), height);
+      return withScroll(state, moveCursor(state.model, -pageSize(state, height)), height);
     }
 
     if (key.name === "s") {
@@ -125,7 +254,7 @@ export function applyKey(state: TuiState, key: KeyEvent, height: number): TuiSta
     }
 
     if (key.name === "q" || key.name === "c") {
-      return { ...state, quit: "clean" };
+      return state.notes.length === 0 ? { ...state, quit: "clean" } : { ...state, mode: "confirm" };
     }
 
     return state;
@@ -147,6 +276,18 @@ export function applyKey(state: TuiState, key: KeyEvent, height: number): TuiSta
     if (key.name === "k" || key.name === "up") {
       return moveSelectionHead(state, -1);
     }
+  }
+
+  if (key.name === "a") {
+    return enterNoteMode(state);
+  }
+
+  if (key.name === "tab") {
+    return focusNextNote(state);
+  }
+
+  if (key.name === "d") {
+    return deleteFocusedNote(state);
   }
 
   if (key.name === "j" || key.name === "down") {
@@ -203,6 +344,10 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
       layout: options.layout,
       quit: "none",
       selection: null,
+      notes: [],
+      focusedNote: null,
+      draft: "",
+      nextNoteId: 1,
     };
 
     let previousLines: string[] = [];
@@ -220,6 +365,10 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
         scrollTop: state.scrollTop,
         layout: state.layout,
         selection: state.selection,
+        mode: state.mode,
+        draft: state.draft,
+        notes: state.notes,
+        focusedNote: state.focusedNote,
       });
 
       state = { ...state, map: result.map };
@@ -257,7 +406,11 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
         return;
       }
 
-      const questions: Question[] = [];
+      if (quit === "send") {
+        writeResult(options.resultFile, state.notes);
+      }
+
+      const questions: Question[] = quit === "send" ? toQuestions(state.notes) : [];
 
       resolve({ quit, questions });
     };

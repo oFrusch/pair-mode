@@ -1,5 +1,7 @@
 import type { DiffModel, ScreenMap, ScreenRow } from "../model/model.types";
+import type { Note } from "../notes/notes.types";
 import type { Selection } from "../selection/selection.types";
+import type { Mode } from "../tui.types";
 
 export interface TuiTheme {
   addBar: string;
@@ -41,6 +43,10 @@ export interface PaintOptions {
   scrollTop: number;
   layout: "split" | "unified";
   selection: Selection | null;
+  mode: Mode;
+  draft: string;
+  notes: Note[];
+  focusedNote: number | null;
 }
 
 export interface PaintResult {

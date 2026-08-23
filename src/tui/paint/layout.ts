@@ -1,8 +1,10 @@
 import { basename } from "node:path";
 import { visibleRows } from "../model/model";
 import type { DiffModel, FoldGroup, ModelRow, PaneBounds, RowKind, ScreenMap, ScreenRow, VisibleRow } from "../model/model.types";
+import type { Note } from "../notes/notes.types";
 import { selectionSpanFor } from "../selection";
 import type { Selection } from "../selection/selection.types";
+import type { Mode } from "../tui.types";
 import { changedSpans, layoutStatusMessage } from "./paint";
 import { bg, DEFAULT_BG, DEFAULT_FG, fg, RESET, theme } from "./theme";
 import type {
@@ -27,6 +29,15 @@ const STATUS_ROWS = 1;
 const HEADER_COUNT_GAP_WIDTH = 1;
 const UNIFIED_PANE_COUNT = 1;
 const TEXT_GAP_WIDTH = 1;
+const MIN_BODY_HEIGHT = 1;
+const MARKER_WIDTH = 1;
+const NOTE_MARKER = "●";
+const FOCUSED_NOTE_MARKER = "▸";
+const PANEL_TITLE_ROWS = 1;
+const PANEL_DRAFT_ROWS = 1;
+const PANEL_MAX_HEIGHT = 6;
+const CONFIRM_PANEL_HEIGHT = 2;
+const CURSOR_WIDTH = 1;
 
 const SIGN_BAR: Record<RowKind, SignBarStyle> = {
   context: { leftChar: " ", leftColor: null, rightChar: " ", rightColor: null },
@@ -34,6 +45,43 @@ const SIGN_BAR: Record<RowKind, SignBarStyle> = {
   del: { leftChar: "▌", leftColor: theme.delBar, rightChar: " ", rightColor: null },
   replace: { leftChar: "▌", leftColor: theme.delBar, rightChar: "▌", rightColor: theme.addBar },
 };
+
+export function panelHeight(noteCount: number, mode: Mode): number {
+  if (mode === "confirm") {
+    return CONFIRM_PANEL_HEIGHT;
+  }
+
+  const draftRows = mode === "note" ? PANEL_DRAFT_ROWS : 0;
+  const rowCount = noteCount + draftRows;
+
+  return rowCount === 0 ? 0 : Math.min(rowCount + PANEL_TITLE_ROWS, PANEL_MAX_HEIGHT);
+}
+
+export function bodyHeight(height: number, noteCount: number, mode: Mode): number {
+  return Math.max(height - HEADER_ROWS - STATUS_ROWS - panelHeight(noteCount, mode), MIN_BODY_HEIGHT);
+}
+
+function hasPaneNotes(notes: Note[], pane: "left" | "right"): boolean {
+  return notes.some((note) => note.pane === pane);
+}
+
+function noteSpansFor(notes: Note[], rowIndex: number, pane: "left" | "right"): Span[] {
+  return notes
+    .filter((note) => note.rowIndex === rowIndex && note.pane === pane)
+    .map((note) => ({ start: note.startColumn, end: note.endColumn }));
+}
+
+function isAnnotatedRow(notes: Note[], rowIndex: number, pane: "left" | "right"): boolean {
+  return notes.some((note) => note.rowIndex === rowIndex && note.pane === pane);
+}
+
+function paintMarkerColumn(hasColumn: boolean, annotated: boolean, truecolor: boolean): string {
+  if (!hasColumn) {
+    return "";
+  }
+
+  return annotated ? fg(theme.note, truecolor) + NOTE_MARKER + DEFAULT_FG : " ";
+}
 
 function computeNumberWidth(model: DiffModel): number {
   const numbers = model.rows
@@ -83,7 +131,7 @@ function renderPaneText(
   paneWidth: number,
   rowBand: boolean,
   truecolor: boolean,
-  selectionSpan: Span | null,
+  highlightSpans: Span[],
 ): string {
   const textLength = Math.min(text.length, paneWidth);
   let output = "";
@@ -96,8 +144,8 @@ function renderPaneText(
     const desiredFg = token === undefined ? null : token.color;
 
     const withinSpan = changeSpansForSide.some((span) => column >= span.start && column < span.end);
-    const withinSelection = selectionSpan !== null && column >= selectionSpan.start && column < selectionSpan.end;
-    const desiredBg = withinSelection ? theme.selection : changeColor !== null && (rowBand || withinSpan) ? changeColor : null;
+    const withinHighlight = highlightSpans.some((span) => column >= span.start && column < span.end);
+    const desiredBg = withinHighlight ? theme.selection : changeColor !== null && (rowBand || withinSpan) ? changeColor : null;
 
     if (desiredFg !== currentFg) {
       output += desiredFg === null ? DEFAULT_FG : fg(desiredFg, truecolor);
@@ -125,6 +173,9 @@ function paintModelRow(
   rowBand: boolean,
   truecolor: boolean,
   selection: Selection | null,
+  notes: Note[],
+  hasLeftMarkerColumn: boolean,
+  hasRightMarkerColumn: boolean,
 ): string {
   const bar = SIGN_BAR[row.kind];
   const spans = changedSpans(row.left, row.right);
@@ -140,6 +191,15 @@ function paintModelRow(
   const rightSelectionSpan =
     selection !== null && selection.pane === "right" ? selectionSpanFor(selection, rowIndex, row.right.length) : null;
 
+  const leftHighlights = [
+    ...(leftSelectionSpan === null ? [] : [leftSelectionSpan]),
+    ...noteSpansFor(notes, rowIndex, "left"),
+  ];
+  const rightHighlights = [
+    ...(rightSelectionSpan === null ? [] : [rightSelectionSpan]),
+    ...noteSpansFor(notes, rowIndex, "right"),
+  ];
+
   const leftText = renderPaneText(
     row.left,
     tokens(row.left, row.leftNumber),
@@ -148,7 +208,7 @@ function paintModelRow(
     leftPaneWidth,
     rowBand,
     truecolor,
-    leftSelectionSpan,
+    leftHighlights,
   );
 
   const rightText = renderPaneText(
@@ -159,7 +219,7 @@ function paintModelRow(
     rightPaneWidth,
     rowBand,
     truecolor,
-    rightSelectionSpan,
+    rightHighlights,
   );
 
   const divider = fg(theme.fold, truecolor) + "│" + DEFAULT_FG;
@@ -167,10 +227,12 @@ function paintModelRow(
   return (
     paintGutter(row.leftNumber, numberWidth, truecolor) +
     paintSignBar(bar.leftChar, bar.leftColor, truecolor) +
+    paintMarkerColumn(hasLeftMarkerColumn, isAnnotatedRow(notes, rowIndex, "left"), truecolor) +
     leftText +
     divider +
     paintGutter(row.rightNumber, numberWidth, truecolor) +
     paintSignBar(bar.rightChar, bar.rightColor, truecolor) +
+    paintMarkerColumn(hasRightMarkerColumn, isAnnotatedRow(notes, rowIndex, "right"), truecolor) +
     rightText +
     RESET
   );
@@ -223,29 +285,112 @@ function paintBlankLine(width: number): string {
   return " ".repeat(width) + RESET;
 }
 
+function padPanelLine(content: string, contentLength: number, width: number): string {
+  return content + " ".repeat(Math.max(0, width - contentLength)) + RESET;
+}
+
+function paintPanelTitle(noteCount: number, width: number, truecolor: boolean): string {
+  const text = `NOTES (${noteCount})`.slice(0, width);
+
+  return padPanelLine(fg(theme.note, truecolor) + text + DEFAULT_FG, text.length, width);
+}
+
+function noteAnchorLabel(note: Note): string {
+  return note.line === null ? "L?" : `L${note.line}`;
+}
+
+function paintNoteRow(note: Note, focused: boolean, width: number, truecolor: boolean): string {
+  const marker = focused ? FOCUSED_NOTE_MARKER : NOTE_MARKER;
+  const rest = ` ${noteAnchorLabel(note)} ${note.text}`.slice(0, Math.max(0, width - MARKER_WIDTH));
+
+  return padPanelLine(fg(theme.note, truecolor) + marker + DEFAULT_FG + rest, marker.length + rest.length, width);
+}
+
+function paintDraftRow(draft: string, width: number, truecolor: boolean): string {
+  const text = draft.slice(0, Math.max(0, width - CURSOR_WIDTH));
+  const cursor = bg(theme.chrome, truecolor) + " " + DEFAULT_BG;
+
+  return padPanelLine(text + cursor, text.length + CURSOR_WIDTH, width);
+}
+
+function paintConfirmSummary(noteCount: number, width: number, truecolor: boolean): string {
+  const text = `${noteCount} notes are not sent.`.slice(0, width);
+
+  return padPanelLine(fg(theme.chrome, truecolor) + text + DEFAULT_FG, text.length, width);
+}
+
+function paintConfirmChoices(width: number, truecolor: boolean): string {
+  const choices: Array<[string, string]> = [
+    ["s", " send   "],
+    ["d", " discard and apply the edit   "],
+    ["esc", " back"],
+  ];
+
+  const content = choices.map(([key, label]) => bg(theme.chrome, truecolor) + key + DEFAULT_BG + label).join("");
+  const plainLength = choices.reduce((sum, [key, label]) => sum + key.length + label.length, 0);
+
+  return padPanelLine(content, plainLength, width);
+}
+
+function buildPanel(options: PaintOptions, width: number, truecolor: boolean): UnifiedBodyEntry {
+  const { notes, focusedNote, mode, draft } = options;
+  const height = panelHeight(notes.length, mode);
+
+  if (height === 0) {
+    return { lines: [], screenRows: [] };
+  }
+
+  const chromeRow: ScreenRow = { kind: "chrome", index: null };
+
+  if (mode === "confirm") {
+    return {
+      lines: [paintConfirmSummary(notes.length, width, truecolor), paintConfirmChoices(width, truecolor)],
+      screenRows: [chromeRow, chromeRow],
+    };
+  }
+
+  const draftRows = mode === "note" ? PANEL_DRAFT_ROWS : 0;
+  const availableForNotes = Math.max(0, height - PANEL_TITLE_ROWS - draftRows);
+  const visibleNotes = notes.slice(0, availableForNotes);
+
+  const lines = [
+    paintPanelTitle(notes.length, width, truecolor),
+    ...visibleNotes.map((note) => paintNoteRow(note, note.id === focusedNote, width, truecolor)),
+    ...(mode === "note" ? [paintDraftRow(draft, width, truecolor)] : []),
+  ];
+
+  return { lines, screenRows: lines.map(() => chromeRow) };
+}
+
 function assembleScreen(
   header: string,
   rule: string,
   bodyLines: string[],
   bodyScreenRows: ScreenRow[],
-  bodyHeight: number,
+  bodyRows: number,
+  panelLines: string[],
+  panelScreenRows: ScreenRow[],
   statusMessage: string | null,
   width: number,
   height: number,
   truecolor: boolean,
   panes: PaneBounds[],
 ): PaintResult {
-  const padCount = Math.max(0, bodyHeight - bodyLines.length);
+  const padCount = Math.max(0, bodyRows - bodyLines.length);
   const padLines = Array.from({ length: padCount }, () => paintBlankLine(width));
   const padScreenRows: ScreenRow[] = Array.from({ length: padCount }, () => ({ kind: "chrome" as const, index: null }));
 
-  const lines = [header, rule, ...bodyLines, ...padLines, paintStatus(width, truecolor, statusMessage)].slice(0, height);
+  const lines = [header, rule, ...bodyLines, ...padLines, ...panelLines, paintStatus(width, truecolor, statusMessage)].slice(
+    0,
+    height,
+  );
 
   const allRows: ScreenRow[] = [
     { kind: "chrome", index: null },
     { kind: "chrome", index: null },
     ...bodyScreenRows,
     ...padScreenRows,
+    ...panelScreenRows,
     { kind: "chrome", index: null },
   ];
 
@@ -257,19 +402,24 @@ function assembleScreen(
 }
 
 export function paintSplit(options: PaintOptions): PaintResult {
-  const { model, width, height, path, tokens, truecolor, rowBand, scrollTop, selection } = options;
+  const { model, width, height, path, tokens, truecolor, rowBand, scrollTop, selection, notes, mode } = options;
 
   const numberWidth = computeNumberWidth(model);
+  const hasLeftMarkerColumn = hasPaneNotes(notes, "left");
+  const hasRightMarkerColumn = hasPaneNotes(notes, "right");
+  const leftMarkerWidth = hasLeftMarkerColumn ? MARKER_WIDTH : 0;
+  const rightMarkerWidth = hasRightMarkerColumn ? MARKER_WIDTH : 0;
 
-  const fixedWidth = PANE_COUNT * (numberWidth + GUTTER_SPACE_WIDTH + SIGN_BAR_WIDTH) + DIVIDER_WIDTH;
+  const fixedWidth =
+    PANE_COUNT * (numberWidth + GUTTER_SPACE_WIDTH + SIGN_BAR_WIDTH) + DIVIDER_WIDTH + leftMarkerWidth + rightMarkerWidth;
   const remaining = Math.max(0, width - fixedWidth);
   const leftPaneWidth = Math.floor(remaining / PANE_COUNT);
   const rightPaneWidth = remaining - leftPaneWidth;
 
-  const leftTextStart = numberWidth + GUTTER_SPACE_WIDTH + SIGN_BAR_WIDTH;
+  const leftTextStart = numberWidth + GUTTER_SPACE_WIDTH + SIGN_BAR_WIDTH + leftMarkerWidth;
   const leftTextEnd = leftTextStart + leftPaneWidth;
   const rightGutterStart = leftTextEnd + DIVIDER_WIDTH;
-  const rightTextStart = rightGutterStart + numberWidth + GUTTER_SPACE_WIDTH + SIGN_BAR_WIDTH;
+  const rightTextStart = rightGutterStart + numberWidth + GUTTER_SPACE_WIDTH + SIGN_BAR_WIDTH + rightMarkerWidth;
   const rightTextEnd = rightTextStart + rightPaneWidth;
 
   const leftBounds: PaneBounds = { pane: "left", gutterStart: 0, textStart: leftTextStart, textEnd: leftTextEnd };
@@ -283,8 +433,8 @@ export function paintSplit(options: PaintOptions): PaintResult {
   const addCount = model.rows.filter((row) => row.kind === "add" || row.kind === "replace").length;
   const delCount = model.rows.filter((row) => row.kind === "del" || row.kind === "replace").length;
 
-  const bodyHeight = Math.max(0, height - HEADER_ROWS - STATUS_ROWS);
-  const visible = visibleRows(model).slice(scrollTop, scrollTop + bodyHeight);
+  const bodyRows = bodyHeight(height, notes.length, mode);
+  const visible = visibleRows(model).slice(scrollTop, scrollTop + bodyRows);
 
   const bodyLines = visible.map((entry) =>
     entry.kind === "fold"
@@ -299,6 +449,9 @@ export function paintSplit(options: PaintOptions): PaintResult {
           rowBand,
           truecolor,
           selection,
+          notes,
+          hasLeftMarkerColumn,
+          hasRightMarkerColumn,
         ),
   );
 
@@ -306,12 +459,16 @@ export function paintSplit(options: PaintOptions): PaintResult {
     entry.kind === "fold" ? { kind: "fold", index: entry.foldIndex } : { kind: "row", index: entry.index },
   );
 
+  const panel = buildPanel(options, width, truecolor);
+
   return assembleScreen(
     paintHeader(path, addCount, delCount, width, truecolor),
     paintRule(width, truecolor),
     bodyLines,
     bodyScreenRows,
-    bodyHeight,
+    bodyRows,
+    panel.lines,
+    panel.screenRows,
     null,
     width,
     height,
@@ -337,14 +494,17 @@ function paintUnifiedHalf(
   textWidth: number,
   rowBand: boolean,
   truecolor: boolean,
-  selectionSpan: Span | null,
+  highlightSpans: Span[],
+  hasMarkerColumn: boolean,
+  annotated: boolean,
 ): string {
   const bar = UNIFIED_SIGN_BAR[halfKind];
-  const rendered = renderPaneText(text, tokens, spans, changeColor, textWidth, rowBand, truecolor, selectionSpan);
+  const rendered = renderPaneText(text, tokens, spans, changeColor, textWidth, rowBand, truecolor, highlightSpans);
 
   return (
     paintGutter(lineNumber, numberWidth, truecolor) +
     paintSignBar(bar.char, bar.color, truecolor) +
+    paintMarkerColumn(hasMarkerColumn, annotated, truecolor) +
     " ".repeat(TEXT_GAP_WIDTH) +
     rendered +
     RESET
@@ -361,6 +521,8 @@ function paintUnifiedBodyEntry(
   rowBand: boolean,
   truecolor: boolean,
   selection: Selection | null,
+  notes: Note[],
+  hasMarkerColumn: boolean,
 ): UnifiedBodyEntry {
   if (entry.kind === "fold") {
     return {
@@ -376,6 +538,7 @@ function paintUnifiedBodyEntry(
 
   if (row.kind === "context") {
     const selectionSpan = hasSelection ? selectionSpanFor(selection, entry.index, row.right.length) : null;
+    const highlights = [...(selectionSpan === null ? [] : [selectionSpan]), ...noteSpansFor(notes, entry.index, "right")];
     const line = paintUnifiedHalf(
       "context",
       row.rightNumber,
@@ -387,7 +550,9 @@ function paintUnifiedBodyEntry(
       textWidth,
       rowBand,
       truecolor,
-      selectionSpan,
+      highlights,
+      hasMarkerColumn,
+      isAnnotatedRow(notes, entry.index, "right"),
     );
 
     return { lines: [line], screenRows: [screenRow] };
@@ -395,6 +560,7 @@ function paintUnifiedBodyEntry(
 
   if (row.kind === "add") {
     const selectionSpan = hasSelection ? selectionSpanFor(selection, entry.index, row.right.length) : null;
+    const highlights = [...(selectionSpan === null ? [] : [selectionSpan]), ...noteSpansFor(notes, entry.index, "right")];
     const line = paintUnifiedHalf(
       "add",
       row.rightNumber,
@@ -406,7 +572,9 @@ function paintUnifiedBodyEntry(
       textWidth,
       rowBand,
       truecolor,
-      selectionSpan,
+      highlights,
+      hasMarkerColumn,
+      isAnnotatedRow(notes, entry.index, "right"),
     );
 
     return { lines: [line], screenRows: [screenRow] };
@@ -414,6 +582,7 @@ function paintUnifiedBodyEntry(
 
   if (row.kind === "del") {
     const selectionSpan = hasSelection ? selectionSpanFor(selection, entry.index, row.left.length) : null;
+    const highlights = [...(selectionSpan === null ? [] : [selectionSpan]), ...noteSpansFor(notes, entry.index, "left")];
     const line = paintUnifiedHalf(
       "del",
       row.leftNumber,
@@ -425,7 +594,9 @@ function paintUnifiedBodyEntry(
       textWidth,
       rowBand,
       truecolor,
-      selectionSpan,
+      highlights,
+      hasMarkerColumn,
+      isAnnotatedRow(notes, entry.index, "left"),
     );
 
     return { lines: [line], screenRows: [screenRow] };
@@ -433,6 +604,8 @@ function paintUnifiedBodyEntry(
 
   const delSelectionSpan = hasSelection ? selectionSpanFor(selection, entry.index, row.left.length) : null;
   const addSelectionSpan = hasSelection ? selectionSpanFor(selection, entry.index, row.right.length) : null;
+  const delHighlights = [...(delSelectionSpan === null ? [] : [delSelectionSpan]), ...noteSpansFor(notes, entry.index, "left")];
+  const addHighlights = [...(addSelectionSpan === null ? [] : [addSelectionSpan]), ...noteSpansFor(notes, entry.index, "right")];
 
   const delLine = paintUnifiedHalf(
     "del",
@@ -445,7 +618,9 @@ function paintUnifiedBodyEntry(
     textWidth,
     rowBand,
     truecolor,
-    delSelectionSpan,
+    delHighlights,
+    hasMarkerColumn,
+    isAnnotatedRow(notes, entry.index, "left"),
   );
 
   const addLine = paintUnifiedHalf(
@@ -459,18 +634,22 @@ function paintUnifiedBodyEntry(
     textWidth,
     rowBand,
     truecolor,
-    addSelectionSpan,
+    addHighlights,
+    hasMarkerColumn,
+    isAnnotatedRow(notes, entry.index, "right"),
   );
 
   return { lines: [delLine, addLine], screenRows: [screenRow, screenRow] };
 }
 
 export function paintUnified(options: PaintOptions): PaintResult {
-  const { model, width, height, path, tokens, truecolor, rowBand, scrollTop, selection } = options;
+  const { model, width, height, path, tokens, truecolor, rowBand, scrollTop, selection, notes, mode } = options;
 
   const numberWidth = computeNumberWidth(model);
+  const hasMarkerColumn = notes.length > 0;
+  const markerWidth = hasMarkerColumn ? MARKER_WIDTH : 0;
 
-  const fixedWidth = UNIFIED_PANE_COUNT * (numberWidth + GUTTER_SPACE_WIDTH + SIGN_BAR_WIDTH) + TEXT_GAP_WIDTH;
+  const fixedWidth = UNIFIED_PANE_COUNT * (numberWidth + GUTTER_SPACE_WIDTH + SIGN_BAR_WIDTH) + markerWidth + TEXT_GAP_WIDTH;
   const textStart = fixedWidth;
   const textWidth = Math.max(0, width - fixedWidth);
   const textEnd = textStart + textWidth;
@@ -480,27 +659,30 @@ export function paintUnified(options: PaintOptions): PaintResult {
   const addCount = model.rows.filter((row) => row.kind === "add" || row.kind === "replace").length;
   const delCount = model.rows.filter((row) => row.kind === "del" || row.kind === "replace").length;
 
-  const bodyHeight = Math.max(0, height - HEADER_ROWS - STATUS_ROWS);
-  const visible = visibleRows(model).slice(scrollTop, scrollTop + bodyHeight);
+  const bodyRows = bodyHeight(height, notes.length, mode);
+  const visible = visibleRows(model).slice(scrollTop, scrollTop + bodyRows);
 
   const entries = visible.map((entry) =>
-    paintUnifiedBodyEntry(entry, model, numberWidth, textWidth, width, tokens, rowBand, truecolor, selection),
+    paintUnifiedBodyEntry(entry, model, numberWidth, textWidth, width, tokens, rowBand, truecolor, selection, notes, hasMarkerColumn),
   );
 
   const rawBodyLines = entries.flatMap((entry) => entry.lines);
   const rawBodyScreenRows = entries.flatMap((entry) => entry.screenRows);
 
-  const bodyLines = rawBodyLines.slice(0, bodyHeight);
-  const bodyScreenRows = rawBodyScreenRows.slice(0, bodyHeight);
+  const bodyLines = rawBodyLines.slice(0, bodyRows);
+  const bodyScreenRows = rawBodyScreenRows.slice(0, bodyRows);
 
   const statusMessage = layoutStatusMessage(options);
+  const panel = buildPanel(options, width, truecolor);
 
   return assembleScreen(
     paintHeader(path, addCount, delCount, width, truecolor),
     paintRule(width, truecolor),
     bodyLines,
     bodyScreenRows,
-    bodyHeight,
+    bodyRows,
+    panel.lines,
+    panel.screenRows,
     statusMessage,
     width,
     height,

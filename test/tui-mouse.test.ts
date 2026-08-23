@@ -163,6 +163,10 @@ function buildMouseState(overrides: Partial<TuiState> = {}): TuiState {
     layout: "split",
     quit: "none",
     selection: null,
+    notes: [],
+    focusedNote: null,
+    draft: "",
+    nextNoteId: 1,
     ...overrides,
   };
 }
@@ -293,6 +297,10 @@ function buildKeyState(overrides: Partial<TuiState> = {}): TuiState {
     layout: "split",
     quit: "none",
     selection: null,
+    notes: [],
+    focusedNote: null,
+    draft: "",
+    nextNoteId: 1,
     ...overrides,
   };
 }
@@ -374,6 +382,7 @@ function makeOptions(overrides: Partial<TuiOptions> = {}): TuiOptions {
     width: 80,
     height: 24,
     truecolor: false,
+    resultFile: "/tmp/pair-mode-test-result.json",
     ...overrides,
   };
 }
@@ -436,6 +445,10 @@ describe("paintSplit — selection layer", () => {
       scrollTop: 0,
       layout: "split",
       selection: paintSelection,
+      mode: "browse",
+      draft: "",
+      notes: [],
+      focusedNote: null,
     });
 
     expect(lines[2]).toContain(SELECTION_BG_TRUECOLOR);
@@ -455,6 +468,10 @@ describe("paintSplit — selection layer", () => {
       scrollTop: 0,
       layout: "split",
       selection: paintSelection,
+      mode: "browse",
+      draft: "",
+      notes: [],
+      focusedNote: null,
     });
 
     expect(lines[3]).not.toContain(SELECTION_BG_TRUECOLOR);

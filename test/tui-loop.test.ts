@@ -20,6 +20,10 @@ function makeState(overrides: Partial<TuiState> = {}): TuiState {
     layout: "split",
     quit: "none",
     selection: null,
+    notes: [],
+    focusedNote: null,
+    draft: "",
+    nextNoteId: 1,
     ...overrides,
   };
 }
@@ -58,7 +62,7 @@ describe("applyKey — cursor movement", () => {
 
     const next = applyKey(state, key("d", true), 10);
 
-    expect(next.model.cursor).toBe(bodyHeight(10) - 1);
+    expect(next.model.cursor).toBe(bodyHeight(10, 0, "browse") - 1);
   });
 });
 
@@ -203,7 +207,7 @@ describe("applyKey — scrollTop follows the cursor", () => {
     );
     let state = makeState({ model });
     const height = 10;
-    const rows = bodyHeight(height);
+    const rows = bodyHeight(height, 0, "browse");
 
     for (let step = 0; step < rows; step += 1) {
       state = applyKey(state, key("j"), height);
@@ -288,6 +292,7 @@ function makeOptions(overrides: Partial<TuiOptions> = {}): TuiOptions {
     width: 80,
     height: 24,
     truecolor: false,
+    resultFile: "/tmp/pair-mode-test-result.json",
     ...overrides,
   };
 }

@@ -19,6 +19,16 @@ function currentRowIndex(model: DiffModel): number | null {
   return entry !== undefined && entry.kind === "row" ? entry.index : null;
 }
 
+export function cursorRowIndex(model: DiffModel): number | null {
+  return currentRowIndex(model);
+}
+
+export function wholeRowSelection(model: DiffModel, rowIndex: number, pane: "left" | "right"): Selection {
+  const length = paneLineLength(model, rowIndex, pane);
+
+  return { pane, anchorRow: rowIndex, anchorColumn: 0, headRow: rowIndex, headColumn: Math.max(length - 1, 0) };
+}
+
 export function moveSelectionHead(state: TuiState, delta: number): TuiState {
   const selection = state.selection;
 
@@ -119,9 +129,33 @@ function paneLineLength(model: DiffModel, rowIndex: number, pane: "left" | "righ
   return pane === "left" ? row.left.length : row.right.length;
 }
 
+function isRepeatDown(state: TuiState, target: ClickTarget & { kind: "row" }): boolean {
+  const selection = state.selection;
+
+  return (
+    state.mode === "select" &&
+    selection !== null &&
+    selection.pane === target.pane &&
+    selection.anchorRow === target.index &&
+    selection.headRow === target.index &&
+    selection.anchorColumn === selection.headColumn
+  );
+}
+
+function openNoteAtRow(state: TuiState, target: ClickTarget & { kind: "row" }): TuiState {
+  const selection = wholeRowSelection(state.model, target.index, target.pane);
+  const model = { ...state.model, cursor: visibleIndexForRow(state.model, target.index) };
+
+  return { ...state, selection, mode: "note", draft: "", model };
+}
+
 function applyMouseDown(state: TuiState, target: ClickTarget): TuiState {
   if (target.kind === "fold") {
     return { ...state, model: toggleFold(state.model, target.foldIndex) };
+  }
+
+  if (isRepeatDown(state, target)) {
+    return openNoteAtRow(state, target);
   }
 
   const selection: Selection = {
