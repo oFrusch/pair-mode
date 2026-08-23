@@ -1,15 +1,8 @@
 import type { Question } from "../core/collect";
 import type { DiffModel, ScreenMap } from "./model/model.types";
+import type { Selection } from "./selection/selection.types";
 
 export type Mode = "browse" | "select" | "note" | "help" | "confirm";
-
-export interface Selection {
-  pane: "left" | "right";
-  anchorRow: number;
-  anchorColumn: number;
-  headRow: number;
-  headColumn: number;
-}
 
 export interface TuiState {
   model: DiffModel;

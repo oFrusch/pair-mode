@@ -1,5 +1,5 @@
 import type { DiffModel, ScreenMap, ScreenRow } from "../model/model.types";
-import type { Selection } from "../tui.types";
+import type { Selection } from "../selection/selection.types";
 
 export interface TuiTheme {
   addBar: string;
@@ -40,7 +40,7 @@ export interface PaintOptions {
   rowBand: boolean;
   scrollTop: number;
   layout: "split" | "unified";
-  selection?: Selection | null;
+  selection: Selection | null;
 }
 
 export interface PaintResult {

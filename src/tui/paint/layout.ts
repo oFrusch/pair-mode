@@ -1,8 +1,8 @@
 import { basename } from "node:path";
 import { visibleRows } from "../model/model";
 import type { DiffModel, FoldGroup, ModelRow, PaneBounds, RowKind, ScreenMap, ScreenRow, VisibleRow } from "../model/model.types";
-import { selectionSpanFor } from "../tui";
-import type { Selection } from "../tui.types";
+import { selectionSpanFor } from "../selection";
+import type { Selection } from "../selection/selection.types";
 import { changedSpans, layoutStatusMessage } from "./paint";
 import { bg, DEFAULT_BG, DEFAULT_FG, fg, RESET, theme } from "./theme";
 import type {
@@ -257,7 +257,7 @@ function assembleScreen(
 }
 
 export function paintSplit(options: PaintOptions): PaintResult {
-  const { model, width, height, path, tokens, truecolor, rowBand, scrollTop, selection = null } = options;
+  const { model, width, height, path, tokens, truecolor, rowBand, scrollTop, selection } = options;
 
   const numberWidth = computeNumberWidth(model);
 
@@ -466,7 +466,7 @@ function paintUnifiedBodyEntry(
 }
 
 export function paintUnified(options: PaintOptions): PaintResult {
-  const { model, width, height, path, tokens, truecolor, rowBand, scrollTop, selection = null } = options;
+  const { model, width, height, path, tokens, truecolor, rowBand, scrollTop, selection } = options;
 
   const numberWidth = computeNumberWidth(model);
 

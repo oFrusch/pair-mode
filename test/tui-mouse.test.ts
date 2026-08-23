@@ -4,8 +4,10 @@ import type { MouseEvent } from "../src/tui/input";
 import { buildModel } from "../src/tui/model";
 import type { DiffModel, ScreenMap } from "../src/tui/model";
 import { noTokens, paintSplit } from "../src/tui/paint";
-import { applyKey, applyMouse, runTui, selectionSpanFor } from "../src/tui/tui";
-import type { Selection, TuiIo, TuiOptions, TuiState } from "../src/tui/tui.types";
+import { applyMouse, selectionSpanFor } from "../src/tui/selection";
+import type { Selection } from "../src/tui/selection";
+import { applyKey, runTui } from "../src/tui/tui";
+import type { TuiIo, TuiOptions, TuiState } from "../src/tui/tui.types";
 import type { KeyEvent } from "../src/tui/input/input.types";
 
 const PRESS = "\x1b[<0;10;5M";

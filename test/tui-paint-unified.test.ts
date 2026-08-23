@@ -55,6 +55,7 @@ function baseOptions(overrides: Partial<PaintOptions> = {}): PaintOptions {
     rowBand: false,
     scrollTop: 0,
     layout: "split",
+    selection: null,
     ...overrides,
   };
 }
