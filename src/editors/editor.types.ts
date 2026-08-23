@@ -22,4 +22,9 @@ export interface Editor {
   headerHint(): string[];
 }
 
+export interface SyntaxIndent {
+  itemIndent: string;
+  nestedIndent: string;
+}
+
 export type { PathResolver };

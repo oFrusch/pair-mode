@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Editor, EditorContext, EditorLaunch, PathResolver } from "./editor.types";
+import type { Editor, EditorContext, EditorLaunch, PathResolver, SyntaxIndent } from "./editor.types";
 import { syntaxName } from "./languages";
 import { ruleBody } from "./syntax-cache";
 import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
@@ -21,13 +21,28 @@ const MICRO_SETTINGS = {
   colorscheme: "pair",
 };
 
+// The upstream vendored files indent rules with 2 spaces, but nothing guarantees that stays true.
+function ruleIndent(rules: string): SyntaxIndent {
+  const itemMatch = rules.match(/^( +)-\s/m);
+  const itemIndent = itemMatch?.[1] ?? "  ";
+
+  const nestedMatch = rules.match(/^( +)start:\s/m);
+  const nestedIndent = nestedMatch?.[1] ?? itemIndent + "  " + itemIndent;
+
+  return { itemIndent, nestedIndent };
+}
+
 // pairadd and pairskip need micro regions, not plain rules, or the row loses colour mid-line.
-function bandRules(): string {
+function bandRules({ itemIndent: indent, nestedIndent: nested }: SyntaxIndent): string {
+  const region = (name: string, start: string): string =>
+    `\n${indent}- ${name}:\n${nested}start: "${start}"\n${nested}end: "$"`;
+
   return (
-    '\n    - pairadd:\n        start: "^▌▌\\\\+"\n        end: "$"' +
-    '\n    - pairdel:\n        start: "^▌▌-"\n        end: "$"' +
-    '\n    - pairskip:\n        start: "^⋯"\n        end: "$"' +
-    '\n    - comment:\n        start: "^#"\n        end: "$"\n'
+    region("pairadd", "^▌▌\\\\+") +
+    region("pairdel", "^▌▌-") +
+    region("pairskip", "^⋯") +
+    region("comment", "^#") +
+    "\n"
   );
 }
 
@@ -48,6 +63,13 @@ function writeColorScheme(configDir: string, theme: EditorContext["theme"]): voi
   writeFileSync(join(dir, "pair.micro"), text, "utf-8");
 }
 
+// Pure text builder, split out from the filesystem write so tests can parse it without a fake source path.
+export function syntaxText(lang: string, rules: string): string {
+  const suffix = `.pair-${lang}`;
+
+  return syntaxHead(lang, suffix) + rules.trimEnd() + "\n" + bandRules(ruleIndent(rules));
+}
+
 function writeSyntax(configDir: string, sourcePath: string): void {
   const lang = syntaxName(sourcePath);
 
@@ -61,12 +83,10 @@ function writeSyntax(configDir: string, sourcePath: string): void {
     return;
   }
 
-  const suffix = `.pair-${lang}`;
   const dir = join(configDir, "syntax");
   mkdirSync(dir, { recursive: true });
 
-  const text = syntaxHead(lang, suffix) + rules.trimEnd() + "\n" + bandRules();
-  writeFileSync(join(dir, `pair-${lang}.yaml`), text, "utf-8");
+  writeFileSync(join(dir, `pair-${lang}.yaml`), syntaxText(lang, rules), "utf-8");
 }
 
 export function createMicroEditor(resolvesOnPath: PathResolver = defaultResolvesOnPath): Editor {

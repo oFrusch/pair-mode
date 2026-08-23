@@ -69,7 +69,7 @@ test("the generated syntax YAML ends with the band regions", () => {
 
   const text = readFileSync(join(configDir, "syntax", "pair-go.yaml"), "utf-8");
 
-  expect(text.trimEnd().endsWith('- comment:\n        start: "^#"\n        end: "$"')).toBe(true);
+  expect(text.trimEnd().endsWith('- comment:\n      start: "^#"\n      end: "$"')).toBe(true);
   expect(text).toContain('start: "^▌▌\\\\+"');
 });
 
