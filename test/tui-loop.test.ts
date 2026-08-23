@@ -365,4 +365,59 @@ describe("runTui", () => {
     expect(writes).toContain("\x1b[?1049l");
     expect(handler).toBeNull();
   });
+
+  test("a write that throws on the leave-alt-screen sequence rejects instead of hanging, and cleanup still runs", async () => {
+    const box: { handler: ((chunk: string) => void) | null } = { handler: null };
+    const writes: string[] = [];
+    const cleanupState = { calls: 0 };
+
+    const throwingIo: TuiIo = {
+      onKey(nextHandler) {
+        box.handler = nextHandler;
+      },
+      write(text) {
+        if (text === "\x1b[?1049l") {
+          throw new Error("leave alt screen failed");
+        }
+
+        writes.push(text);
+      },
+      size() {
+        return { width: 80, height: 24 };
+      },
+      cleanup() {
+        cleanupState.calls += 1;
+      },
+    };
+
+    const resultPromise = runTui(makeOptions(), throwingIo);
+
+    box.handler?.("\x11");
+
+    await expect(resultPromise).rejects.toThrow("leave alt screen failed");
+    expect(cleanupState.calls).toBe(1);
+  }, 2000);
+
+  test("a cleanup that throws still settles the promise instead of hanging", async () => {
+    const box: { handler: ((chunk: string) => void) | null } = { handler: null };
+
+    const throwingIo: TuiIo = {
+      onKey(nextHandler) {
+        box.handler = nextHandler;
+      },
+      write() {},
+      size() {
+        return { width: 80, height: 24 };
+      },
+      cleanup() {
+        throw new Error("cleanup failed");
+      },
+    };
+
+    const resultPromise = runTui(makeOptions(), throwingIo);
+
+    box.handler?.("\x11");
+
+    await expect(resultPromise).rejects.toThrow("cleanup failed");
+  }, 2000);
 });

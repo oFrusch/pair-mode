@@ -205,15 +205,34 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
       previousLines = result.lines;
     };
 
-    const teardown = () => {
-      io.write(SHOW_CURSOR);
-      io.write(LEAVE_ALT_SCREEN);
-      io.cleanup();
+    const attemptTeardown = (): Error | null => {
+      let teardownError: Error | null = null;
+
+      try {
+        io.write(SHOW_CURSOR);
+        io.write(LEAVE_ALT_SCREEN);
+      } catch (writeError) {
+        teardownError = writeError instanceof Error ? writeError : new Error(String(writeError));
+      }
+
+      try {
+        io.cleanup();
+      } catch (cleanupError) {
+        teardownError = teardownError ?? (cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)));
+      }
+
+      return teardownError;
     };
 
     const finishQuit = (quit: "clean" | "send") => {
       finished = true;
-      teardown();
+
+      const teardownError = attemptTeardown();
+
+      if (teardownError !== null) {
+        reject(teardownError);
+        return;
+      }
 
       const questions: Question[] = [];
 
@@ -226,7 +245,7 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
       }
 
       finished = true;
-      teardown();
+      attemptTeardown();
       reject(error instanceof Error ? error : new Error(String(error)));
     };
 
