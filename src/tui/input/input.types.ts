@@ -3,3 +3,11 @@ export interface KeyEvent {
   ctrl: boolean;
   text: string;
 }
+
+export interface MouseEvent {
+  kind: "down" | "drag" | "up" | "scroll";
+  button: number;
+  row: number;
+  column: number;
+  shift: boolean;
+}

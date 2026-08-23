@@ -19,6 +19,7 @@ function makeState(overrides: Partial<TuiState> = {}): TuiState {
     map: { rows: [], panes: [] },
     layout: "split",
     quit: "none",
+    selection: null,
     ...overrides,
   };
 }

@@ -3,6 +3,14 @@ import type { DiffModel, ScreenMap } from "./model/model.types";
 
 export type Mode = "browse" | "select" | "note" | "help" | "confirm";
 
+export interface Selection {
+  pane: "left" | "right";
+  anchorRow: number;
+  anchorColumn: number;
+  headRow: number;
+  headColumn: number;
+}
+
 export interface TuiState {
   model: DiffModel;
   mode: Mode;
@@ -10,6 +18,7 @@ export interface TuiState {
   map: ScreenMap;
   layout: "split" | "unified";
   quit: "none" | "clean" | "send";
+  selection: Selection | null;
 }
 
 export interface TuiOptions {

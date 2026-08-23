@@ -1,6 +1,8 @@
 import { basename } from "node:path";
 import { visibleRows } from "../model/model";
 import type { DiffModel, FoldGroup, ModelRow, PaneBounds, RowKind, ScreenMap, ScreenRow, VisibleRow } from "../model/model.types";
+import { selectionSpanFor } from "../tui";
+import type { Selection } from "../tui.types";
 import { changedSpans, layoutStatusMessage } from "./paint";
 import { bg, DEFAULT_BG, DEFAULT_FG, fg, RESET, theme } from "./theme";
 import type {
@@ -81,6 +83,7 @@ function renderPaneText(
   paneWidth: number,
   rowBand: boolean,
   truecolor: boolean,
+  selectionSpan: Span | null,
 ): string {
   const textLength = Math.min(text.length, paneWidth);
   let output = "";
@@ -93,7 +96,8 @@ function renderPaneText(
     const desiredFg = token === undefined ? null : token.color;
 
     const withinSpan = changeSpansForSide.some((span) => column >= span.start && column < span.end);
-    const desiredBg = changeColor !== null && (rowBand || withinSpan) ? changeColor : null;
+    const withinSelection = selectionSpan !== null && column >= selectionSpan.start && column < selectionSpan.end;
+    const desiredBg = withinSelection ? theme.selection : changeColor !== null && (rowBand || withinSpan) ? changeColor : null;
 
     if (desiredFg !== currentFg) {
       output += desiredFg === null ? DEFAULT_FG : fg(desiredFg, truecolor);
@@ -113,12 +117,14 @@ function renderPaneText(
 
 function paintModelRow(
   row: ModelRow,
+  rowIndex: number,
   leftBounds: PaneBounds,
   rightBounds: PaneBounds,
   numberWidth: number,
   tokens: TokenProvider,
   rowBand: boolean,
   truecolor: boolean,
+  selection: Selection | null,
 ): string {
   const bar = SIGN_BAR[row.kind];
   const spans = changedSpans(row.left, row.right);
@@ -129,6 +135,11 @@ function paintModelRow(
   const leftPaneWidth = leftBounds.textEnd - leftBounds.textStart;
   const rightPaneWidth = rightBounds.textEnd - rightBounds.textStart;
 
+  const leftSelectionSpan =
+    selection !== null && selection.pane === "left" ? selectionSpanFor(selection, rowIndex, row.left.length) : null;
+  const rightSelectionSpan =
+    selection !== null && selection.pane === "right" ? selectionSpanFor(selection, rowIndex, row.right.length) : null;
+
   const leftText = renderPaneText(
     row.left,
     tokens(row.left, row.leftNumber),
@@ -137,6 +148,7 @@ function paintModelRow(
     leftPaneWidth,
     rowBand,
     truecolor,
+    leftSelectionSpan,
   );
 
   const rightText = renderPaneText(
@@ -147,6 +159,7 @@ function paintModelRow(
     rightPaneWidth,
     rowBand,
     truecolor,
+    rightSelectionSpan,
   );
 
   const divider = fg(theme.fold, truecolor) + "│" + DEFAULT_FG;
@@ -244,7 +257,7 @@ function assembleScreen(
 }
 
 export function paintSplit(options: PaintOptions): PaintResult {
-  const { model, width, height, path, tokens, truecolor, rowBand, scrollTop } = options;
+  const { model, width, height, path, tokens, truecolor, rowBand, scrollTop, selection = null } = options;
 
   const numberWidth = computeNumberWidth(model);
 
@@ -276,7 +289,17 @@ export function paintSplit(options: PaintOptions): PaintResult {
   const bodyLines = visible.map((entry) =>
     entry.kind === "fold"
       ? paintFoldRow(lookupFold(model, entry.foldIndex), width, truecolor)
-      : paintModelRow(lookupRow(model, entry.index), leftBounds, rightBounds, numberWidth, tokens, rowBand, truecolor),
+      : paintModelRow(
+          lookupRow(model, entry.index),
+          entry.index,
+          leftBounds,
+          rightBounds,
+          numberWidth,
+          tokens,
+          rowBand,
+          truecolor,
+          selection,
+        ),
   );
 
   const bodyScreenRows: ScreenRow[] = visible.map((entry) =>
@@ -314,9 +337,10 @@ function paintUnifiedHalf(
   textWidth: number,
   rowBand: boolean,
   truecolor: boolean,
+  selectionSpan: Span | null,
 ): string {
   const bar = UNIFIED_SIGN_BAR[halfKind];
-  const rendered = renderPaneText(text, tokens, spans, changeColor, textWidth, rowBand, truecolor);
+  const rendered = renderPaneText(text, tokens, spans, changeColor, textWidth, rowBand, truecolor, selectionSpan);
 
   return (
     paintGutter(lineNumber, numberWidth, truecolor) +
@@ -336,6 +360,7 @@ function paintUnifiedBodyEntry(
   tokens: TokenProvider,
   rowBand: boolean,
   truecolor: boolean,
+  selection: Selection | null,
 ): UnifiedBodyEntry {
   if (entry.kind === "fold") {
     return {
@@ -347,8 +372,10 @@ function paintUnifiedBodyEntry(
   const row = lookupRow(model, entry.index);
   const spans = changedSpans(row.left, row.right);
   const screenRow: ScreenRow = { kind: "row", index: entry.index };
+  const hasSelection = selection !== null && selection.pane === "right";
 
   if (row.kind === "context") {
+    const selectionSpan = hasSelection ? selectionSpanFor(selection, entry.index, row.right.length) : null;
     const line = paintUnifiedHalf(
       "context",
       row.rightNumber,
@@ -360,12 +387,14 @@ function paintUnifiedBodyEntry(
       textWidth,
       rowBand,
       truecolor,
+      selectionSpan,
     );
 
     return { lines: [line], screenRows: [screenRow] };
   }
 
   if (row.kind === "add") {
+    const selectionSpan = hasSelection ? selectionSpanFor(selection, entry.index, row.right.length) : null;
     const line = paintUnifiedHalf(
       "add",
       row.rightNumber,
@@ -377,12 +406,14 @@ function paintUnifiedBodyEntry(
       textWidth,
       rowBand,
       truecolor,
+      selectionSpan,
     );
 
     return { lines: [line], screenRows: [screenRow] };
   }
 
   if (row.kind === "del") {
+    const selectionSpan = hasSelection ? selectionSpanFor(selection, entry.index, row.left.length) : null;
     const line = paintUnifiedHalf(
       "del",
       row.leftNumber,
@@ -394,10 +425,14 @@ function paintUnifiedBodyEntry(
       textWidth,
       rowBand,
       truecolor,
+      selectionSpan,
     );
 
     return { lines: [line], screenRows: [screenRow] };
   }
+
+  const delSelectionSpan = hasSelection ? selectionSpanFor(selection, entry.index, row.left.length) : null;
+  const addSelectionSpan = hasSelection ? selectionSpanFor(selection, entry.index, row.right.length) : null;
 
   const delLine = paintUnifiedHalf(
     "del",
@@ -410,6 +445,7 @@ function paintUnifiedBodyEntry(
     textWidth,
     rowBand,
     truecolor,
+    delSelectionSpan,
   );
 
   const addLine = paintUnifiedHalf(
@@ -423,13 +459,14 @@ function paintUnifiedBodyEntry(
     textWidth,
     rowBand,
     truecolor,
+    addSelectionSpan,
   );
 
   return { lines: [delLine, addLine], screenRows: [screenRow, screenRow] };
 }
 
 export function paintUnified(options: PaintOptions): PaintResult {
-  const { model, width, height, path, tokens, truecolor, rowBand, scrollTop } = options;
+  const { model, width, height, path, tokens, truecolor, rowBand, scrollTop, selection = null } = options;
 
   const numberWidth = computeNumberWidth(model);
 
@@ -447,7 +484,7 @@ export function paintUnified(options: PaintOptions): PaintResult {
   const visible = visibleRows(model).slice(scrollTop, scrollTop + bodyHeight);
 
   const entries = visible.map((entry) =>
-    paintUnifiedBodyEntry(entry, model, numberWidth, textWidth, width, tokens, rowBand, truecolor),
+    paintUnifiedBodyEntry(entry, model, numberWidth, textWidth, width, tokens, rowBand, truecolor, selection),
   );
 
   const rawBodyLines = entries.flatMap((entry) => entry.lines);
