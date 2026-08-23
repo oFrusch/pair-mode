@@ -74,13 +74,6 @@ when `XDG_CONFIG_HOME` is not set.
 An `editor` array lists editor names in order of preference. Pair mode tries each in
 turn and uses the first one it finds on the machine.
 
-## Known limits
-
-- Pair mode opens one editor pane per `Edit` call, not one pane per changeset.
-- opencode hooks do not fire for subagent tool calls or MCP tool calls.
-- Claude Code cannot add a choice to its permission menu. Pair mode opens on every
-  edit while it is enabled.
-
 ## License
 
 MIT. See `LICENSE`.
