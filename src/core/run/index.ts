@@ -1,2 +1,2 @@
 export { runPair } from "./run";
-export type { EditRequest, RunVerdict } from "./types";
+export type { EditRequest, RunDeps, RunVerdict } from "./types";

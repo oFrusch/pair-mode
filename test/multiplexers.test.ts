@@ -112,6 +112,20 @@ test("tmux run quotes an argv element containing a space", () => {
   expect(script).toContain("'path with space.txt'");
 });
 
+test("tmux run quotes a KEY=VALUE argv element whose value contains a space", () => {
+  const { spawn, calls } = recordingSpawn();
+  const tmux = createTmuxMultiplexer(spawn);
+
+  tmux.run(["env", "MICRO_CONFIG_HOME=/Users/owen/path with space/micro", "micro"], {
+    width: "90%",
+    height: "90%",
+  });
+
+  const popup = calls[0];
+  const script = popup?.args[popup.args.length - 1];
+  expect(script).toContain("'MICRO_CONFIG_HOME=/Users/owen/path with space/micro'");
+});
+
 test("tmux run reports ok:false when the popup command fails", () => {
   const spawn: Spawn = (): SpawnResult => ({ status: 1, stderr: "no server" });
   const tmux = createTmuxMultiplexer(spawn);
