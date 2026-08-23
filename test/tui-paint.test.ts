@@ -282,4 +282,40 @@ describe("paintSplit — split layout", () => {
     expect(plain).toContain("y".repeat(rightPaneWidth));
     expect(plain).not.toContain("y".repeat(rightPaneWidth + 1));
   });
+
+  test("lines.length equals height even when height is smaller than the header and status rows", () => {
+    const height = 2;
+
+    const { lines, map } = paintSplit({
+      model: buildFixtureModel(),
+      width: WIDTH,
+      height,
+      path: "src/example.ts",
+      tokens: noTokens,
+      truecolor: true,
+      rowBand: false,
+      scrollTop: 0,
+    });
+
+    expect(lines).toHaveLength(height);
+    expect(map.rows).toHaveLength(height);
+  });
+
+  test("lines.length equals height when height is 1", () => {
+    const height = 1;
+
+    const { lines, map } = paintSplit({
+      model: buildFixtureModel(),
+      width: WIDTH,
+      height,
+      path: "src/example.ts",
+      tokens: noTokens,
+      truecolor: true,
+      rowBand: false,
+      scrollTop: 0,
+    });
+
+    expect(lines).toHaveLength(height);
+    expect(map.rows).toHaveLength(height);
+  });
 });

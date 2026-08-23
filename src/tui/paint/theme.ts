@@ -1,5 +1,5 @@
 import { isHexColor } from "../../helpers/hexColor";
-import type { TuiTheme } from "./paint.types";
+import type { AnsiPair, Rgb, TuiTheme } from "./paint.types";
 
 const RED_CHANNEL_START = 1;
 const GREEN_CHANNEL_START = 3;
@@ -23,11 +23,6 @@ export const RESET = "\x1b[0m";
 export const DEFAULT_FG = "\x1b[39m";
 export const DEFAULT_BG = "\x1b[49m";
 
-interface AnsiPair {
-  fg: string;
-  bg: string;
-}
-
 const ANSI_16: Record<string, AnsiPair> = {
   [theme.addBar]: { fg: "\x1b[32m", bg: "\x1b[42m" },
   [theme.addSpan]: { fg: "\x1b[32m", bg: "\x1b[42m" },
@@ -41,12 +36,6 @@ const ANSI_16: Record<string, AnsiPair> = {
 
 export function supportsTruecolor(env: Record<string, string | undefined>): boolean {
   return env.COLORTERM === "truecolor" || env.COLORTERM === "24bit";
-}
-
-interface Rgb {
-  r: number;
-  g: number;
-  b: number;
 }
 
 function hexToRgb(hex: string): Rgb | null {

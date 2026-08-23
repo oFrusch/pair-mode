@@ -46,25 +46,38 @@ describe("fg without truecolor", () => {
   });
 });
 
-describe("an unknown hex", () => {
-  test("fg falls back to the default code with truecolor", () => {
+describe("a valid, unlisted hex", () => {
+  test("fg converts it normally under truecolor, since truecolor never needs the ANSI-16 lookup", () => {
     expect(fg("#123456", true)).toBe("\x1b[38;2;18;52;86m");
   });
 
-  test("fg falls back to the default code without truecolor", () => {
+  test("fg falls back to the default code without truecolor, since the ANSI-16 table has no entry for it", () => {
     expect(fg("#123456", false)).toBe("\x1b[39m");
   });
 
-  test("bg falls back to the default code without truecolor", () => {
+  test("bg falls back to the default code without truecolor, since the ANSI-16 table has no entry for it", () => {
     expect(bg("#123456", false)).toBe("\x1b[49m");
   });
+});
 
-  test("fg falls back to the default code for a value that is not a hex colour", () => {
+describe("a malformed hex", () => {
+  test("fg falls back to the default code under truecolor", () => {
     expect(fg("not-a-color", true)).toBe("\x1b[39m");
-    expect(fg("not-a-color", false)).toBe("\x1b[39m");
+    expect(fg("#12345", true)).toBe("\x1b[39m");
   });
 
-  test("bg falls back to the default code for a value that is not a hex colour", () => {
+  test("bg falls back to the default code under truecolor", () => {
     expect(bg("not-a-color", true)).toBe("\x1b[49m");
+    expect(bg("#12345", true)).toBe("\x1b[49m");
+  });
+
+  test("fg falls back to the default code without truecolor", () => {
+    expect(fg("not-a-color", false)).toBe("\x1b[39m");
+    expect(fg("#12345", false)).toBe("\x1b[39m");
+  });
+
+  test("bg falls back to the default code without truecolor", () => {
+    expect(bg("not-a-color", false)).toBe("\x1b[49m");
+    expect(bg("#12345", false)).toBe("\x1b[49m");
   });
 });

@@ -44,3 +44,21 @@ export interface PaintResult {
   lines: string[];
   map: ScreenMap;
 }
+
+export interface AnsiPair {
+  fg: string;
+  bg: string;
+}
+
+export interface Rgb {
+  r: number;
+  g: number;
+  b: number;
+}
+
+export interface SignBarStyle {
+  leftChar: string;
+  leftColor: string | null;
+  rightChar: string;
+  rightColor: string | null;
+}

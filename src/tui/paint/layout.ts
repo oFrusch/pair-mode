@@ -3,7 +3,7 @@ import { visibleRows } from "../model/model";
 import type { DiffModel, FoldGroup, ModelRow, PaneBounds, RowKind, ScreenMap, ScreenRow } from "../model/model.types";
 import { changedSpans } from "./paint";
 import { bg, DEFAULT_BG, DEFAULT_FG, fg, RESET, theme } from "./theme";
-import type { PaintOptions, PaintResult, Span, SyntaxToken, TokenProvider } from "./paint.types";
+import type { PaintOptions, PaintResult, SignBarStyle, Span, SyntaxToken, TokenProvider } from "./paint.types";
 
 const NUMBER_WIDTH_FLOOR = 2;
 const GUTTER_SPACE_WIDTH = 1;
@@ -13,13 +13,6 @@ const PANE_COUNT = 2;
 const HEADER_ROWS = 2;
 const STATUS_ROWS = 1;
 const HEADER_COUNT_GAP_WIDTH = 1;
-
-interface SignBarStyle {
-  leftChar: string;
-  leftColor: string | null;
-  rightChar: string;
-  rightColor: string | null;
-}
 
 const SIGN_BAR: Record<RowKind, SignBarStyle> = {
   context: { leftChar: " ", leftColor: null, rightChar: " ", rightColor: null },
@@ -209,7 +202,7 @@ export function paintSplit(options: PaintOptions): PaintResult {
 
   const fixedWidth = PANE_COUNT * (numberWidth + GUTTER_SPACE_WIDTH + SIGN_BAR_WIDTH) + DIVIDER_WIDTH;
   const remaining = Math.max(0, width - fixedWidth);
-  const leftPaneWidth = Math.floor(remaining / 2);
+  const leftPaneWidth = Math.floor(remaining / PANE_COUNT);
   const rightPaneWidth = remaining - leftPaneWidth;
 
   const leftTextStart = numberWidth + GUTTER_SPACE_WIDTH + SIGN_BAR_WIDTH;
@@ -252,15 +245,17 @@ export function paintSplit(options: PaintOptions): PaintResult {
     ...bodyLines,
     ...padLines,
     paintStatus(width, truecolor),
-  ];
+  ].slice(0, height);
 
-  const rows: ScreenRow[] = [
+  const allRows: ScreenRow[] = [
     { kind: "chrome", index: null },
     { kind: "chrome", index: null },
     ...bodyScreenRows,
     ...padScreenRows,
     { kind: "chrome", index: null },
   ];
+
+  const rows = allRows.slice(0, height);
 
   const map: ScreenMap = { rows, panes: [leftBounds, rightBounds] };
 
