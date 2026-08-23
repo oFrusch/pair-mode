@@ -5,11 +5,12 @@ import { test, expect, beforeEach } from "vitest";
 import { vimEditor } from "../src/editors/vim";
 import { createNanoEditor } from "../src/editors/nano";
 import { resolve } from "../src/editors";
+import { DEFAULT_CONFIG } from "../src/core/config";
 import type { EditorContext, PathResolver } from "../src/editors/editor.types";
 
 let configDir: string;
 
-const theme = { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a" };
+const theme = { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a", rowBand: false };
 
 beforeEach(() => {
   configDir = mkdtempSync(join(tmpdir(), "pair-mode-editors-"));
@@ -23,6 +24,7 @@ function context(overrides: Partial<EditorContext> = {}): EditorContext {
     sourcePath: "main.go",
     theme,
     configDir,
+    config: DEFAULT_CONFIG,
     ...overrides,
   };
 }
@@ -102,18 +104,18 @@ test("resolve of a custom command array returns a passthrough editor", () => {
   expect(editor.name).toBe("custom");
 });
 
-test("resolve(auto) prefers micro when every binary is available", () => {
+test("resolve(auto) returns the pair editor even when every other binary is available", () => {
   const alwaysAvailable: PathResolver = () => true;
   const editor = resolve("auto", alwaysAvailable);
 
-  expect(editor.name).toBe("micro");
+  expect(editor.name).toBe("pair");
 });
 
-test("resolve(auto) falls back to vim when nothing is available", () => {
+test("resolve(auto) returns the pair editor even when nothing else is available", () => {
   const neverAvailable: PathResolver = () => false;
   const editor = resolve("auto", neverAvailable);
 
-  expect(editor.name).toBe("vim");
+  expect(editor.name).toBe("pair");
 });
 
 test("vim and nvim tell the user to save and quit with :wqa", () => {
@@ -133,14 +135,14 @@ test("a passthrough custom editor gives a generic save hint", () => {
 
 test("vim prepare throws on a theme colour carrying a vim command separator", () => {
   const editor = vimEditor("vim");
-  const badTheme = { add: "#123456|only", del: "#3a1e1e", fold: "#2a2a2a" };
+  const badTheme = { add: "#123456|only", del: "#3a1e1e", fold: "#2a2a2a", rowBand: false };
 
   expect(() => editor.prepare(context({ theme: badTheme }))).toThrow(/invalid theme colour/);
 });
 
 test("nano prepare throws on a theme colour carrying a space that would shift nanorc tokens", () => {
   const nano = createNanoEditor();
-  const badTheme = { add: "#123 456", del: "#3a1e1e", fold: "#2a2a2a" };
+  const badTheme = { add: "#123 456", del: "#3a1e1e", fold: "#2a2a2a", rowBand: false };
 
   expect(() => nano.prepare(context({ theme: badTheme }))).toThrow(/invalid theme colour/);
 });

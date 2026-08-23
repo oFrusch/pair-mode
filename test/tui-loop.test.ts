@@ -24,6 +24,7 @@ function makeState(overrides: Partial<TuiState> = {}): TuiState {
     focusedNote: null,
     draft: "",
     nextNoteId: 1,
+    notePosition: "panel",
     ...overrides,
   };
 }
@@ -293,6 +294,8 @@ function makeOptions(overrides: Partial<TuiOptions> = {}): TuiOptions {
     height: 24,
     truecolor: false,
     resultFile: "/tmp/pair-mode-test-result.json",
+    notePosition: "panel",
+    tokens: () => [],
     ...overrides,
   };
 }

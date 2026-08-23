@@ -4,11 +4,12 @@ import { join } from "node:path";
 import { parse } from "yaml";
 import { test, expect, beforeEach } from "vitest";
 import { createMicroEditor } from "../src/editors/micro";
+import { DEFAULT_CONFIG } from "../src/core/config";
 import type { EditorContext } from "../src/editors/editor.types";
 
 let configDir: string;
 
-const theme = { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a" };
+const theme = { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a", rowBand: false };
 
 beforeEach(() => {
   configDir = mkdtempSync(join(tmpdir(), "pair-mode-micro-"));
@@ -22,6 +23,7 @@ function context(overrides: Partial<EditorContext> = {}): EditorContext {
     sourcePath: "main.go",
     theme,
     configDir,
+    config: DEFAULT_CONFIG,
     ...overrides,
   };
 }

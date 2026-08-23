@@ -5,24 +5,22 @@ import { MOUSE_OFF, MOUSE_ON, splitInput } from "./input/mouse";
 import { buildModel, moveCursor, toggleFold, visibleRows } from "./model";
 import type { DiffModel, VisibleRow } from "./model";
 import { noteFromSelection, toQuestions, writeResult } from "./notes";
-import { bodyHeight, noTokens, paint } from "./paint";
-import type { NotePosition } from "./paint";
+import { bodyHeight, paint } from "./paint";
 import { applyMouse, cursorRowIndex, moveSelectionHead, startSelection, wholeRowSelection } from "./selection";
 import type { TuiIo, TuiOptions, TuiResult, TuiState } from "./tui.types";
 
 const OVERLAP_ROWS = 1;
 const MIN_PAGE = 1;
 const NOTE_PANE = "right";
-const NOTE_POSITION: NotePosition = "panel";
 
 export { bodyHeight };
 
 function pageSize(state: TuiState, height: number): number {
-  return Math.max(bodyHeight(height, state.notes.length, state.mode, NOTE_POSITION) - OVERLAP_ROWS, MIN_PAGE);
+  return Math.max(bodyHeight(height, state.notes.length, state.mode, state.notePosition) - OVERLAP_ROWS, MIN_PAGE);
 }
 
 function followScroll(state: TuiState, model: DiffModel, scrollTop: number, height: number): number {
-  const bodyRows = bodyHeight(height, state.notes.length, state.mode, NOTE_POSITION);
+  const bodyRows = bodyHeight(height, state.notes.length, state.mode, state.notePosition);
   const lastBodyRow = scrollTop + bodyRows - 1;
 
   if (model.cursor < scrollTop) {
@@ -350,6 +348,7 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
       focusedNote: null,
       draft: "",
       nextNoteId: 1,
+      notePosition: options.notePosition,
     };
 
     let previousLines: string[] = [];
@@ -361,7 +360,7 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
         width: options.width,
         height: options.height,
         path: options.path,
-        tokens: noTokens,
+        tokens: options.tokens,
         truecolor: options.truecolor,
         rowBand: options.rowBand,
         scrollTop: state.scrollTop,
@@ -371,7 +370,7 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
         draft: state.draft,
         notes: state.notes,
         focusedNote: state.focusedNote,
-        notePosition: NOTE_POSITION,
+        notePosition: state.notePosition,
       });
 
       state = { ...state, map: result.map };

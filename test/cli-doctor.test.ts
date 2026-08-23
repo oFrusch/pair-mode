@@ -64,8 +64,8 @@ test("doctor on an unconfigured machine exits 1 and names each failing check", (
 
   expect(report.exitCode).toBe(1);
 
+  // The pair editor is always available, so config.editor "auto" now resolves to it and the editor check passes even here.
   const failing = report.checks.filter((check) => !check.passed).map((check) => check.name);
-  expect(failing).toContain("editor: vim");
   expect(failing).toContain("controlling terminal");
   expect(failing).toContain("claude-code hook");
   expect(failing).toContain("codex hook");
@@ -82,9 +82,11 @@ test("doctor on a fully configured temporary home exits 0", () => {
     context: 5,
     minFold: 3,
     pane: { width: "90%", height: "90%" },
-    theme: { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a" },
+    theme: { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a", rowBand: false },
     trace: false,
     autoApprove: true,
+    notes: "panel",
+    syntax: true,
   };
   saveConfig(config);
 
@@ -131,9 +133,11 @@ test("doctor fails the entry points check when a built file is not executable", 
     context: 5,
     minFold: 3,
     pane: { width: "90%", height: "90%" },
-    theme: { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a" },
+    theme: { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a", rowBand: false },
     trace: false,
     autoApprove: true,
+    notes: "panel",
+    syntax: true,
   };
   saveConfig(config);
 

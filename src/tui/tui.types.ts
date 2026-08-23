@@ -1,6 +1,7 @@
 import type { Question } from "../core/collect";
 import type { DiffModel, ScreenMap } from "./model/model.types";
 import type { Note } from "./notes/notes.types";
+import type { NotePosition, TokenProvider } from "./paint/paint.types";
 import type { Selection } from "./selection/selection.types";
 
 export type Mode = "browse" | "select" | "note" | "help" | "confirm";
@@ -17,6 +18,7 @@ export interface TuiState {
   focusedNote: number | null;
   draft: string;
   nextNoteId: number;
+  notePosition: NotePosition;
 }
 
 export interface TuiOptions {
@@ -26,11 +28,13 @@ export interface TuiOptions {
   context: number;
   minFold: number;
   layout: "split" | "unified";
+  notePosition: NotePosition;
   rowBand: boolean;
   width: number;
   height: number;
   truecolor: boolean;
   resultFile: string;
+  tokens: TokenProvider;
 }
 
 export interface TuiIo {

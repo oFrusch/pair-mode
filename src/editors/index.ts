@@ -3,6 +3,7 @@ import type { Editor, EditorContext, EditorLaunch, PathResolver } from "./editor
 import { createMicroEditor } from "./micro";
 import { vimEditor } from "./vim";
 import { createNanoEditor } from "./nano";
+import { createPairEditor } from "./pair";
 import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
 
 // A string array is a raw command. It bypasses every adapter and every syntax feature.
@@ -31,6 +32,7 @@ function createPassthroughEditor(command: string[]): Editor {
 
 function candidates(resolvesOnPath: PathResolver): Editor[] {
   return [
+    createPairEditor(),
     createMicroEditor(resolvesOnPath),
     vimEditor("nvim", resolvesOnPath),
     vimEditor("vim", resolvesOnPath),
@@ -44,6 +46,10 @@ export function resolve(
 ): Editor {
   if (Array.isArray(preference)) {
     return createPassthroughEditor(preference);
+  }
+
+  if (preference === "pair") {
+    return createPairEditor();
   }
 
   if (preference === "micro") {

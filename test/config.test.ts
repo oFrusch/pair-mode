@@ -118,3 +118,97 @@ test("saveConfig creates the parent directory", () => {
 
   expect(() => mkdirSync(dir, { recursive: true })).not.toThrow();
 });
+
+test("notes defaults to panel", () => {
+  const result = loadConfig(join(xdgConfigHome, "missing.json"));
+
+  expect(result.config.notes).toBe("panel");
+});
+
+test("notes accepts anchored", () => {
+  const path = join(xdgConfigHome, "notes.json");
+  writeFileSync(path, JSON.stringify({ notes: "anchored" }), "utf-8");
+
+  const result = loadConfig(path);
+
+  expect(result.config.notes).toBe("anchored");
+  expect(result.errors).toEqual([]);
+});
+
+test("notes: inline is rejected with a ConfigError, since layout already owns that word", () => {
+  const path = join(xdgConfigHome, "notes-inline.json");
+  writeFileSync(path, JSON.stringify({ notes: "inline" }), "utf-8");
+
+  const result = loadConfig(path);
+
+  expect(result.config.notes).toBe("panel");
+  expect(result.errors).toHaveLength(1);
+  expect(result.errors[0]?.path).toBe("notes");
+});
+
+test("syntax defaults to true", () => {
+  const result = loadConfig(join(xdgConfigHome, "missing.json"));
+
+  expect(result.config.syntax).toBe(true);
+});
+
+test("syntax rejects a non-boolean", () => {
+  const path = join(xdgConfigHome, "syntax.json");
+  writeFileSync(path, JSON.stringify({ syntax: "yes" }), "utf-8");
+
+  const result = loadConfig(path);
+
+  expect(result.config.syntax).toBe(true);
+  expect(result.errors).toHaveLength(1);
+  expect(result.errors[0]?.path).toBe("syntax");
+});
+
+test("theme.rowBand defaults to false", () => {
+  const result = loadConfig(join(xdgConfigHome, "missing.json"));
+
+  expect(result.config.theme.rowBand).toBe(false);
+});
+
+test("theme.rowBand rejects a non-boolean", () => {
+  const path = join(xdgConfigHome, "row-band.json");
+  writeFileSync(path, JSON.stringify({ theme: { rowBand: "yes" } }), "utf-8");
+
+  const result = loadConfig(path);
+
+  expect(result.config.theme.rowBand).toBe(false);
+  expect(result.errors).toHaveLength(1);
+  expect(result.errors[0]?.path).toBe("theme.rowBand");
+});
+
+test("editor: pair validates", () => {
+  const path = join(xdgConfigHome, "editor-pair.json");
+  writeFileSync(path, JSON.stringify({ editor: "pair" }), "utf-8");
+
+  const result = loadConfig(path);
+
+  expect(result.config.editor).toBe("pair");
+  expect(result.errors).toEqual([]);
+});
+
+test("a config file written before this task, with none of the three new fields, loads with every default and zero errors", () => {
+  const path = join(xdgConfigHome, "pre-task-10.json");
+  const preExisting = {
+    editor: "micro",
+    multiplexer: "tmux",
+    layout: "split",
+    context: 5,
+    minFold: 4,
+    pane: { width: "90%", height: "90%" },
+    theme: { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a" },
+    trace: false,
+    autoApprove: true,
+  };
+  writeFileSync(path, JSON.stringify(preExisting), "utf-8");
+
+  const result = loadConfig(path);
+
+  expect(result.errors).toEqual([]);
+  expect(result.config.notes).toBe(DEFAULT_CONFIG.notes);
+  expect(result.config.syntax).toBe(DEFAULT_CONFIG.syntax);
+  expect(result.config.theme.rowBand).toBe(DEFAULT_CONFIG.theme.rowBand);
+});

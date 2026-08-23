@@ -294,9 +294,11 @@ test("a re-run backs up the existing config and preserves fields the wizard neve
     context: 9,
     minFold: 7,
     pane: { width: "70%", height: "60%" },
-    theme: { add: "#111111", del: "#222222", fold: "#333333" },
+    theme: { add: "#111111", del: "#222222", fold: "#333333", rowBand: false },
     trace: true,
     autoApprove: false,
+    notes: "panel",
+    syntax: true,
   };
   saveConfig(customized, configFilePath);
 
@@ -320,6 +322,6 @@ test("a re-run backs up the existing config and preserves fields the wizard neve
   expect(written.context).toBe(9);
   expect(written.minFold).toBe(7);
   expect(written.pane).toEqual({ width: "70%", height: "60%" });
-  expect(written.theme).toEqual({ add: "#111111", del: "#222222", fold: "#333333" });
+  expect(written.theme).toEqual({ add: "#111111", del: "#222222", fold: "#333333", rowBand: false });
   expect(written.trace).toBe(true);
 });
