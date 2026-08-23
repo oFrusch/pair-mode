@@ -9,6 +9,7 @@ import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
 function createPassthroughEditor(command: string[]): Editor {
   return {
     name: "custom",
+    collectMode: "buffer-diff",
 
     available(): boolean {
       return true;

@@ -102,6 +102,7 @@ function writeSyntax(configDir: string, sourcePath: string): void {
 export function createMicroEditor(resolvesOnPath: PathResolver = defaultResolvesOnPath): Editor {
   return {
     name: "micro",
+    collectMode: "buffer-diff",
 
     available(): boolean {
       return resolvesOnPath("micro");

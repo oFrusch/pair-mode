@@ -1,2 +1,2 @@
-export { anchor, collect, formatQuestions } from "./collect";
-export type { Question } from "./types";
+export { anchor, collect, formatQuestions, parseNoteResult } from "./collect";
+export type { Question, NoteResult } from "./types";

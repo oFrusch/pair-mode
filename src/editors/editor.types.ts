@@ -9,6 +9,7 @@ export interface EditorLaunch {
 export interface EditorContext {
   leftFile: string;
   rightFile: string;
+  resultFile: string;
   sourcePath: string;
   theme: Theme;
   configDir: string;
@@ -16,6 +17,7 @@ export interface EditorContext {
 
 export interface Editor {
   name: "micro" | "vim" | "nvim" | "nano" | "custom";
+  collectMode: "buffer-diff" | "result-file";
   available(): boolean;
   prepare(context: EditorContext): EditorLaunch;
   bufferSuffix(sourcePath: string): string;

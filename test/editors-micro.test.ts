@@ -18,6 +18,7 @@ function context(overrides: Partial<EditorContext> = {}): EditorContext {
   return {
     leftFile: join(configDir, "left.txt"),
     rightFile: join(configDir, "right.txt"),
+    resultFile: join(configDir, "result.json"),
     sourcePath: "main.go",
     theme,
     configDir,

@@ -64,6 +64,7 @@ export function vimEditor(
 ): Editor {
   return {
     name,
+    collectMode: "buffer-diff",
 
     available(): boolean {
       return resolvesOnPath(name);
