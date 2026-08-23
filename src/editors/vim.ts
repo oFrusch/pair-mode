@@ -26,7 +26,11 @@ function vimFiletype(sourcePath: string): string | null {
 
 // matchadd() overlays a highlight on top of syntax, so a changed row keeps both.
 function highlightCommands(theme: EditorContext["theme"]): string[] {
-  return [`hi PairAdd guibg=${theme.add}`, `hi PairDel guibg=${theme.del}`, `hi PairFold guibg=${theme.fold}`];
+  return [
+    `hi PairAdd guibg=${theme.add}`,
+    `hi PairDel guibg=${theme.del}`,
+    `hi PairFold guibg=${theme.fold}`,
+  ];
 }
 
 // windo applies each match in every window, so both split buffers carry the bands.
@@ -50,7 +54,10 @@ function launchCommands(context: EditorContext): string[] {
   return commands;
 }
 
-export function vimEditor(name: "vim" | "nvim", resolvesOnPath: PathResolver = defaultResolvesOnPath): Editor {
+export function vimEditor(
+  name: "vim" | "nvim",
+  resolvesOnPath: PathResolver = defaultResolvesOnPath,
+): Editor {
   return {
     name,
 

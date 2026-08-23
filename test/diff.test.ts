@@ -47,9 +47,9 @@ describe("align + fold against captured fixtures", () => {
 test("two-hunks has 39 left rows with exactly 3 fold rows", () => {
   const before = readLines(join(casesDir, "two-hunks", "before.txt"));
   const after = readLines(join(casesDir, "two-hunks", "after.txt"));
-  const expected = JSON.parse(
-    readFileSync(join(expectedDir, "two-hunks.json"), "utf-8"),
-  ) as { left: string[] };
+  const expected = JSON.parse(readFileSync(join(expectedDir, "two-hunks.json"), "utf-8")) as {
+    left: string[];
+  };
   const header = expected.left.filter((line) => line.startsWith("#"));
 
   const rows = align(before, after);
@@ -63,9 +63,9 @@ test("two-hunks has 39 left rows with exactly 3 fold rows", () => {
 test("no-change has zero fold rows", () => {
   const before = readLines(join(casesDir, "no-change", "before.txt"));
   const after = readLines(join(casesDir, "no-change", "after.txt"));
-  const expected = JSON.parse(
-    readFileSync(join(expectedDir, "no-change.json"), "utf-8"),
-  ) as { left: string[] };
+  const expected = JSON.parse(readFileSync(join(expectedDir, "no-change.json"), "utf-8")) as {
+    left: string[];
+  };
   const header = expected.left.filter((line) => line.startsWith("#"));
 
   const rows = align(before, after);

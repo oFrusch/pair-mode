@@ -43,7 +43,10 @@ function candidates(resolvesOnPath: PathResolver): Editor[] {
   ];
 }
 
-export function resolve(preference: PairConfig["editor"], resolvesOnPath: PathResolver = defaultResolvesOnPath): Editor {
+export function resolve(
+  preference: PairConfig["editor"],
+  resolvesOnPath: PathResolver = defaultResolvesOnPath,
+): Editor {
   if (Array.isArray(preference)) {
     return createPassthroughEditor(preference);
   }
@@ -70,5 +73,7 @@ export function resolve(preference: PairConfig["editor"], resolvesOnPath: PathRe
 }
 
 export function describe(resolvesOnPath: PathResolver = defaultResolvesOnPath): string[] {
-  return candidates(resolvesOnPath).map((editor) => `${editor.name}: ${editor.available() ? "available" : "not available"}`);
+  return candidates(resolvesOnPath).map(
+    (editor) => `${editor.name}: ${editor.available() ? "available" : "not available"}`,
+  );
 }

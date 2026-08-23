@@ -25,7 +25,10 @@ function defaultAssetsDir(): string | null {
   }
 }
 
-export function ruleBody(lang: string, assetsDir: string | null = defaultAssetsDir()): string | null {
+export function ruleBody(
+  lang: string,
+  assetsDir: string | null = defaultAssetsDir(),
+): string | null {
   if (assetsDir === null) {
     return null;
   }

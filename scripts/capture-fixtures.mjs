@@ -1,24 +1,24 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 // Locate the repo root relative to this script, so the script runs from anywhere.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, '..');
+const repoRoot = path.resolve(__dirname, "..");
 
 // The prototype lives outside this repo. PAIR_PROTOTYPE lets a test override it.
-const protoPath = process.env.PAIR_PROTOTYPE || '/Users/owen/dev/claude-config/hooks/pair-mode.py';
+const protoPath = process.env.PAIR_PROTOTYPE || "/Users/owen/dev/claude-config/hooks/pair-mode.py";
 
 if (!existsSync(protoPath)) {
   console.error(`pair-mode prototype not found at ${protoPath}. Set PAIR_PROTOTYPE to override.`);
   process.exit(1);
 }
 
-const casesDir = path.join(repoRoot, 'test/fixtures/cases');
-const expectedDir = path.join(repoRoot, 'test/fixtures/expected');
-const collectDir = path.join(repoRoot, 'test/fixtures/collect');
+const casesDir = path.join(repoRoot, "test/fixtures/cases");
+const expectedDir = path.join(repoRoot, "test/fixtures/expected");
+const collectDir = path.join(repoRoot, "test/fixtures/collect");
 
 mkdirSync(expectedDir, { recursive: true });
 
@@ -32,15 +32,15 @@ function listDirs(dir) {
 
 const renderCases = listDirs(casesDir).map((id) => {
   const dir = path.join(casesDir, id);
-  const meta = JSON.parse(readFileSync(path.join(dir, 'meta.json'), 'utf8'));
-  const before = readFileSync(path.join(dir, 'before.txt'), 'utf8');
-  const after = readFileSync(path.join(dir, 'after.txt'), 'utf8');
+  const meta = JSON.parse(readFileSync(path.join(dir, "meta.json"), "utf8"));
+  const before = readFileSync(path.join(dir, "before.txt"), "utf8");
+  const after = readFileSync(path.join(dir, "after.txt"), "utf8");
   return { id, before, after, tool: meta.tool, path: meta.path };
 });
 
 const collectCases = listDirs(collectDir).map((id) => {
   const dir = path.join(collectDir, id);
-  const input = JSON.parse(readFileSync(path.join(dir, 'input.json'), 'utf8'));
+  const input = JSON.parse(readFileSync(path.join(dir, "input.json"), "utf8"));
   return { id, original: input.original, numbers: input.numbers, saved: input.saved };
 });
 
@@ -75,22 +75,22 @@ with open(os.environ["PAIR_RESULT_PATH"], "w", encoding="utf-8") as fh:
 const resultPath = path.join(tmpdir(), `pair-fixtures-${process.pid}.json`);
 const shellCommand = `python3 - <<'PAIR_CAPTURE_EOF'\n${pythonScript}\nPAIR_CAPTURE_EOF`;
 
-const result = spawnSync('bash', ['-c', shellCommand], {
+const result = spawnSync("bash", ["-c", shellCommand], {
   env: {
     ...process.env,
     PAIR_PROTOTYPE_PATH: protoPath,
     PAIR_PAYLOAD: JSON.stringify({ render_cases: renderCases, collect_cases: collectCases }),
     PAIR_RESULT_PATH: resultPath,
   },
-  encoding: 'utf8',
+  encoding: "utf8",
 });
 
 if (result.status !== 0) {
-  console.error(result.stderr || result.stdout || 'python3 exited with a non-zero status');
+  console.error(result.stderr || result.stdout || "python3 exited with a non-zero status");
   process.exit(1);
 }
 
-const parsed = JSON.parse(readFileSync(resultPath, 'utf8'));
+const parsed = JSON.parse(readFileSync(resultPath, "utf8"));
 
 for (const [id, fixture] of Object.entries(parsed.render)) {
   const outPath = path.join(expectedDir, `${id}.json`);
@@ -98,8 +98,10 @@ for (const [id, fixture] of Object.entries(parsed.render)) {
 }
 
 for (const collectCase of collectCases) {
-  const outPath = path.join(collectDir, collectCase.id, 'expected.json');
+  const outPath = path.join(collectDir, collectCase.id, "expected.json");
   writeFileSync(outPath, `${JSON.stringify(parsed.collect[collectCase.id], null, 2)}\n`);
 }
 
-console.log(`Wrote ${Object.keys(parsed.render).length} expected files and ${collectCases.length} collect files.`);
+console.log(
+  `Wrote ${Object.keys(parsed.render).length} expected files and ${collectCases.length} collect files.`,
+);

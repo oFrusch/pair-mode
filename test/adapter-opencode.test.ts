@@ -92,7 +92,11 @@ test("an unrecognised tool resolves without calling runPair", async () => {
   };
 
   await expect(
-    beforeToolExecute({ tool: "bash", sessionID: "s1", callID: "c1" }, { args: { command: "ls" } }, runPair),
+    beforeToolExecute(
+      { tool: "bash", sessionID: "s1", callID: "c1" },
+      { args: { command: "ls" } },
+      runPair,
+    ),
   ).resolves.toBeUndefined();
 
   expect(called).toBe(false);

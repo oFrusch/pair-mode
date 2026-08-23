@@ -19,7 +19,7 @@ test("applyEdit honours replace_all", () => {
   expect(result).toBe("b b b");
 });
 
-test("applyEdit with an empty old_string and replace_all matches Python's str.replace(\"\", x)", () => {
+test('applyEdit with an empty old_string and replace_all matches Python\'s str.replace("", x)', () => {
   const result = applyEdit("abc", { old_string: "", new_string: "X", replace_all: true });
 
   expect(result).toBe("XaXbXcX");
@@ -33,7 +33,12 @@ test("simulate handles Write", () => {
   const readFn = readFile({ "/tmp/a.txt": "old text" });
   const request = simulate("Write", { file_path: "/tmp/a.txt", content: "new text" }, readFn);
 
-  expect(request).toEqual({ tool: "Write", filePath: "/tmp/a.txt", before: "old text", after: "new text" });
+  expect(request).toEqual({
+    tool: "Write",
+    filePath: "/tmp/a.txt",
+    before: "old text",
+    after: "new text",
+  });
 });
 
 test("simulate handles Edit with a single old_string/new_string pair", () => {
@@ -44,7 +49,12 @@ test("simulate handles Edit with a single old_string/new_string pair", () => {
     readFn,
   );
 
-  expect(request).toEqual({ tool: "Edit", filePath: "/tmp/a.txt", before: "hello world", after: "hello there" });
+  expect(request).toEqual({
+    tool: "Edit",
+    filePath: "/tmp/a.txt",
+    before: "hello world",
+    after: "hello there",
+  });
 });
 
 test("simulate handles MultiEdit applying edits in order", () => {
@@ -61,7 +71,12 @@ test("simulate handles MultiEdit applying edits in order", () => {
     readFn,
   );
 
-  expect(request).toEqual({ tool: "MultiEdit", filePath: "/tmp/a.txt", before: "one two three", after: "1 2 three" });
+  expect(request).toEqual({
+    tool: "MultiEdit",
+    filePath: "/tmp/a.txt",
+    before: "one two three",
+    after: "1 2 three",
+  });
 });
 
 test("simulate returns null for Bash", () => {

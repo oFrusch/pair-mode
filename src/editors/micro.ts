@@ -100,8 +100,16 @@ export function createMicroEditor(resolvesOnPath: PathResolver = defaultResolves
     prepare(context: EditorContext): EditorLaunch {
       mkdirSync(context.configDir, { recursive: true });
 
-      writeFileSync(join(context.configDir, "bindings.json"), JSON.stringify(MICRO_BINDINGS, null, 2), "utf-8");
-      writeFileSync(join(context.configDir, "settings.json"), JSON.stringify(MICRO_SETTINGS, null, 2), "utf-8");
+      writeFileSync(
+        join(context.configDir, "bindings.json"),
+        JSON.stringify(MICRO_BINDINGS, null, 2),
+        "utf-8",
+      );
+      writeFileSync(
+        join(context.configDir, "settings.json"),
+        JSON.stringify(MICRO_SETTINGS, null, 2),
+        "utf-8",
+      );
       writeColorScheme(context.configDir, context.theme);
       writeSyntax(context.configDir, context.sourcePath);
 

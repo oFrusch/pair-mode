@@ -54,7 +54,12 @@ function toSimulateCall(tool: string, args: Record<string, unknown>): SimulateCa
 
     return {
       tool: "Edit",
-      input: { file_path: filePath, old_string: oldString, new_string: newString, replace_all: replaceAll },
+      input: {
+        file_path: filePath,
+        old_string: oldString,
+        new_string: newString,
+        replace_all: replaceAll,
+      },
       filePath,
     };
   }

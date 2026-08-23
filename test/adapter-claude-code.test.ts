@@ -77,7 +77,10 @@ function setupHarness(): Harness {
 
 function writeEditorScript(dir: string, appendLine: string | null): string {
   const scriptPath = join(dir, "editor.sh");
-  const body = appendLine === null ? "#!/bin/sh\nexit 0\n" : `#!/bin/sh\nprintf '%s\\n' ${JSON.stringify(appendLine)} >> "$2"\n`;
+  const body =
+    appendLine === null
+      ? "#!/bin/sh\nexit 0\n"
+      : `#!/bin/sh\nprintf '%s\\n' ${JSON.stringify(appendLine)} >> "$2"\n`;
 
   writeFileSync(scriptPath, body, "utf-8");
   chmodSync(scriptPath, 0o755);

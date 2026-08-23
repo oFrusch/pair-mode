@@ -79,14 +79,21 @@ function setupHarness(): Harness {
 
 function writeEditorScript(dir: string, appendLine: string | null): string {
   const scriptPath = join(dir, "editor.sh");
-  const body = appendLine === null ? "#!/bin/sh\nexit 0\n" : `#!/bin/sh\nprintf '%s\\n' ${JSON.stringify(appendLine)} >> "$2"\n`;
+  const body =
+    appendLine === null
+      ? "#!/bin/sh\nexit 0\n"
+      : `#!/bin/sh\nprintf '%s\\n' ${JSON.stringify(appendLine)} >> "$2"\n`;
 
   writeFileSync(scriptPath, body, "utf-8");
   chmodSync(scriptPath, 0o755);
   return scriptPath;
 }
 
-function runAdapter(payload: string, harness: Harness, editorScript: string | null): { status: number | null; stdout: string; stderr: string } {
+function runAdapter(
+  payload: string,
+  harness: Harness,
+  editorScript: string | null,
+): { status: number | null; stdout: string; stderr: string } {
   const configHome = mkdtempSync(join(tmpdir(), "pair-mode-config-"));
   const fakeHome = mkdtempSync(join(tmpdir(), "pair-mode-home-"));
 
@@ -275,7 +282,9 @@ test("parsePatch keeps a trimmed blank context line in an Update File hunk, not 
   const parsed = parsePatch(patch);
 
   expect(parsed).not.toBeNull();
-  expect(parsed?.edits).toEqual([{ old_string: "line one\n\nline three", new_string: "line one\n\nline three" }]);
+  expect(parsed?.edits).toEqual([
+    { old_string: "line one\n\nline three", new_string: "line one\n\nline three" },
+  ]);
 });
 
 test("parsePatch keeps a trimmed blank added line in an Add File patch, not drops it", () => {
@@ -296,7 +305,9 @@ test("parsePatch keeps a trimmed blank added line in an Add File patch, not drop
 });
 
 test("parsePatch reconstructs empty content for a Delete File patch", () => {
-  const patch = ["*** Begin Patch", "*** Delete File: /tmp/obsolete.txt", "*** End Patch", ""].join("\n");
+  const patch = ["*** Begin Patch", "*** Delete File: /tmp/obsolete.txt", "*** End Patch", ""].join(
+    "\n",
+  );
 
   const parsed = parsePatch(patch);
 

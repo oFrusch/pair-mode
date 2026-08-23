@@ -27,7 +27,10 @@ afterEach(() => {
   }
 });
 
-function recordingSpawn(status = 0): { spawn: Spawn; calls: { command: string; args: string[] }[] } {
+function recordingSpawn(status = 0): {
+  spawn: Spawn;
+  calls: { command: string; args: string[] }[];
+} {
   const calls: { command: string; args: string[] }[] = [];
 
   const spawn: Spawn = (command, args): SpawnResult => {
@@ -54,9 +57,7 @@ test("zellij run builds the blocking floating pane argv", () => {
   expect(call?.args).toContain("--close-on-exit");
   expect(call?.args).toContain("90%");
   expect(call?.args).toContain("80%");
-  expect(call?.args).toEqual(
-    expect.arrayContaining(["micro", "file.txt"]),
-  );
+  expect(call?.args).toEqual(expect.arrayContaining(["micro", "file.txt"]));
 });
 
 test("zellij run reports the failure detail on a nonzero exit", () => {

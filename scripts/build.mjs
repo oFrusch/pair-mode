@@ -1,22 +1,22 @@
-import { build } from 'esbuild';
-import { existsSync, chmodSync } from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { build } from "esbuild";
+import { existsSync, chmodSync } from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 // Get directory context for ESM.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const projectRoot = path.resolve(__dirname, '..');
+const projectRoot = path.resolve(__dirname, "..");
 
 // Every entry point is a hook or CLI a shell invokes directly, so every one needs the shebang and the executable bit.
-const SHEBANG = '#!/usr/bin/env node';
+const SHEBANG = "#!/usr/bin/env node";
 
 // Define all entry points to build.
 const entryPoints = [
-  { src: 'src/cli/index.ts', out: 'dist/cli.js' },
-  { src: 'src/adapters/claude-code.ts', out: 'dist/claude-code.js' },
-  { src: 'src/adapters/codex.ts', out: 'dist/codex.js' },
-  { src: 'src/adapters/opencode.ts', out: 'dist/opencode.js' },
-  { src: 'src/adapters/pi.ts', out: 'dist/pi.js' },
+  { src: "src/cli/index.ts", out: "dist/cli.js" },
+  { src: "src/adapters/claude-code.ts", out: "dist/claude-code.js" },
+  { src: "src/adapters/codex.ts", out: "dist/codex.js" },
+  { src: "src/adapters/opencode.ts", out: "dist/opencode.js" },
+  { src: "src/adapters/pi.ts", out: "dist/pi.js" },
 ];
 
 // Check which entry points exist.
@@ -48,9 +48,9 @@ for (const entry of tooBuild) {
       entryPoints: [path.resolve(projectRoot, entry.src)],
       outfile,
       bundle: true,
-      platform: 'node',
-      format: 'esm',
-      target: 'node20',
+      platform: "node",
+      format: "esm",
+      target: "node20",
       sourcemap: false,
       banner: { js: SHEBANG },
     });

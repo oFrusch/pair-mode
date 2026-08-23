@@ -39,5 +39,7 @@ export function describe(): string[] {
     createTtyMultiplexer(),
   ];
 
-  return adapters.map((adapter) => `${adapter.name}: ${adapter.available() ? "available" : "not available"}`);
+  return adapters.map(
+    (adapter) => `${adapter.name}: ${adapter.available() ? "available" : "not available"}`,
+  );
 }

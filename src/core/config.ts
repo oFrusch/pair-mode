@@ -45,9 +45,7 @@ function isEditorName(value: unknown): value is EditorName {
 
 function isEditorList(value: unknown): value is string[] {
   return (
-    Array.isArray(value) &&
-    value.length > 0 &&
-    value.every((item) => typeof item === "string")
+    Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string")
   );
 }
 
@@ -85,14 +83,14 @@ function validateEditor(
     return value;
   }
 
-  errors.push({ path: "editor", message: "must be one of auto, micro, nvim, vim, nano, or a non-empty array of strings" });
+  errors.push({
+    path: "editor",
+    message: "must be one of auto, micro, nvim, vim, nano, or a non-empty array of strings",
+  });
   return DEFAULT_CONFIG.editor;
 }
 
-function validateMultiplexer(
-  raw: Record<string, unknown>,
-  errors: ConfigError[],
-): MultiplexerName {
+function validateMultiplexer(raw: Record<string, unknown>, errors: ConfigError[]): MultiplexerName {
   if (!("multiplexer" in raw)) {
     return DEFAULT_CONFIG.multiplexer;
   }
@@ -263,7 +261,10 @@ export function loadConfig(path?: string): ConfigResult {
     text = readFileSync(target, "utf-8");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return { config: DEFAULT_CONFIG, errors: [{ path: target, message: `could not read file: ${message}` }] };
+    return {
+      config: DEFAULT_CONFIG,
+      errors: [{ path: target, message: `could not read file: ${message}` }],
+    };
   }
 
   let parsed: unknown;
@@ -272,11 +273,17 @@ export function loadConfig(path?: string): ConfigResult {
     parsed = JSON.parse(text);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return { config: DEFAULT_CONFIG, errors: [{ path: target, message: `invalid JSON: ${message}` }] };
+    return {
+      config: DEFAULT_CONFIG,
+      errors: [{ path: target, message: `invalid JSON: ${message}` }],
+    };
   }
 
   if (!isRecord(parsed)) {
-    return { config: DEFAULT_CONFIG, errors: [{ path: target, message: "config must be a JSON object" }] };
+    return {
+      config: DEFAULT_CONFIG,
+      errors: [{ path: target, message: "config must be a JSON object" }],
+    };
   }
 
   return validate(parsed);

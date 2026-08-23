@@ -1,5 +1,12 @@
 import { spawnSync } from "node:child_process";
-import type { Multiplexer, PaneSize, PathResolver, RunResult, Spawn, SpawnResult } from "./multiplexer.types";
+import type {
+  Multiplexer,
+  PaneSize,
+  PathResolver,
+  RunResult,
+  Spawn,
+  SpawnResult,
+} from "./multiplexer.types";
 
 // The default spawn shells out for real and captures stderr for a failure report.
 const defaultSpawn: Spawn = (command, args): SpawnResult => {

@@ -1,18 +1,5 @@
 {
-  "original": [
-    "func main() {",
-    "\tx := 1",
-    "}"
-  ],
-  "numbers": [
-    10,
-    11,
-    12
-  ],
-  "saved": [
-    "what does this function do overall?",
-    "func main() {",
-    "\tx := 1",
-    "}"
-  ]
+  "original": ["func main() {", "\tx := 1", "}"],
+  "numbers": [10, 11, 12],
+  "saved": ["what does this function do overall?", "func main() {", "\tx := 1", "}"]
 }

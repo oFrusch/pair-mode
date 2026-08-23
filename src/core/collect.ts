@@ -18,7 +18,11 @@ export function anchor(
   return { line: null, code: "" };
 }
 
-export function collect(original: string[], numbers: (number | null)[], saved: string[]): Question[] {
+export function collect(
+  original: string[],
+  numbers: (number | null)[],
+  saved: string[],
+): Question[] {
   const questions: Question[] = [];
 
   for (const op of opcodes(original, saved)) {

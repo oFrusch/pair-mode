@@ -35,22 +35,5 @@
     "    func main() {",
     "⋯ 7 unchanged lines"
   ],
-  "numbers": [
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7,
-    8,
-    null
-  ]
+  "numbers": [null, null, null, null, null, null, null, 1, 2, 3, 4, 5, 6, 7, 8, null]
 }

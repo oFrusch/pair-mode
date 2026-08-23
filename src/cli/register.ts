@@ -113,7 +113,12 @@ function writeJsonObject(path: string, root: Record<string, unknown>): void {
   writeFileSync(path, JSON.stringify(root, null, 2) + "\n", "utf-8");
 }
 
-function registerPreToolUseHook(path: string, matcher: string, command: string, timeout: number): RegisterResult {
+function registerPreToolUseHook(
+  path: string,
+  matcher: string,
+  command: string,
+  timeout: number,
+): RegisterResult {
   const root = readJsonObject(path);
   const shapeError = describeShapeError(root, path);
 

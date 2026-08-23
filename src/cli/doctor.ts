@@ -78,7 +78,9 @@ function describeRegistration(spec: RegistrationSpec): DoctorCheck {
   return {
     name: `${spec.cli} hook`,
     passed: spec.targetExists,
-    detail: spec.targetExists ? "registered, target exists" : "registered, but target file is missing",
+    detail: spec.targetExists
+      ? "registered, target exists"
+      : "registered, but target file is missing",
   };
 }
 
@@ -96,10 +98,26 @@ function checkClis(home: string, root: string): DoctorCheck[] {
   const piRegistered = isReExportRegistered(piExtensionPath(home), piTarget);
 
   return [
-    describeRegistration({ cli: "claude-code", registered: claudeRegistered, targetExists: existsSync(claudeCommand) }),
-    describeRegistration({ cli: "codex", registered: codexRegistered, targetExists: existsSync(codexCommand) }),
-    describeRegistration({ cli: "opencode", registered: opencodeRegistered, targetExists: existsSync(opencodeTarget) }),
-    describeRegistration({ cli: "pi", registered: piRegistered, targetExists: existsSync(piTarget) }),
+    describeRegistration({
+      cli: "claude-code",
+      registered: claudeRegistered,
+      targetExists: existsSync(claudeCommand),
+    }),
+    describeRegistration({
+      cli: "codex",
+      registered: codexRegistered,
+      targetExists: existsSync(codexCommand),
+    }),
+    describeRegistration({
+      cli: "opencode",
+      registered: opencodeRegistered,
+      targetExists: existsSync(opencodeTarget),
+    }),
+    describeRegistration({
+      cli: "pi",
+      registered: piRegistered,
+      targetExists: existsSync(piTarget),
+    }),
   ];
 }
 
@@ -149,10 +167,16 @@ function checkTrace(): DoctorCheck | null {
     return { name: "trace log", passed: true, detail: "tracing is on; no log written yet" };
   }
 
-  const lines = readFileSync(tracePath, "utf-8").split("\n").filter((line) => line !== "");
+  const lines = readFileSync(tracePath, "utf-8")
+    .split("\n")
+    .filter((line) => line !== "");
   const tail = lines.slice(-10);
 
-  return { name: "trace log", passed: true, detail: tail.length === 0 ? "empty" : tail.join(" | ") };
+  return {
+    name: "trace log",
+    passed: true,
+    detail: tail.length === 0 ? "empty" : tail.join(" | "),
+  };
 }
 
 const defaultOpenTty = (): number => openSync("/dev/tty", "r+");
@@ -178,7 +202,9 @@ export function runDoctor(options: DoctorOptions = {}): DoctorReport {
   }
 
   const exitCode = checks.every((check) => check.passed) ? 0 : 1;
-  const text = checks.map((check) => `[${check.passed ? "PASS" : "FAIL"}] ${check.name}: ${check.detail}`).join("\n");
+  const text = checks
+    .map((check) => `[${check.passed ? "PASS" : "FAIL"}] ${check.name}: ${check.detail}`)
+    .join("\n");
 
   return { checks, exitCode, text };
 }

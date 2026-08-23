@@ -109,7 +109,7 @@ Check: `pnpm test` passes, and every fixture matches the Python output byte for 
 ### 2.1 `src/multiplexers/`
 
 1. `zellij.ts` runs `zellij run --floating --close-on-exit --blocking --width --height --
-   argv`. `--blocking` waits for the pane to close.
+argv`. `--blocking` waits for the pane to close.
 2. `tmux.ts` runs `tmux display-popup -E`. The popup returns immediately, so append
    `tmux wait-for -S <channel>` to the inner command. The adapter then waits on
    `tmux wait-for <channel>`.

@@ -3,12 +3,7 @@ import { isEnabled } from "../core/state";
 import { simulate } from "../core/simulate";
 import { runPair as defaultRunPair } from "../core/run";
 import { loadConfig } from "../core/config";
-import type {
-  PiExtensionAPI,
-  PiToolCallEvent,
-  PiToolCallResult,
-  RunPairFn,
-} from "./pi.types";
+import type { PiExtensionAPI, PiToolCallEvent, PiToolCallResult, RunPairFn } from "./pi.types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

@@ -91,29 +91,46 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
       ? existingConfig.editor.join(" ")
       : existingConfig.editor;
     const defaultEditor =
-      existingEditorLabel !== "auto" ? existingEditorLabel : report.editors.find((editor) => editor.onPath)?.name ?? "auto";
-    const editorAnswer = withDefault(await prompter.question(`Editor [${defaultEditor}]: `), defaultEditor);
+      existingEditorLabel !== "auto"
+        ? existingEditorLabel
+        : (report.editors.find((editor) => editor.onPath)?.name ?? "auto");
+    const editorAnswer = withDefault(
+      await prompter.question(`Editor [${defaultEditor}]: `),
+      defaultEditor,
+    );
 
     const onPathMultiplexer = report.multiplexers.find((multiplexer) => multiplexer.onPath)?.name;
     const defaultMultiplexer =
-      existingConfig.multiplexer !== "auto" ? existingConfig.multiplexer : report.insideMultiplexer ?? onPathMultiplexer ?? "none";
+      existingConfig.multiplexer !== "auto"
+        ? existingConfig.multiplexer
+        : (report.insideMultiplexer ?? onPathMultiplexer ?? "none");
     const multiplexerAnswer = withDefault(
       await prompter.question(`Multiplexer [${defaultMultiplexer}]: `),
       defaultMultiplexer,
     );
 
     const defaultLayout = existingConfig.layout;
-    const layoutAnswer = withDefault(await prompter.question(`Layout [${defaultLayout}]: `), defaultLayout);
+    const layoutAnswer = withDefault(
+      await prompter.question(`Layout [${defaultLayout}]: `),
+      defaultLayout,
+    );
 
     const presentClis = report.clis.filter((cli) => cli.present).map((cli) => cli.name);
     const defaultClis = presentClis.join(",");
     const clisAnswer = withDefault(
-      await prompter.question(`Register with which CLIs (comma-separated: claude-code,codex,opencode,pi) [${defaultClis}]: `),
+      await prompter.question(
+        `Register with which CLIs (comma-separated: claude-code,codex,opencode,pi) [${defaultClis}]: `,
+      ),
       defaultClis,
     );
-    const selectedClis = clisAnswer.split(",").map((name) => name.trim()).filter((name) => name !== "");
+    const selectedClis = clisAnswer
+      .split(",")
+      .map((name) => name.trim())
+      .filter((name) => name !== "");
 
-    const hasMultiplexer = report.multiplexers.some((multiplexer) => multiplexer.onPath) || report.insideMultiplexer !== null;
+    const hasMultiplexer =
+      report.multiplexers.some((multiplexer) => multiplexer.onPath) ||
+      report.insideMultiplexer !== null;
     const wantsHookOnlyCli = selectedClis.includes("claude-code") || selectedClis.includes("codex");
 
     if (!hasMultiplexer && wantsHookOnlyCli) {
@@ -129,7 +146,9 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
 
     // A blank answer to "Editor" keeps a previously configured custom editor array intact rather than collapsing it to a name.
     const editorValue: EditorName | string[] =
-      editorAnswer === defaultEditor && Array.isArray(existingConfig.editor) ? existingConfig.editor : toEditorName(editorAnswer);
+      editorAnswer === defaultEditor && Array.isArray(existingConfig.editor)
+        ? existingConfig.editor
+        : toEditorName(editorAnswer);
 
     const config: PairConfig = {
       ...existingConfig,
@@ -157,7 +176,9 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
 
         if (result.changed) {
           pushChanged(changedFiles, result.path, result.backupPath);
-          console.log("Claude Code loads hooks at startup. Restart Claude Code for the hook to take effect.");
+          console.log(
+            "Claude Code loads hooks at startup. Restart Claude Code for the hook to take effect.",
+          );
         }
 
         continue;
@@ -198,7 +219,9 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
           pushChanged(changedFiles, result.path, result.backupPath);
         }
 
-        console.log("Codex asks you to trust a hook definition once. Run /hooks inside Codex to trust it.");
+        console.log(
+          "Codex asks you to trust a hook definition once. Run /hooks inside Codex to trust it.",
+        );
         continue;
       }
 
@@ -227,7 +250,11 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
       console.log(`  ${file}`);
     }
 
-    const doctorReport = runDoctor({ homeDir: home, installRoot: root, resolvesOnPath: options.resolvesOnPath });
+    const doctorReport = runDoctor({
+      homeDir: home,
+      installRoot: root,
+      resolvesOnPath: options.resolvesOnPath,
+    });
     console.log(doctorReport.text);
 
     return { changedFiles, stopped: false, doctorExitCode: doctorReport.exitCode };

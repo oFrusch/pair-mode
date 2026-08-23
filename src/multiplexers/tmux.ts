@@ -1,5 +1,12 @@
 import { spawnSync } from "node:child_process";
-import type { Multiplexer, PaneSize, PathResolver, RunResult, Spawn, SpawnResult } from "./multiplexer.types";
+import type {
+  Multiplexer,
+  PaneSize,
+  PathResolver,
+  RunResult,
+  Spawn,
+  SpawnResult,
+} from "./multiplexer.types";
 
 // The default spawn shells out for real and captures stderr for a failure report.
 const defaultSpawn: Spawn = (command, args): SpawnResult => {
@@ -41,7 +48,15 @@ export function createTmuxMultiplexer(
       const inner = argv.map(shellQuote).join(" ");
       const script = `stty -ixon 2>/dev/null; ${inner}; tmux wait-for -S ${channel}`;
 
-      const popup = spawn("tmux", ["display-popup", "-E", "-w", size.width, "-h", size.height, script]);
+      const popup = spawn("tmux", [
+        "display-popup",
+        "-E",
+        "-w",
+        size.width,
+        "-h",
+        size.height,
+        script,
+      ]);
 
       if (popup.status !== 0) {
         return { ok: false, detail: popup.stderr };

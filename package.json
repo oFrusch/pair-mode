@@ -2,26 +2,40 @@
   "name": "pair-mode",
   "version": "0.1.0",
   "description": "Annotate a coding agent's proposed edits line by line, in your terminal.",
-  "type": "module",
   "license": "MIT",
-  "bin": { "pair-mode": "dist/cli.js" },
-  "files": ["dist", "assets", "README.md"],
-  "engines": { "node": ">=20" },
+  "bin": {
+    "pair-mode": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "assets",
+    "README.md"
+  ],
+  "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
     "capture": "node scripts/capture-fixtures.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "pnpm run build"
+    "prepublishOnly": "pnpm run build",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix"
   },
   "dependencies": {
-    "diff": "^8.0.2"
+    "diff": "^9.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "esbuild": "^0.25.0",
-    "typescript": "^5.7.0",
-    "vitest": "^3.0.0"
+    "oxfmt": "^0.64.0",
+    "oxlint": "^1.79.0",
+    "typescript": "^7.0.0",
+    "vitest": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

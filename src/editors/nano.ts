@@ -12,7 +12,9 @@ const defaultResolvesOnPath: PathResolver = (command) => {
 
 function writeNanorc(configDir: string, theme: EditorContext["theme"]): string {
   const text =
-    `color ,${theme.add} "^▌▌\\+"\n` + `color ,${theme.del} "^▌▌-"\n` + `color ,${theme.fold} "^⋯"\n`;
+    `color ,${theme.add} "^▌▌\\+"\n` +
+    `color ,${theme.del} "^▌▌-"\n` +
+    `color ,${theme.fold} "^⋯"\n`;
 
   const path = join(configDir, "pair.nanorc");
   writeFileSync(path, text, "utf-8");

@@ -1,13 +1,7 @@
 import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { join, dirname, basename } from "node:path";
-import {
-  existsSync,
-  realpathSync,
-  mkdirSync,
-  writeFileSync,
-  unlinkSync,
-} from "node:fs";
+import { existsSync, realpathSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
 
 export function stateDir(): string {
   const base = process.env["XDG_STATE_HOME"] || join(homedir(), ".local", "state");

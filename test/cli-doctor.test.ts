@@ -3,7 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, expect, beforeEach, afterEach } from "vitest";
 import { runDoctor } from "../src/cli/doctor";
-import { registerClaudeCode, registerCodex, registerOpencode, registerPi } from "../src/cli/register";
+import {
+  registerClaudeCode,
+  registerCodex,
+  registerOpencode,
+  registerPi,
+} from "../src/cli/register";
 import { saveConfig } from "../src/core/config";
 import type { PairConfig } from "../src/core/config.types";
 

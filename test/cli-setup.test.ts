@@ -130,7 +130,10 @@ test("registration into a settings file that already carries unrelated hooks pre
 
   const hooks = (written as { hooks: { PreToolUse: unknown[] } }).hooks.PreToolUse;
   expect(hooks).toHaveLength(2);
-  expect(hooks).toContainEqual({ matcher: "Bash", hooks: [{ type: "command", command: "some-other-hook" }] });
+  expect(hooks).toContainEqual({
+    matcher: "Bash",
+    hooks: [{ type: "command", command: "some-other-hook" }],
+  });
 });
 
 test("a second registration is a no-op and reports the file as unchanged", () => {
@@ -162,7 +165,9 @@ test("a Codex hooks file carrying MultiEdit is detected, and correcting it remov
     path,
     JSON.stringify({
       hooks: {
-        PreToolUse: [{ matcher: "Write|Edit|MultiEdit", hooks: [{ type: "command", command: "some-hook" }] }],
+        PreToolUse: [
+          { matcher: "Write|Edit|MultiEdit", hooks: [{ type: "command", command: "some-hook" }] },
+        ],
       },
     }),
     "utf-8",
@@ -192,7 +197,9 @@ test("registerCodex writes the apply_patch|Edit|Write matcher, not MultiEdit", (
       PreToolUse: [
         {
           matcher: "apply_patch|Edit|Write",
-          hooks: [{ type: "command", command: join(installDir, "dist", "codex.js"), timeout: 1800 }],
+          hooks: [
+            { type: "command", command: join(installDir, "dist", "codex.js"), timeout: 1800 },
+          ],
         },
       ],
     },
@@ -302,7 +309,9 @@ test("a re-run backs up the existing config and preserves fields the wizard neve
   });
 
   expect(existsSync(`${configFilePath}.pair-backup`)).toBe(true);
-  expect(JSON.parse(readFileSync(`${configFilePath}.pair-backup`, "utf-8"))).toMatchObject({ editor: "nano" });
+  expect(JSON.parse(readFileSync(`${configFilePath}.pair-backup`, "utf-8"))).toMatchObject({
+    editor: "nano",
+  });
   expect(result.changedFiles).toContain(configFilePath);
 
   const written = loadConfig(configFilePath).config;

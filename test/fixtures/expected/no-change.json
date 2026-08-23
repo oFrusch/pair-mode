@@ -29,19 +29,5 @@
     "    func main() { fmt.Println(\"noop\") }",
     "    "
   ],
-  "numbers": [
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    1,
-    2,
-    3,
-    4,
-    5,
-    6
-  ]
+  "numbers": [null, null, null, null, null, null, null, 1, 2, 3, 4, 5, 6]
 }

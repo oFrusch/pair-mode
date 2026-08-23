@@ -25,7 +25,10 @@ function splitLines(text: string): string[] {
 }
 
 function splitCommand(value: string): string[] {
-  return value.trim().split(/\s+/).filter((part) => part !== "");
+  return value
+    .trim()
+    .split(/\s+/)
+    .filter((part) => part !== "");
 }
 
 function tempFile(prefix: string, suffix: string, content: string): string {
