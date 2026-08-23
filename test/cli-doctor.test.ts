@@ -84,6 +84,7 @@ test("doctor on a fully configured temporary home exits 0", () => {
     pane: { width: "90%", height: "90%" },
     theme: { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a" },
     trace: false,
+    autoApprove: true,
   };
   saveConfig(config);
 
@@ -132,6 +133,7 @@ test("doctor fails the entry points check when a built file is not executable", 
     pane: { width: "90%", height: "90%" },
     theme: { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a" },
     trace: false,
+    autoApprove: true,
   };
   saveConfig(config);
 

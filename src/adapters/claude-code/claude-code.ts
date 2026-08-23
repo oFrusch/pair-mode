@@ -43,11 +43,26 @@ async function main(config: PairConfig): Promise<number> {
   const verdict = await runPair(request, config);
 
   if (verdict.decision === "allow") {
+    if (verdict.reviewed && config.autoApprove) {
+      process.stdout.write(JSON.stringify(allowPayload()) + "\n");
+    }
+
     return 0;
   }
 
   process.stderr.write(verdict.reason + "\n");
   return 2;
+}
+
+// PreToolUse allow decision, per https://code.claude.com/docs/en/hooks.md.
+function allowPayload(): Record<string, unknown> {
+  return {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "allow",
+      permissionDecisionReason: "reviewed in pair mode",
+    },
+  };
 }
 
 // A hook that fails must never block the user's work, so every error path exits 0.

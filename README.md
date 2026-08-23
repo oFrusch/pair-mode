@@ -70,9 +70,17 @@ when `XDG_CONFIG_HOME` is not set.
 | `theme.del`   | 6-digit hex colour                                                            | `"#3a1e1e"` |
 | `theme.fold`  | 6-digit hex colour                                                            | `"#2a2a2a"` |
 | `trace`       | boolean                                                                       | `false`     |
+| `autoApprove` | boolean                                                                       | `true`      |
 
 An `editor` array lists editor names in order of preference. Pair mode tries each in
 turn and uses the first one it finds on the machine.
+
+`autoApprove` controls what happens on a clean quit: you reviewed the diff in the pane
+and typed no questions. With `autoApprove` on, the Claude Code hook approves the edit
+itself, so Claude Code's own permission prompt does not appear a second time. With
+`autoApprove` off, the hook stays silent and Claude Code's normal permission flow runs.
+Pair mode never approves an edit it did not show you: a disabled path, an unsupported
+tool, or a multiplexer failure all fall through to Claude Code's normal prompt too.
 
 ## Known limits
 

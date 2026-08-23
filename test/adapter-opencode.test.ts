@@ -34,7 +34,7 @@ function denyingRunPair(reason: string): RunPairFn {
 }
 
 function allowingRunPair(): RunPairFn {
-  return async () => ({ decision: "allow" });
+  return async () => ({ decision: "allow", reviewed: true });
 }
 
 function throwingRunPair(): RunPairFn {
@@ -88,7 +88,7 @@ test("an unrecognised tool resolves without calling runPair", async () => {
 
   const runPair: RunPairFn = async () => {
     called = true;
-    return { decision: "allow" };
+    return { decision: "allow", reviewed: true };
   };
 
   await expect(

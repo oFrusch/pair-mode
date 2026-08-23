@@ -5,6 +5,8 @@ export interface EditRequest {
   after: string;
 }
 
+// reviewed distinguishes an allow the user actually saw in the pane from an allow pair mode never showed them.
 export type RunVerdict =
-  | { decision: "allow"; reason?: string }
+  | { decision: "allow"; reviewed: true }
+  | { decision: "allow"; reviewed: false; reason?: string }
   | { decision: "deny"; reason: string };

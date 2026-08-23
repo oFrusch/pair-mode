@@ -67,11 +67,11 @@ function applyEnv(env: Record<string, string>): () => void {
 
 export async function runPair(request: EditRequest, config: PairConfig): Promise<RunVerdict> {
   if (request.before === request.after) {
-    return { decision: "allow" };
+    return { decision: "allow", reviewed: false };
   }
 
   if (!isEnabled(request.filePath)) {
-    return { decision: "allow" };
+    return { decision: "allow", reviewed: false };
   }
 
   const override = process.env["CC_PAIR_EDITOR"] || process.env["VISUAL"] || process.env["EDITOR"];
@@ -126,14 +126,14 @@ export async function runPair(request: EditRequest, config: PairConfig): Promise
     }
 
     if (!result.ok) {
-      return { decision: "allow", reason: result.detail };
+      return { decision: "allow", reviewed: false, reason: result.detail };
     }
 
     const saved = splitLines(readFileSync(rightFile, "utf-8"));
     const questions = collect(rendered.right, rendered.numbers, saved);
 
     if (questions.length === 0) {
-      return { decision: "allow" };
+      return { decision: "allow", reviewed: true };
     }
 
     return { decision: "deny", reason: formatQuestions(questions, request.filePath) };
