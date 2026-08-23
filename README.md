@@ -70,6 +70,7 @@ when `XDG_CONFIG_HOME` is not set.
 | `theme.del`   | 6-digit hex colour                                                            | `"#3a1e1e"` |
 | `theme.fold`  | 6-digit hex colour                                                            | `"#2a2a2a"` |
 | `trace`       | boolean                                                                       | `false`     |
+| `autoApprove` | boolean                                                                       | `true`      |
 
 An `editor` array lists editor names in order of preference. Pair mode tries each in
 turn and uses the first one it finds on the machine.

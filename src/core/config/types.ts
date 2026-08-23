@@ -22,6 +22,7 @@ export interface PairConfig {
   pane: Pane;
   theme: Theme;
   trace: boolean;
+  autoApprove: boolean;
 }
 
 export interface ConfigError {

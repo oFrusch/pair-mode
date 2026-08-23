@@ -296,6 +296,7 @@ test("a re-run backs up the existing config and preserves fields the wizard neve
     pane: { width: "70%", height: "60%" },
     theme: { add: "#111111", del: "#222222", fold: "#333333" },
     trace: true,
+    autoApprove: false,
   };
   saveConfig(customized, configFilePath);
 

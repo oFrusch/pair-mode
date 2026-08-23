@@ -13,11 +13,11 @@ import type {
 } from "./types";
 import { DEFAULT_CONTEXT, DEFAULT_MIN_FOLD } from "../marks";
 import { isRecord } from "../../helpers/isRecord";
+import { isHexColor as isHexColorString } from "../../helpers/hexColor";
 
 const EDITOR_NAMES: string[] = ["auto", "micro", "nvim", "vim", "nano"];
 const MULTIPLEXER_NAMES: string[] = ["auto", "zellij", "tmux", "none"];
 const LAYOUTS: string[] = ["split", "inline"];
-const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 export const DEFAULT_CONFIG: PairConfig = {
   editor: "auto",
@@ -28,6 +28,7 @@ export const DEFAULT_CONFIG: PairConfig = {
   pane: { width: "90%", height: "90%" },
   theme: { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a" },
   trace: false,
+  autoApprove: true,
 };
 
 // homeDir lets a caller (setup, in particular) resolve the config path for an explicit home rather than the process's real one.
@@ -59,7 +60,7 @@ function isPositiveInteger(value: unknown): value is number {
 }
 
 function isHexColor(value: unknown): value is string {
-  return typeof value === "string" && HEX_COLOR.test(value);
+  return typeof value === "string" && isHexColorString(value);
 }
 
 function validateEditor(
@@ -228,6 +229,21 @@ function validateTrace(raw: Record<string, unknown>, errors: ConfigError[]): boo
   return DEFAULT_CONFIG.trace;
 }
 
+function validateAutoApprove(raw: Record<string, unknown>, errors: ConfigError[]): boolean {
+  if (!("autoApprove" in raw)) {
+    return DEFAULT_CONFIG.autoApprove;
+  }
+
+  const value = raw["autoApprove"];
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  errors.push({ path: "autoApprove", message: "must be a boolean" });
+  return DEFAULT_CONFIG.autoApprove;
+}
+
 function validate(raw: Record<string, unknown>): ConfigResult {
   const errors: ConfigError[] = [];
 
@@ -240,6 +256,7 @@ function validate(raw: Record<string, unknown>): ConfigResult {
     pane: validatePane(raw, errors),
     theme: validateTheme(raw, errors),
     trace: validateTrace(raw, errors),
+    autoApprove: validateAutoApprove(raw, errors),
   };
 
   return { config, errors };

@@ -2,6 +2,7 @@ import { extname } from "node:path";
 import type { Editor, EditorContext, EditorLaunch, PathResolver } from "./editor.types";
 import { syntaxName } from "./languages";
 import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
+import { isHexColor } from "../helpers/hexColor";
 
 // The micro syntax name and the vim filetype name diverge only for these entries.
 const VIM_FILETYPE_OVERRIDES: Record<string, string> = {
@@ -18,12 +19,21 @@ function vimFiletype(sourcePath: string): string | null {
   return VIM_FILETYPE_OVERRIDES[lang] ?? lang;
 }
 
+// A `|` in a vim -c string splits it into a second command, so guard here even though config.ts already validates hex upstream.
+function safeThemeColor(value: string): string {
+  if (!isHexColor(value)) {
+    throw new Error(`invalid theme colour for vim highlight: ${value}`);
+  }
+
+  return value;
+}
+
 // matchadd() overlays a highlight on top of syntax, so a changed row keeps both.
 function highlightCommands(theme: EditorContext["theme"]): string[] {
   return [
-    `hi PairAdd guibg=${theme.add}`,
-    `hi PairDel guibg=${theme.del}`,
-    `hi PairFold guibg=${theme.fold}`,
+    `hi PairAdd guibg=${safeThemeColor(theme.add)}`,
+    `hi PairDel guibg=${safeThemeColor(theme.del)}`,
+    `hi PairFold guibg=${safeThemeColor(theme.fold)}`,
   ];
 }
 

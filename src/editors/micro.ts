@@ -1,9 +1,12 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { parse, stringify } from "yaml";
 import type { Editor, EditorContext, EditorLaunch, PathResolver } from "./editor.types";
+import type { BandRule, MicroSyntaxFile, MicroSyntaxSource } from "./micro.types";
 import { syntaxName } from "./languages";
-import { ruleBody } from "./syntax-cache";
+import { syntaxSource } from "./syntax-cache";
 import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
+import { isRecord } from "../helpers/isRecord";
 
 const MICRO_BINDINGS = {
   F2: "QuitAll",
@@ -21,18 +24,22 @@ const MICRO_SETTINGS = {
   colorscheme: "pair",
 };
 
-// pairadd and pairskip need micro regions, not plain rules, or the row loses colour mid-line.
-function bandRules(): string {
-  return (
-    '\n    - pairadd:\n        start: "^▌▌\\\\+"\n        end: "$"' +
-    '\n    - pairdel:\n        start: "^▌▌-"\n        end: "$"' +
-    '\n    - pairskip:\n        start: "^⋯"\n        end: "$"' +
-    '\n    - comment:\n        start: "^#"\n        end: "$"\n'
-  );
+function isMicroSyntaxSource(value: unknown): value is MicroSyntaxSource {
+  return isRecord(value) && Array.isArray(value["rules"]);
 }
 
-function syntaxHead(lang: string, suffix: string): string {
-  return `filetype: pair-${lang}\n\ndetect:\n    filename: "\\\\${suffix}$"\n\nrules:\n`;
+// pairadd and pairskip need micro regions, not plain rules, or the row loses colour mid-line.
+function bandRules(): BandRule[] {
+  const region = (name: string, start: string): BandRule => ({
+    [name]: { start, end: "$" },
+  });
+
+  return [
+    region("pairadd", "^▌▌\\+"),
+    region("pairdel", "^▌▌-"),
+    region("pairskip", "^⋯"),
+    region("comment", "^#"),
+  ];
 }
 
 function writeColorScheme(configDir: string, theme: EditorContext["theme"]): void {
@@ -48,6 +55,25 @@ function writeColorScheme(configDir: string, theme: EditorContext["theme"]): voi
   writeFileSync(join(dir, "pair.micro"), text, "utf-8");
 }
 
+// Builds a real object, then hands it to the yaml library, so indentation is the serializer's problem, not ours.
+export function syntaxText(lang: string, source: string): string | null {
+  const parsed: unknown = parse(source);
+
+  if (!isMicroSyntaxSource(parsed)) {
+    return null;
+  }
+
+  const suffix = `.pair-${lang}`;
+
+  const file: MicroSyntaxFile = {
+    filetype: `pair-${lang}`,
+    detect: { filename: `\\${suffix}$` },
+    rules: [...parsed.rules, ...bandRules()],
+  };
+
+  return stringify(file, { lineWidth: 0 });
+}
+
 function writeSyntax(configDir: string, sourcePath: string): void {
   const lang = syntaxName(sourcePath);
 
@@ -55,17 +81,21 @@ function writeSyntax(configDir: string, sourcePath: string): void {
     return;
   }
 
-  const rules = ruleBody(lang);
+  const source = syntaxSource(lang);
 
-  if (rules === null) {
+  if (source === null) {
     return;
   }
 
-  const suffix = `.pair-${lang}`;
+  const text = syntaxText(lang, source);
+
+  if (text === null) {
+    return;
+  }
+
   const dir = join(configDir, "syntax");
   mkdirSync(dir, { recursive: true });
 
-  const text = syntaxHead(lang, suffix) + rules.trimEnd() + "\n" + bandRules();
   writeFileSync(join(dir, `pair-${lang}.yaml`), text, "utf-8");
 }
 
@@ -88,7 +118,7 @@ export function createMicroEditor(resolvesOnPath: PathResolver = defaultResolves
         return ".diff";
       }
 
-      return ruleBody(lang) === null ? ".diff" : `.pair-${lang}`;
+      return syntaxSource(lang) === null ? ".diff" : `.pair-${lang}`;
     },
 
     prepare(context: EditorContext): EditorLaunch {

@@ -23,6 +23,9 @@ beforeAll(async () => {
     platform: "node",
     format: "esm",
     target: "node20",
+    banner: {
+      js: 'import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);',
+    },
   });
 });
 
@@ -101,14 +104,17 @@ function runAdapter(
   harness: Harness,
   editorScript: string | null,
   layout: "split" | "inline" = "split",
+  configOverrides: Record<string, unknown> = {},
 ): { status: number | null; stdout: string; stderr: string } {
   const configHome = mkdtempSync(join(tmpdir(), "pair-mode-config-"));
   const fakeHome = mkdtempSync(join(tmpdir(), "pair-mode-home-"));
 
-  if (layout === "inline") {
+  const overrides = layout === "inline" ? { layout, ...configOverrides } : configOverrides;
+
+  if (Object.keys(overrides).length > 0) {
     const configDir = join(configHome, "pair-mode");
     mkdirSync(configDir, { recursive: true });
-    writeFileSync(join(configDir, "config.json"), JSON.stringify({ layout: "inline" }), "utf-8");
+    writeFileSync(join(configDir, "config.json"), JSON.stringify(overrides), "utf-8");
   }
 
   const env: Record<string, string | undefined> = {
@@ -151,7 +157,15 @@ test("a payload with a question line exits 2 and reports the question and the fi
   expect(outcome.stderr).toContain(harness.filePath);
 });
 
-test("an editor that changes nothing exits 0", () => {
+const ALLOW_JSON = JSON.stringify({
+  hookSpecificOutput: {
+    hookEventName: "PreToolUse",
+    permissionDecision: "allow",
+    permissionDecisionReason: "reviewed in pair mode",
+  },
+});
+
+test("a clean quit with no questions and autoApprove true writes the allow JSON and exits 0", () => {
   const harness = setupHarness();
   const editorScript = writeEditorScript(harness.targetDir, null);
 
@@ -160,12 +174,28 @@ test("an editor that changes nothing exits 0", () => {
     tool_input: { file_path: harness.filePath, content: "hello\nworld\n" },
   });
 
-  const outcome = runAdapter(payload, harness, editorScript);
+  const outcome = runAdapter(payload, harness, editorScript, "split", { autoApprove: true });
 
   expect(outcome.status).toBe(0);
+  expect(outcome.stdout).toBe(ALLOW_JSON + "\n");
 });
 
-test("a payload with no file_path exits 0", () => {
+test("a clean quit with no questions and autoApprove false writes nothing and exits 0", () => {
+  const harness = setupHarness();
+  const editorScript = writeEditorScript(harness.targetDir, null);
+
+  const payload = JSON.stringify({
+    tool_name: "Write",
+    tool_input: { file_path: harness.filePath, content: "hello\nworld\n" },
+  });
+
+  const outcome = runAdapter(payload, harness, editorScript, "split", { autoApprove: false });
+
+  expect(outcome.status).toBe(0);
+  expect(outcome.stdout).toBe("");
+});
+
+test("a payload with no file_path exits 0 and writes nothing", () => {
   const harness = setupHarness();
 
   const payload = JSON.stringify({ tool_name: "Write", tool_input: { content: "hello" } });
@@ -173,9 +203,10 @@ test("a payload with no file_path exits 0", () => {
   const outcome = runAdapter(payload, harness, null);
 
   expect(outcome.status).toBe(0);
+  expect(outcome.stdout).toBe("");
 });
 
-test("a path with no flag file exits 0", () => {
+test("a path with no flag file exits 0 and writes nothing", () => {
   const stateHome = mkdtempSync(join(tmpdir(), "pair-mode-state-"));
   const targetDir = mkdtempSync(join(tmpdir(), "pair-mode-target-"));
   const filePath = join(targetDir, "example.ts");
@@ -191,14 +222,54 @@ test("a path with no flag file exits 0", () => {
   const outcome = runAdapter(payload, harness, null);
 
   expect(outcome.status).toBe(0);
+  expect(outcome.stdout).toBe("");
 });
 
-test("malformed JSON on stdin exits 0", () => {
+test("malformed JSON on stdin exits 0 and writes nothing", () => {
   const harness = setupHarness();
 
   const outcome = runAdapter("{not json", harness, null);
 
   expect(outcome.status).toBe(0);
+  expect(outcome.stdout).toBe("");
+});
+
+test("a multiplexer failure exits 0 and writes nothing", () => {
+  const harness = setupHarness();
+
+  const brokenBinDir = mkdtempSync(join(tmpdir(), "pair-mode-bin-broken-"));
+  const brokenTmux = join(brokenBinDir, "tmux");
+  writeFileSync(brokenTmux, "#!/bin/sh\nexit 1\n", "utf-8");
+  chmodSync(brokenTmux, 0o755);
+
+  const brokenHarness: Harness = { ...harness, fakeBinDir: brokenBinDir };
+  const editorScript = writeEditorScript(harness.targetDir, null);
+
+  const payload = JSON.stringify({
+    tool_name: "Write",
+    tool_input: { file_path: harness.filePath, content: "hello\nworld\n" },
+  });
+
+  const outcome = runAdapter(payload, brokenHarness, editorScript);
+
+  expect(outcome.status).toBe(0);
+  expect(outcome.stdout).toBe("");
+});
+
+test("an annotated review exits 2 with the questions on stderr and writes no allow JSON", () => {
+  const harness = setupHarness();
+  const editorScript = writeEditorScript(harness.targetDir, "why does this work?");
+
+  const payload = JSON.stringify({
+    tool_name: "Write",
+    tool_input: { file_path: harness.filePath, content: "hello\nworld\n" },
+  });
+
+  const outcome = runAdapter(payload, harness, editorScript);
+
+  expect(outcome.status).toBe(2);
+  expect(outcome.stderr).toContain("why does this work?");
+  expect(outcome.stdout).toBe("");
 });
 
 test("importing the module as a library does not read stdin or call process.exit", async () => {

@@ -129,3 +129,17 @@ test("a passthrough custom editor gives a generic save hint", () => {
   const editor = resolve(["kak", "-e", "x"]);
   expect(editor.headerHint()).toEqual(["# Save the right pane before you quit."]);
 });
+
+test("vim prepare throws on a theme colour carrying a vim command separator", () => {
+  const editor = vimEditor("vim");
+  const badTheme = { add: "#123456|only", del: "#3a1e1e", fold: "#2a2a2a" };
+
+  expect(() => editor.prepare(context({ theme: badTheme }))).toThrow(/invalid theme colour/);
+});
+
+test("nano prepare throws on a theme colour carrying a space that would shift nanorc tokens", () => {
+  const nano = createNanoEditor();
+  const badTheme = { add: "#123 456", del: "#3a1e1e", fold: "#2a2a2a" };
+
+  expect(() => nano.prepare(context({ theme: badTheme }))).toThrow(/invalid theme colour/);
+});

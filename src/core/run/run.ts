@@ -3,14 +3,13 @@ import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PairConfig } from "../config";
-import type { EditRequest, RunVerdict } from "./types";
+import type { EditRequest, RunDeps, RunVerdict } from "./types";
 import type { RenderInput } from "../render";
 import { renderSplit, renderInline } from "../render";
 import { isEnabled, stateDir } from "../state";
 import { collect, formatQuestions } from "../collect";
 import { resolve } from "../../editors";
 import { detect } from "../../multiplexers";
-import type { RunResult } from "../../multiplexers/multiplexer.types";
 
 // Same trailing-newline convention as render.ts: a lone trailing empty element is dropped.
 function splitLines(text: string): string[] {
@@ -46,38 +45,34 @@ function removeQuietly(path: string): void {
   }
 }
 
-function applyEnv(env: Record<string, string>): () => void {
-  const entries = Object.entries(env);
-  const previous = new Map(entries.map(([key]) => [key, process.env[key]] as const));
+// A multiplexer's server spawns the command, so process.env never reaches it. Baking KEY=VALUE into argv does.
+function withEnvPrefix(argv: string[], env: Record<string, string>): string[] {
+  const assignments = Object.entries(env).map(([key, value]) => `${key}=${value}`);
 
-  entries.forEach(([key, value]) => {
-    process.env[key] = value;
-  });
+  if (assignments.length === 0) {
+    return argv;
+  }
 
-  return () => {
-    previous.forEach((value, key) => {
-      if (value === undefined) {
-        delete process.env[key];
-      } else {
-        process.env[key] = value;
-      }
-    });
-  };
+  return ["env", ...assignments, ...argv];
 }
 
-export async function runPair(request: EditRequest, config: PairConfig): Promise<RunVerdict> {
+export async function runPair(
+  request: EditRequest,
+  config: PairConfig,
+  deps: RunDeps = {},
+): Promise<RunVerdict> {
   if (request.before === request.after) {
-    return { decision: "allow" };
+    return { decision: "allow", reviewed: false };
   }
 
   if (!isEnabled(request.filePath)) {
-    return { decision: "allow" };
+    return { decision: "allow", reviewed: false };
   }
 
   const override = process.env["CC_PAIR_EDITOR"] || process.env["VISUAL"] || process.env["EDITOR"];
   const preference = override ? splitCommand(override) : config.editor;
   const editor = resolve(preference);
-  const multiplexer = detect(config.multiplexer);
+  const multiplexer = deps.multiplexer ?? detect(config.multiplexer);
 
   const renderInput: RenderInput = {
     before: request.before,
@@ -116,24 +111,18 @@ export async function runPair(request: EditRequest, config: PairConfig): Promise
       configDir,
     });
 
-    const restoreEnv = applyEnv(launch.env);
-    let result: RunResult;
-
-    try {
-      result = multiplexer.run(launch.argv, config.pane);
-    } finally {
-      restoreEnv();
-    }
+    const argv = withEnvPrefix(launch.argv, launch.env);
+    const result = multiplexer.run(argv, config.pane);
 
     if (!result.ok) {
-      return { decision: "allow", reason: result.detail };
+      return { decision: "allow", reviewed: false, reason: result.detail };
     }
 
     const saved = splitLines(readFileSync(rightFile, "utf-8"));
     const questions = collect(rendered.right, rendered.numbers, saved);
 
     if (questions.length === 0) {
-      return { decision: "allow" };
+      return { decision: "allow", reviewed: true };
     }
 
     return { decision: "deny", reason: formatQuestions(questions, request.filePath) };

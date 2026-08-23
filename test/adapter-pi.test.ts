@@ -34,7 +34,7 @@ function denyingRunPair(reason: string): RunPairFn {
 }
 
 function allowingRunPair(): RunPairFn {
-  return async () => ({ decision: "allow" });
+  return async () => ({ decision: "allow", reviewed: true });
 }
 
 function throwingRunPair(): RunPairFn {
@@ -102,7 +102,7 @@ test("an unrecognised tool name resolves block: false without calling runPair", 
 
   const runPair: RunPairFn = async () => {
     called = true;
-    return { decision: "allow" };
+    return { decision: "allow", reviewed: true };
   };
 
   const result = await handleToolCall({ toolName: "bash", input: { command: "ls" } }, runPair);

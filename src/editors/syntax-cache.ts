@@ -2,8 +2,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const RULES_MARKER = "\nrules:\n";
-
 // The default root walks up from this module to find the shipped assets/syntax dir.
 function defaultAssetsDir(): string | null {
   let dir = dirname(fileURLToPath(import.meta.url));
@@ -25,7 +23,7 @@ function defaultAssetsDir(): string | null {
   }
 }
 
-export function ruleBody(
+export function syntaxSource(
   lang: string,
   assetsDir: string | null = defaultAssetsDir(),
 ): string | null {
@@ -39,12 +37,5 @@ export function ruleBody(
     return null;
   }
 
-  const text = readFileSync(path, "utf-8");
-  const index = text.indexOf(RULES_MARKER);
-
-  if (index === -1) {
-    return null;
-  }
-
-  return text.slice(index + RULES_MARKER.length);
+  return readFileSync(path, "utf-8");
 }
