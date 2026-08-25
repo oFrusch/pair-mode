@@ -1,5 +1,4 @@
 import { existsSync, openSync, closeSync, readFileSync, statSync } from "node:fs";
-import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { loadConfig, configPath } from "../../core/config";
@@ -183,7 +182,7 @@ function checkShiki(resolvesShiki?: () => boolean): DoctorCheck {
     resolvesShiki ??
     ((): boolean => {
       try {
-        createRequire(import.meta.url).resolve("shiki");
+        import.meta.resolve("shiki");
         return true;
       } catch {
         return false;

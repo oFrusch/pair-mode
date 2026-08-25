@@ -30,6 +30,24 @@ for (const entry of entryPoints) {
   });
 }
 
+// A banner collision or a duplicate hoisted import throws at parse time, which no unit test on src would catch.
+for (const entry of entryPoints) {
+  test(`dist/${entry} parses under node`, () => {
+    const path = join(repoRoot, "dist", entry);
+    const result = spawnSync(
+      "node",
+      ["--input-type=module", "-e", `await import("file://${path}")`],
+      {
+        cwd: repoRoot,
+        encoding: "utf-8",
+      },
+    );
+
+    expect(result.stderr).not.toContain("SyntaxError");
+    expect(result.stderr).not.toContain("ReferenceError");
+  });
+}
+
 // shiki is marked external for this entry, so its bundled grammars must never land inside pair-tui.js.
 const SHIKI_BUNDLE_SIZE_CEILING_BYTES = 500_000;
 
