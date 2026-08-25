@@ -256,4 +256,25 @@ describe("status bar layout override reason", () => {
     expect(plain).not.toContain("whole file is new");
     expect(plain).not.toContain("narrow · unified");
   });
+
+  test("a status bar with no override reason lists the keys", () => {
+    const { lines } = paint(baseOptions({ width: 200, layout: "split" }));
+
+    const plain = stripAnsi(lines[lines.length - 1] ?? "");
+
+    expect(plain).toContain("j/k move");
+    expect(plain).toContain("a note");
+    expect(plain).toContain("^q quit");
+  });
+
+  test("an override reason replaces the key hint rather than joining it", () => {
+    const { lines } = paint(
+      baseOptions({ width: 200, layout: "split", model: buildNewFileModel() }),
+    );
+
+    const plain = stripAnsi(lines[lines.length - 1] ?? "");
+
+    expect(plain).toContain("whole file is new");
+    expect(plain).not.toContain("j/k move");
+  });
 });

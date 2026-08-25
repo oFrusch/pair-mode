@@ -349,8 +349,12 @@ function paintRule(width: number, truecolor: boolean): string {
   return fg(theme.fold, truecolor) + "─".repeat(width) + RESET;
 }
 
+// Without this the status bar is a blank strip, and every key in the TUI is undiscoverable.
+const KEY_HINT =
+  "j/k move · n/N hunk · a note · space fold · u layout · ^s send · ^q quit · ? keys";
+
 function paintStatus(width: number, truecolor: boolean, message: string | null): string {
-  const text = message === null ? "" : message.slice(0, width);
+  const text = (message ?? KEY_HINT).slice(0, width);
   const padding = " ".repeat(Math.max(0, width - text.length));
 
   return bg(theme.chrome, truecolor) + text + padding + RESET;
