@@ -20,6 +20,11 @@ export interface Session {
   timeout: number;
 }
 
+export interface Web {
+  enabled: boolean;
+  port: number;
+}
+
 export interface PairConfig {
   editor: EditorName | string[];
   multiplexer: MultiplexerName;
@@ -29,6 +34,7 @@ export interface PairConfig {
   pane: Pane;
   transport: TransportName;
   session: Session;
+  web: Web;
   theme: Theme;
   trace: boolean;
   autoApprove: boolean;

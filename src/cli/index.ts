@@ -4,6 +4,7 @@ import { runSetup } from "./setup";
 import { runDoctor } from "./doctor";
 import { pairOn, pairOff, pairStatus } from "./toggle";
 import { runWatch } from "./watch";
+import { startWebWatch } from "../web";
 import { loadConfig } from "../core/config";
 import { installRoot } from "./install-root";
 import { isRecord } from "../helpers";
@@ -17,6 +18,7 @@ Commands:
   off       turn pair mode off for a directory (default: cwd)
   status    report pair mode status for a directory (default: cwd)
   watch     review edits in this terminal (default: cwd)
+  watch --web  serve the review in a browser and print the link
   --version print the installed version
   --help    print this message
 `;
@@ -77,12 +79,34 @@ async function main(): Promise<number> {
   }
 
   if (command === "watch") {
-    const directory = resolve(process.argv[3] ?? process.cwd());
+    const rest = process.argv.slice(3);
+    const wantsWeb = rest.includes("--web");
+    const target = rest.find((entry) => !entry.startsWith("--"));
+    const directory = resolve(target ?? process.cwd());
     const { config, errors } = loadConfig();
 
     errors.forEach((error) => console.error(`config ${error.path}: ${error.message}`));
 
-    return runWatch({ directory }, config);
+    if (!wantsWeb && !config.web.enabled) {
+      return runWatch({ directory }, config);
+    }
+
+    const watcher = await startWebWatch({ directory, port: config.web.port }, config);
+
+    console.log(`pair mode is watching ${directory}`);
+    console.log(watcher.url);
+
+    // The web watcher has no TTY loop of its own, so the process stays alive until a signal stops it.
+    await new Promise<void>((done) => {
+      const stop = (): void => {
+        void watcher.close().then(done);
+      };
+
+      process.once("SIGINT", stop);
+      process.once("SIGTERM", stop);
+    });
+
+    return 0;
   }
 
   console.error(`unknown command: ${command}`);

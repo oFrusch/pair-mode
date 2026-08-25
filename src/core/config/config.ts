@@ -6,6 +6,7 @@ import type {
   MultiplexerName,
   TransportName,
   Session,
+  Web,
   Layout,
   Theme,
   Pane,
@@ -22,6 +23,8 @@ const EDITOR_NAMES: string[] = ["auto", "pair", "micro", "nvim", "vim", "nano"];
 const MULTIPLEXER_NAMES: string[] = ["auto", "zellij", "tmux", "none"];
 const TRANSPORT_NAMES: string[] = ["pane", "session"];
 const DEFAULT_SESSION_TIMEOUT = 300;
+const ANY_FREE_PORT = 0;
+const MAX_PORT = 65535;
 const LAYOUTS: string[] = ["split", "inline"];
 const NOTE_POSITIONS: string[] = ["panel", "anchored"];
 
@@ -34,6 +37,7 @@ export const DEFAULT_CONFIG: PairConfig = {
   pane: { width: "95%", height: "95%" },
   transport: "pane",
   session: { timeout: DEFAULT_SESSION_TIMEOUT },
+  web: { enabled: false, port: ANY_FREE_PORT },
   theme: { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a", rowBand: true },
   trace: false,
   autoApprove: true,
@@ -158,6 +162,46 @@ function validateSession(raw: Record<string, unknown>, errors: ConfigError[]): S
 
   errors.push({ path: "session.timeout", message: "must be an integer of 1 or more" });
   return DEFAULT_CONFIG.session;
+}
+
+// A port of zero asks the operating system for a free one, so zero is valid alongside a real port.
+function isPort(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= MAX_PORT;
+}
+
+function validateWeb(raw: Record<string, unknown>, errors: ConfigError[]): Web {
+  if (!("web" in raw)) {
+    return DEFAULT_CONFIG.web;
+  }
+
+  const value = raw["web"];
+
+  if (!isRecord(value)) {
+    errors.push({ path: "web", message: "must be an object" });
+    return DEFAULT_CONFIG.web;
+  }
+
+  let enabled = DEFAULT_CONFIG.web.enabled;
+
+  if ("enabled" in value) {
+    if (typeof value["enabled"] === "boolean") {
+      enabled = value["enabled"];
+    } else {
+      errors.push({ path: "web.enabled", message: "must be a boolean" });
+    }
+  }
+
+  let port = DEFAULT_CONFIG.web.port;
+
+  if ("port" in value) {
+    if (isPort(value["port"])) {
+      port = value["port"];
+    } else {
+      errors.push({ path: "web.port", message: "must be an integer from 0 to 65535" });
+    }
+  }
+
+  return { enabled, port };
 }
 
 function validateLayout(raw: Record<string, unknown>, errors: ConfigError[]): Layout {
@@ -359,6 +403,7 @@ function validate(raw: Record<string, unknown>): ConfigResult {
     pane: validatePane(raw, errors),
     transport: validateTransport(raw, errors),
     session: validateSession(raw, errors),
+    web: validateWeb(raw, errors),
     theme: validateTheme(raw, errors),
     trace: validateTrace(raw, errors),
     autoApprove: validateAutoApprove(raw, errors),

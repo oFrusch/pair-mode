@@ -296,6 +296,7 @@ test("a re-run backs up the existing config and preserves fields the wizard neve
     pane: { width: "70%", height: "60%" },
     transport: "pane",
     session: { timeout: 300 },
+    web: { enabled: false, port: 0 },
     theme: { add: "#111111", del: "#222222", fold: "#333333", rowBand: false },
     trace: true,
     autoApprove: false,

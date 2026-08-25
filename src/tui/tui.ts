@@ -4,7 +4,7 @@ import { parseKeys } from "./input/keys";
 import { MOUSE_OFF, MOUSE_ON, splitInput } from "./input/mouse";
 import { buildModel, moveCursor, toggleFold, visibleRows } from "./model";
 import type { DiffModel, VisibleRow } from "./model";
-import { noteFromSelection, toQuestions, writeResult } from "./notes";
+import { noteFromSelection, sortNotes, toQuestions, writeResult } from "./notes";
 import { bodyHeight, paint } from "./paint";
 import {
   applyMouse,
@@ -142,7 +142,11 @@ function commitDraft(state: TuiState): TuiState {
     return cleared;
   }
 
-  return { ...cleared, notes: [...state.notes, note], nextNoteId: state.nextNoteId + 1 };
+  return {
+    ...cleared,
+    notes: sortNotes([...state.notes, note]),
+    nextNoteId: state.nextNoteId + 1,
+  };
 }
 
 function enterNoteMode(state: TuiState): TuiState {

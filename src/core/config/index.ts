@@ -8,5 +8,6 @@ export type {
   Theme,
   Pane,
   Session,
+  Web,
   NotePosition,
 } from "./types";
