@@ -140,10 +140,18 @@ function lookupFold(model: DiffModel, foldIndex: number): FoldGroup {
   return fold;
 }
 
-function paintGutter(lineNumber: number | null, numberWidth: number, truecolor: boolean): string {
+function paintGutter(
+  lineNumber: number | null,
+  numberWidth: number,
+  truecolor: boolean,
+  cursorRow: boolean,
+): string {
   const text = lineNumber === null ? "" : String(lineNumber);
 
-  return fg(theme.fold, truecolor) + text.padStart(numberWidth, " ") + " " + DEFAULT_FG;
+  // The cursor row marks itself by recolouring the gutter, so it costs no column.
+  const color = cursorRow ? theme.chrome : theme.fold;
+
+  return fg(color, truecolor) + text.padStart(numberWidth, " ") + " " + DEFAULT_FG;
 }
 
 function paintSignBar(char: string, color: string | null, truecolor: boolean): string {
@@ -224,6 +232,7 @@ function paintModelRow(
   notes: Note[],
   hasLeftMarkerColumn: boolean,
   hasRightMarkerColumn: boolean,
+  cursorRow: boolean,
 ): string {
   const bar = SIGN_BAR[row.kind];
   const spans = changedSpans(row.left, row.right);
@@ -277,12 +286,12 @@ function paintModelRow(
   const divider = fg(theme.fold, truecolor) + "│" + DEFAULT_FG;
 
   return (
-    paintGutter(row.leftNumber, numberWidth, truecolor) +
+    paintGutter(row.leftNumber, numberWidth, truecolor, cursorRow) +
     paintSignBar(bar.leftChar, bar.leftColor, truecolor) +
     paintMarkerColumn(hasLeftMarkerColumn, isAnnotatedRow(notes, rowIndex, "left"), truecolor) +
     leftText +
     divider +
-    paintGutter(row.rightNumber, numberWidth, truecolor) +
+    paintGutter(row.rightNumber, numberWidth, truecolor, cursorRow) +
     paintSignBar(bar.rightChar, bar.rightColor, truecolor) +
     paintMarkerColumn(hasRightMarkerColumn, isAnnotatedRow(notes, rowIndex, "right"), truecolor) +
     rightText +
@@ -290,15 +299,21 @@ function paintModelRow(
   );
 }
 
-function paintFoldRow(fold: FoldGroup, width: number, truecolor: boolean): string {
+function paintFoldRow(
+  fold: FoldGroup,
+  width: number,
+  truecolor: boolean,
+  cursorRow: boolean,
+): string {
   const label = `⋯ ${fold.count} unchanged lines`;
   const totalPadding = Math.max(0, width - label.length);
   const leftPadding = Math.floor(totalPadding / 2);
   const rightPadding = totalPadding - leftPadding;
 
-  return (
-    fg(theme.fold, truecolor) + " ".repeat(leftPadding) + label + " ".repeat(rightPadding) + RESET
-  );
+  // A fold row on the cursor recolours its label, the same zero-width marker the gutter uses.
+  const color = cursorRow ? theme.chrome : theme.fold;
+
+  return fg(color, truecolor) + " ".repeat(leftPadding) + label + " ".repeat(rightPadding) + RESET;
 }
 
 function paintHeader(
@@ -617,10 +632,13 @@ export function paintSplit(options: PaintOptions): PaintResult {
   const bodyRows = bodyHeight(height, notes.length, mode, notePosition);
   const visible = visibleRows(model).slice(scrollTop, scrollTop + bodyRows);
 
-  const bodyEntries: UnifiedBodyEntry[] = visible.map((entry) => {
+  const bodyEntries: UnifiedBodyEntry[] = visible.map((entry, offset) => {
+    // model.cursor indexes the visible rows, so the absolute index is the scroll top plus the offset.
+    const cursorRow = scrollTop + offset === model.cursor;
+
     if (entry.kind === "fold") {
       return {
-        lines: [paintFoldRow(lookupFold(model, entry.foldIndex), width, truecolor)],
+        lines: [paintFoldRow(lookupFold(model, entry.foldIndex), width, truecolor, cursorRow)],
         screenRows: [{ kind: "fold", index: entry.foldIndex }],
       };
     }
@@ -638,6 +656,7 @@ export function paintSplit(options: PaintOptions): PaintResult {
       notes,
       hasLeftMarkerColumn,
       hasRightMarkerColumn,
+      cursorRow,
     );
     const screenRow: ScreenRow = { kind: "row", index: entry.index };
     const extras =
@@ -689,6 +708,7 @@ function paintUnifiedHalf(
   highlightSpans: Span[],
   hasMarkerColumn: boolean,
   annotated: boolean,
+  cursorRow: boolean,
 ): string {
   const bar = UNIFIED_SIGN_BAR[halfKind];
   const rendered = renderPaneText(
@@ -703,7 +723,7 @@ function paintUnifiedHalf(
   );
 
   return (
-    paintGutter(lineNumber, numberWidth, truecolor) +
+    paintGutter(lineNumber, numberWidth, truecolor, cursorRow) +
     paintSignBar(bar.char, bar.color, truecolor) +
     paintMarkerColumn(hasMarkerColumn, annotated, truecolor) +
     " ".repeat(TEXT_GAP_WIDTH) +
@@ -724,10 +744,11 @@ function paintUnifiedBodyEntry(
   selection: Selection | null,
   notes: Note[],
   hasMarkerColumn: boolean,
+  cursorRow: boolean,
 ): UnifiedBodyEntry {
   if (entry.kind === "fold") {
     return {
-      lines: [paintFoldRow(lookupFold(model, entry.foldIndex), width, truecolor)],
+      lines: [paintFoldRow(lookupFold(model, entry.foldIndex), width, truecolor, cursorRow)],
       screenRows: [{ kind: "fold", index: entry.foldIndex }],
     };
   }
@@ -759,6 +780,7 @@ function paintUnifiedBodyEntry(
       highlights,
       hasMarkerColumn,
       isAnnotatedRow(notes, entry.index, "right"),
+      cursorRow,
     );
 
     return { lines: [line], screenRows: [screenRow] };
@@ -786,6 +808,7 @@ function paintUnifiedBodyEntry(
       highlights,
       hasMarkerColumn,
       isAnnotatedRow(notes, entry.index, "right"),
+      cursorRow,
     );
 
     return { lines: [line], screenRows: [screenRow] };
@@ -813,6 +836,7 @@ function paintUnifiedBodyEntry(
       highlights,
       hasMarkerColumn,
       isAnnotatedRow(notes, entry.index, "left"),
+      cursorRow,
     );
 
     return { lines: [line], screenRows: [screenRow] };
@@ -847,6 +871,7 @@ function paintUnifiedBodyEntry(
     delHighlights,
     hasMarkerColumn,
     isAnnotatedRow(notes, entry.index, "left"),
+    cursorRow,
   );
 
   const addLine = paintUnifiedHalf(
@@ -863,6 +888,7 @@ function paintUnifiedBodyEntry(
     addHighlights,
     hasMarkerColumn,
     isAnnotatedRow(notes, entry.index, "right"),
+    cursorRow,
   );
 
   return { lines: [delLine, addLine], screenRows: [screenRow, screenRow] };
@@ -904,7 +930,10 @@ export function paintUnified(options: PaintOptions): PaintResult {
   const bodyRows = bodyHeight(height, notes.length, mode, notePosition);
   const visible = visibleRows(model).slice(scrollTop, scrollTop + bodyRows);
 
-  const entries = visible.map((entry) => {
+  const entries = visible.map((entry, offset) => {
+    // model.cursor indexes the visible rows, so the absolute index is the scroll top plus the offset.
+    const cursorRow = scrollTop + offset === model.cursor;
+
     const base = paintUnifiedBodyEntry(
       entry,
       model,
@@ -917,6 +946,7 @@ export function paintUnified(options: PaintOptions): PaintResult {
       selection,
       notes,
       hasMarkerColumn,
+      cursorRow,
     );
 
     if (notePosition !== "anchored" || entry.kind === "fold") {
