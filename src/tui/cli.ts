@@ -119,7 +119,7 @@ async function run(): Promise<number> {
   const path = args["path"] ?? "";
   const layout = toLayout(args["layout"]);
   const notePosition = toNotePosition(args["notes"]);
-  const rowBand = toBoolean(args["row-band"], false);
+  const rowBand = toBoolean(args["row-band"], true);
   const syntaxEnabled = toBoolean(args["syntax"], true);
   const context = toPositiveInteger(args["context"], DEFAULT_CONTEXT);
   const minFold = toPositiveInteger(args["min-fold"], DEFAULT_MIN_FOLD);

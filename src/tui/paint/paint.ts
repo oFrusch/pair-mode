@@ -10,6 +10,11 @@ const NARROW_REASON = "narrow · unified";
 
 export const noTokens: TokenProvider = () => [];
 
+// Shared indent inflates the similarity fraction, so an otherwise-rewritten row keeps word-level spans.
+function indentWidth(line: string): number {
+  return line.length - line.trimStart().length;
+}
+
 export function changedSpans(before: string, after: string): ChangedSpans {
   const chunks = diffWordsWithSpace(before, after);
 
@@ -39,8 +44,9 @@ export function changedSpans(before: string, after: string): ChangedSpans {
     rightCursor += length;
   });
 
-  const longer = Math.max(before.length, after.length);
-  const sharedFraction = longer === 0 ? 1 : sharedLength / longer;
+  const indent = Math.min(indentWidth(before), indentWidth(after));
+  const longer = Math.max(before.length, after.length) - indent;
+  const sharedFraction = longer <= 0 ? 1 : (sharedLength - indent) / longer;
 
   if (sharedFraction < SPAN_SIMILARITY_FLOOR) {
     return {

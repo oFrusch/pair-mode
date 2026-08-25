@@ -63,6 +63,17 @@ describe("changedSpans", () => {
     expect(spans.right).not.toEqual([]);
   });
 
+  test("shared indent does not change the whole-line verdict", () => {
+    const indent = "            ";
+    const before = "the quick brown fox";
+    const after = "completely different words entirely";
+
+    const spans = changedSpans(indent + before, indent + after);
+
+    expect(spans.left).toEqual([{ start: 0, end: indent.length + before.length }]);
+    expect(spans.right).toEqual([{ start: 0, end: indent.length + after.length }]);
+  });
+
   test("SPAN_SIMILARITY_FLOOR is 0.3", () => {
     expect(SPAN_SIMILARITY_FLOOR).toBe(0.3);
   });

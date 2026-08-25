@@ -24,7 +24,7 @@ implementation.
 | Layout | Split and unified. The user chooses. Split is the default. |
 | Note position | Docked panel and inline. The user chooses. Panel is the default. |
 | Change colour | A sign bar in the gutter, plus a background on the changed words only. |
-| Full-row band | Off by default. A config flag turns it back on. |
+| Full-row band | On by default. A config flag turns it off for word-level spans. |
 | Syntax colour | Shiki. |
 | Note anchor | The model holds a span. The wire payload holds a line number. |
 | Batched changesets | Out of scope. One pane per tool call, the same as today. |
@@ -248,7 +248,7 @@ working.
 | Field | Type | Default | Meaning |
 |---|---|---|---|
 | `notes` | `"panel" \| "inline"` | `"panel"` | Where a note renders. |
-| `theme.rowBand` | `boolean` | `false` | Paint the whole changed row. |
+| `theme.rowBand` | `boolean` | `true` | Paint the whole changed row. |
 | `syntax` | `boolean` | `true` | Load Shiki. |
 
 `editor` gains `"pair"` as a value. The `"auto"` preference resolves to `pair` first, then

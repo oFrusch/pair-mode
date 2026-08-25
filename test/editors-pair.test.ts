@@ -120,7 +120,7 @@ test("prepare emits every argv flag", () => {
     "--notes",
     "panel",
     "--row-band",
-    "false",
+    "true",
     "--syntax",
     "true",
     "--context",

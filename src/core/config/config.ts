@@ -28,7 +28,7 @@ export const DEFAULT_CONFIG: PairConfig = {
   context: DEFAULT_CONTEXT,
   minFold: DEFAULT_MIN_FOLD,
   pane: { width: "90%", height: "90%" },
-  theme: { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a", rowBand: false },
+  theme: { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a", rowBand: true },
   trace: false,
   autoApprove: true,
   notes: "panel",

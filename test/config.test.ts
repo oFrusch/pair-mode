@@ -163,10 +163,10 @@ test("syntax rejects a non-boolean", () => {
   expect(result.errors[0]?.path).toBe("syntax");
 });
 
-test("theme.rowBand defaults to false", () => {
+test("theme.rowBand defaults to true", () => {
   const result = loadConfig(join(xdgConfigHome, "missing.json"));
 
-  expect(result.config.theme.rowBand).toBe(false);
+  expect(result.config.theme.rowBand).toBe(true);
 });
 
 test("theme.rowBand rejects a non-boolean", () => {
@@ -175,7 +175,7 @@ test("theme.rowBand rejects a non-boolean", () => {
 
   const result = loadConfig(path);
 
-  expect(result.config.theme.rowBand).toBe(false);
+  expect(result.config.theme.rowBand).toBe(true);
   expect(result.errors).toHaveLength(1);
   expect(result.errors[0]?.path).toBe("theme.rowBand");
 });

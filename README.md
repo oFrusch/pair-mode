@@ -100,7 +100,7 @@ when `XDG_CONFIG_HOME` is not set.
 | `theme.add`     | 6-digit hex colour                                                                      | `"#1e3a1e"` |                                                         |
 | `theme.del`     | 6-digit hex colour                                                                      | `"#3a1e1e"` |                                                         |
 | `theme.fold`    | 6-digit hex colour                                                                      | `"#2a2a2a"` |                                                         |
-| `theme.rowBand` | boolean                                                                                 | `false`     | Paint the whole changed row, not just the changed span, in pair. |
+| `theme.rowBand` | boolean                                                                                 | `true`      | Paint the whole changed row, not just the changed span, in pair. |
 | `syntax`        | boolean                                                                                 | `true`      | Load Shiki for syntax colour in pair.                  |
 | `trace`         | boolean                                                                                 | `false`     |                                                         |
 | `autoApprove`   | boolean                                                                                 | `true`      |                                                         |
