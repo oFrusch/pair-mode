@@ -506,6 +506,23 @@ describe("runTui — wheel scroll", () => {
     expect(fake.writes[fake.writes.length - 1]).toBe("");
   });
 
+  // A trackpad emits 66 and 67 during a vertical gesture, and treating them as down made scroll-up jitter.
+  test("a horizontal wheel code moves nothing", () => {
+    const WHEEL_LEFT = "\x1b[<66;40;10M";
+    const WHEEL_RIGHT = "\x1b[<67;40;10M";
+    const fake = makeFakeIo();
+    void runTui(longOptions(), fake.io);
+
+    fake.feed(WHEEL_DOWN);
+    fake.feed(WHEEL_LEFT);
+
+    expect(fake.writes[fake.writes.length - 1]).toBe("");
+
+    fake.feed(WHEEL_RIGHT);
+
+    expect(fake.writes[fake.writes.length - 1]).toBe("");
+  });
+
   test("repeated wheel-down stops at the bottom", () => {
     const fake = makeFakeIo();
     void runTui(longOptions(), fake.io);

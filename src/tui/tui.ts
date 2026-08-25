@@ -98,12 +98,27 @@ function toggleFoldAtCursor(model: DiffModel): DiffModel {
 }
 
 const WHEEL_UP_BUTTON = 0;
+const WHEEL_DOWN_BUTTON = 1;
 const WHEEL_ROWS = 3;
+
+// A trackpad gesture is never perfectly vertical, so it emits horizontal wheel codes throughout.
+function wheelStep(button: number): number {
+  if (button === WHEEL_UP_BUTTON) {
+    return -WHEEL_ROWS;
+  }
+
+  return button === WHEEL_DOWN_BUTTON ? WHEEL_ROWS : 0;
+}
 
 // The wheel moves the viewport alone. followScroll pulls it back to the cursor on the next key.
 function applyScroll(state: TuiState, event: MouseEvent, height: number): TuiState {
+  const step = wheelStep(event.button);
+
+  if (step === 0) {
+    return state;
+  }
+
   const bodyRows = bodyHeight(height, state.notes.length, state.mode, state.notePosition);
-  const step = event.button === WHEEL_UP_BUTTON ? -WHEEL_ROWS : WHEEL_ROWS;
   const maxScroll = Math.max(0, visibleRows(state.model).length - bodyRows);
   const scrollTop = Math.min(maxScroll, Math.max(0, state.scrollTop + step));
 
