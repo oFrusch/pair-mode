@@ -377,7 +377,7 @@ const LEAVE_ALT_SCREEN = "\x1b[?1049l";
 const HIDE_CURSOR = "\x1b[?25l";
 const SHOW_CURSOR = "\x1b[?25h";
 
-export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
+export function runTui(options: TuiOptions, io: TuiIo, abort?: AbortSignal): Promise<TuiResult> {
   return new Promise((resolve, reject) => {
     const model = buildModel(options.before, options.after, options.context, options.minFold);
 
@@ -476,6 +476,17 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
       attemptTeardown();
       reject(error instanceof Error ? error : new Error(String(error)));
     };
+
+    // The hook behind this review died, so the review closes clean and its notes go nowhere.
+    abort?.addEventListener(
+      "abort",
+      () => {
+        if (!finished) {
+          finishQuit("clean");
+        }
+      },
+      { once: true },
+    );
 
     try {
       io.write(ENTER_ALT_SCREEN);

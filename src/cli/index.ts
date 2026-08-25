@@ -1,8 +1,10 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { runSetup } from "./setup";
 import { runDoctor } from "./doctor";
 import { pairOn, pairOff, pairStatus } from "./toggle";
+import { runWatch } from "./watch";
+import { loadConfig } from "../core/config";
 import { installRoot } from "./install-root";
 import { isRecord } from "../helpers";
 
@@ -14,6 +16,7 @@ Commands:
   on        turn pair mode on for a directory (default: cwd)
   off       turn pair mode off for a directory (default: cwd)
   status    report pair mode status for a directory (default: cwd)
+  watch     review edits in this terminal (default: cwd)
   --version print the installed version
   --help    print this message
 `;
@@ -71,6 +74,15 @@ async function main(): Promise<number> {
   if (command === "status") {
     console.log(pairStatus(process.argv[3] ?? process.cwd()));
     return 0;
+  }
+
+  if (command === "watch") {
+    const directory = resolve(process.argv[3] ?? process.cwd());
+    const { config, errors } = loadConfig();
+
+    errors.forEach((error) => console.error(`config ${error.path}: ${error.message}`));
+
+    return runWatch({ directory }, config);
   }
 
   console.error(`unknown command: ${command}`);
