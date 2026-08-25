@@ -1,8 +1,11 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { runSetup } from "./setup";
 import { runDoctor } from "./doctor";
-import { pairOn, pairOff, pairStatus } from "./toggle";
+import { pairOn, pairOnWeb, pairOff, pairStatus } from "./toggle";
+import { runWatch } from "./watch";
+import { startWebWatch } from "../web";
+import { loadConfig } from "../core/config";
 import { installRoot } from "./install-root";
 import { isRecord } from "../helpers";
 
@@ -12,8 +15,11 @@ Commands:
   setup     interactively configure pair mode and register hooks
   doctor    diagnose a pair mode install
   on        turn pair mode on for a directory (default: cwd)
+  on --web  turn pair mode on and serve the review in a browser
   off       turn pair mode off for a directory (default: cwd)
   status    report pair mode status for a directory (default: cwd)
+  watch     review edits in this terminal (default: cwd)
+  watch --web  serve the review in a browser and print the link
   --version print the installed version
   --help    print this message
 `;
@@ -53,23 +59,63 @@ async function main(): Promise<number> {
   }
 
   if (command === "doctor") {
-    const report = runDoctor();
+    const report = await runDoctor();
     console.log(report.text);
     return report.exitCode;
   }
 
   if (command === "on") {
-    console.log(pairOn(process.argv[3] ?? process.cwd()));
+    const rest = process.argv.slice(3);
+    const target = rest.find((entry) => !entry.startsWith("--"));
+    const directory = resolve(target ?? process.cwd());
+
+    if (rest.includes("--web")) {
+      console.log(await pairOnWeb(directory, process.argv[1] ?? ""));
+      return 0;
+    }
+
+    console.log(pairOn(directory));
     return 0;
   }
 
   if (command === "off") {
-    console.log(pairOff(process.argv[3] ?? process.cwd()));
+    console.log(pairOff(resolve(process.argv[3] ?? process.cwd())));
     return 0;
   }
 
   if (command === "status") {
-    console.log(pairStatus(process.argv[3] ?? process.cwd()));
+    console.log(pairStatus(resolve(process.argv[3] ?? process.cwd())));
+    return 0;
+  }
+
+  if (command === "watch") {
+    const rest = process.argv.slice(3);
+    const wantsWeb = rest.includes("--web");
+    const target = rest.find((entry) => !entry.startsWith("--"));
+    const directory = resolve(target ?? process.cwd());
+    const { config, errors } = loadConfig();
+
+    errors.forEach((error) => console.error(`config ${error.path}: ${error.message}`));
+
+    if (!wantsWeb && !config.web.enabled) {
+      return runWatch({ directory }, config);
+    }
+
+    const watcher = await startWebWatch({ directory, port: config.web.port }, config);
+
+    console.log(`pair mode is watching ${directory}`);
+    console.log(watcher.url);
+
+    // The web watcher has no TTY loop of its own, so the process stays alive until a signal stops it.
+    await new Promise<void>((done) => {
+      const stop = (): void => {
+        void watcher.close().then(done);
+      };
+
+      process.once("SIGINT", stop);
+      process.once("SIGTERM", stop);
+    });
+
     return 0;
   }
 
@@ -78,5 +124,15 @@ async function main(): Promise<number> {
   return 1;
 }
 
-const code = await main();
+// A failure here is a message for the user, not a stack trace. Node would print one otherwise.
+async function report(): Promise<number> {
+  try {
+    return await main();
+  } catch (error) {
+    console.error(`pair-mode: ${error instanceof Error ? error.message : String(error)}`);
+    return 1;
+  }
+}
+
+const code = await report();
 process.exit(code);

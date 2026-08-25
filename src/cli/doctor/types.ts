@@ -15,6 +15,8 @@ export interface DoctorOptions {
   openTty?: () => number;
   multiplexerAdapters?: DetectAdapters;
   resolvesShiki?: () => boolean;
+  directory?: string;
+  probeSocket?: (path: string) => Promise<boolean>;
 }
 
 export interface DoctorReport {

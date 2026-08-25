@@ -78,32 +78,74 @@ terminal, which then selects text for copy — the same as any other terminal pr
 ## Multiplexers
 
 Claude Code and Codex run their hooks with no controlling terminal. `/dev/tty` returns
-`ENXIO` there. Pair mode needs zellij or tmux to open an editor pane under those two
-CLIs. pi and opencode run hooks with a controlling terminal already attached, so no
-multiplexer is required for them.
+`ENXIO` there. Pane mode needs zellij or tmux to open an editor pane under those two
+CLIs. pi and opencode run hooks with a controlling terminal already attached, so pane
+mode needs no multiplexer for them.
+
+Session mode removes the requirement for every CLI. See the next section.
+
+## Session modes
+
+Pane mode is the default. The hook opens an editor in a floating pane and blocks. That
+needs a multiplexer under Claude Code and Codex.
+
+Session mode moves the review out of the agent's process. The hook posts to a Unix
+socket and waits. A client you start renders the review and answers. There are two
+clients, and both remove the multiplexer requirement.
+
+Set `transport` to `"session"`, then pick a client.
+
+**Watch mode** reviews in a terminal you own.
+
+```
+pair-mode watch          # in any terminal, at the repo root
+```
+
+The watcher paints an idle screen between reviews and opens the pair TUI for each one.
+`q` on the idle screen quits and releases the socket.
+
+**Web mode** reviews in a browser and needs no terminal at all.
+
+```
+pair-mode on --web       # prints a link
+```
+
+That spawns a detached watcher, binds an HTTP server on `127.0.0.1`, and prints a link
+carrying a random token. Drag across any text in the diff. A popup opens under the
+selection. Type the note and press Enter. `pair-mode off` stops the watcher.
+
+The watcher process binds the socket, so there is no separate daemon to manage. If the
+watcher dies, the socket goes away and every hook fails open at once.
+
+A hook that finds no watcher applies the edit rather than hanging. So does a hook whose
+watcher never answers within `session.timeout`.
 
 ## Configuration
 
 Pair mode reads `$XDG_CONFIG_HOME/pair-mode/config.json`, or `~/.config/pair-mode/config.json`
 when `XDG_CONFIG_HOME` is not set.
 
-| Key             | Type                                                                                    | Default     | Meaning                                                          |
-| --------------- | --------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------- |
-| `editor`        | `"auto" \| "pair" \| "micro" \| "nvim" \| "vim" \| "nano"`, or an array of editor names | `"auto"`    | Which editor opens the review pane.                              |
-| `multiplexer`   | `"auto" \| "zellij" \| "tmux" \| "none"`                                                | `"auto"`    | Which multiplexer hosts the pane.                                |
-| `layout`        | `"split" \| "inline"`                                                                   | `"split"`   | Side-by-side columns, or one column.                             |
-| `notes`         | `"panel" \| "anchored"`                                                                 | `"panel"`   | A docked notes panel, or a note inline at its anchor.            |
-| `context`       | integer, 1 or more                                                                      | `5`         | Unchanged lines kept around a change before folding.             |
-| `minFold`       | integer, 1 or more                                                                      | `4`         | Minimum run of unchanged lines that folds.                       |
-| `pane.width`    | string                                                                                  | `"95%"`     |                                                                  |
-| `pane.height`   | string                                                                                  | `"95%"`     |                                                                  |
-| `theme.add`     | 6-digit hex colour                                                                      | `"#1e3a1e"` |                                                                  |
-| `theme.del`     | 6-digit hex colour                                                                      | `"#3a1e1e"` |                                                                  |
-| `theme.fold`    | 6-digit hex colour                                                                      | `"#2a2a2a"` |                                                                  |
-| `theme.rowBand` | boolean                                                                                 | `true`      | Paint the whole changed row, not just the changed span, in pair. |
-| `syntax`        | boolean                                                                                 | `true`      | Load Shiki for syntax colour in pair.                            |
-| `trace`         | boolean                                                                                 | `false`     |                                                                  |
-| `autoApprove`   | boolean                                                                                 | `true`      |                                                                  |
+| Key               | Type                                                                                    | Default     | Meaning                                                          |
+| ----------------- | --------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------- |
+| `editor`          | `"auto" \| "pair" \| "micro" \| "nvim" \| "vim" \| "nano"`, or an array of editor names | `"auto"`    | Which editor opens the review pane.                              |
+| `multiplexer`     | `"auto" \| "zellij" \| "tmux" \| "none"`                                                | `"auto"`    | Which multiplexer hosts the pane.                                |
+| `transport`       | `"pane" \| "session"`                                                                   | `"pane"`    | Open a pane per edit, or post to a watcher you started.          |
+| `session.timeout` | integer, 1 or more                                                                      | `300`       | Seconds a hook waits for a verdict before it applies the edit.   |
+| `web.enabled`     | boolean                                                                                 | `false`     | Serve the review in a browser whenever a watcher starts.         |
+| `web.port`        | integer, 0 to 65535                                                                     | `0`         | `0` asks the operating system for a free port.                   |
+| `layout`          | `"split" \| "inline"`                                                                   | `"split"`   | Side-by-side columns, or one column.                             |
+| `notes`           | `"panel" \| "anchored"`                                                                 | `"panel"`   | A docked notes panel, or a note inline at its anchor.            |
+| `context`         | integer, 1 or more                                                                      | `5`         | Unchanged lines kept around a change before folding.             |
+| `minFold`         | integer, 1 or more                                                                      | `4`         | Minimum run of unchanged lines that folds.                       |
+| `pane.width`      | string                                                                                  | `"95%"`     |                                                                  |
+| `pane.height`     | string                                                                                  | `"95%"`     |                                                                  |
+| `theme.add`       | 6-digit hex colour                                                                      | `"#1e3a1e"` |                                                                  |
+| `theme.del`       | 6-digit hex colour                                                                      | `"#3a1e1e"` |                                                                  |
+| `theme.fold`      | 6-digit hex colour                                                                      | `"#2a2a2a"` |                                                                  |
+| `theme.rowBand`   | boolean                                                                                 | `true`      | Paint the whole changed row, not just the changed span, in pair. |
+| `syntax`          | boolean                                                                                 | `true`      | Load Shiki for syntax colour in pair.                            |
+| `trace`           | boolean                                                                                 | `false`     |                                                                  |
+| `autoApprove`     | boolean                                                                                 | `true`      |                                                                  |
 
 An `editor` array lists editor names in order of preference. Pair mode tries each in
 turn and uses the first one it finds on the machine. `auto` tries `pair` first, so an
@@ -121,6 +163,11 @@ the span it annotates. Setting one does not affect the other.
 - The pane reviews. It does not edit the proposal.
 - Syntax colour in pair needs `shiki` installed. A missing package disables colour and
   the pane still works.
+- A client answers one review at a time. It cannot skip ahead in the queue.
+- Web mode does not defend against another user on the same machine. The token sits in
+  the URL, and a local user can read the process list.
+- Watch mode needs the watcher running before the agent edits. A missing watcher fails
+  open, so an unattended agent applies its edits.
 
 ## License
 

@@ -81,8 +81,17 @@ function withSpanSuffix(note: Note): string {
   return `${note.text} [re: "${selected}"]`;
 }
 
+// An agent reads the questions top to bottom, so a note's place in the file beats the order it was written in.
+export function sortNotes(notes: Note[]): Note[] {
+  return [...notes].sort((first, second) =>
+    first.rowIndex === second.rowIndex
+      ? first.startColumn - second.startColumn
+      : first.rowIndex - second.rowIndex,
+  );
+}
+
 export function toQuestions(notes: Note[]): Question[] {
-  return notes.map((note) => ({
+  return sortNotes(notes).map((note) => ({
     line: note.line,
     code: note.code,
     text: isWholeLine(note) ? note.text : withSpanSuffix(note),

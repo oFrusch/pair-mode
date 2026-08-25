@@ -1,8 +1,16 @@
 import { mkdtempSync, mkdirSync, writeFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { test, expect, beforeEach, afterEach } from "vitest";
-import { stateDir, flagPath, isEnabled, enable, disable } from "../src/core/state";
+import {
+  stateDir,
+  flagPath,
+  isEnabled,
+  enable,
+  disable,
+  sessionSocketPath,
+  findSessionSocket,
+} from "../src/core/state";
 
 let xdgStateHome: string;
 let originalXdgStateHome: string | undefined;
@@ -85,4 +93,18 @@ test("enable returns the flag path and disable removes it", () => {
 
 test("disable returns false when no flag file exists", () => {
   expect(disable(repoRoot)).toBe(false);
+});
+
+test("findSessionSocket walks up from the edited file to the directory holding the socket", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "pair-mode-walk-")));
+  const nested = join(root, "src", "deep");
+  mkdirSync(nested, { recursive: true });
+
+  expect(findSessionSocket(join(nested, "file.ts"))).toBeNull();
+
+  const socket = sessionSocketPath(root);
+  mkdirSync(dirname(socket), { recursive: true });
+  writeFileSync(socket, "");
+
+  expect(findSessionSocket(join(nested, "file.ts"))).toBe(socket);
 });

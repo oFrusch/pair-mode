@@ -1,1 +1,11 @@
-export { stateDir, flagPath, isEnabled, enable, disable } from "./state";
+export {
+  stateDir,
+  flagPath,
+  isEnabled,
+  enable,
+  disable,
+  sessionsDir,
+  sessionSocketPath,
+  sessionUrlPath,
+  findSessionSocket,
+} from "./state";

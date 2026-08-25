@@ -1,0 +1,18 @@
+import type { Question } from "../core/collect";
+import type { WebReview } from "./review.types";
+
+export interface WebServerOptions {
+  port: number;
+  token?: string;
+  onVerdict(id: string, questions: Question[]): void;
+}
+
+export interface WebServer {
+  url: string;
+  port: number;
+  token: string;
+  viewerCount(): number;
+  offer(review: WebReview): void;
+  withdraw(id: string): void;
+  close(): Promise<void>;
+}

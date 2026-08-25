@@ -4,7 +4,7 @@ import { parseKeys } from "./input/keys";
 import { MOUSE_OFF, MOUSE_ON, splitInput } from "./input/mouse";
 import { buildModel, moveCursor, toggleFold, visibleRows } from "./model";
 import type { DiffModel, VisibleRow } from "./model";
-import { noteFromSelection, toQuestions, writeResult } from "./notes";
+import { noteFromSelection, sortNotes, toQuestions, writeResult } from "./notes";
 import { bodyHeight, paint } from "./paint";
 import {
   applyMouse,
@@ -142,7 +142,11 @@ function commitDraft(state: TuiState): TuiState {
     return cleared;
   }
 
-  return { ...cleared, notes: [...state.notes, note], nextNoteId: state.nextNoteId + 1 };
+  return {
+    ...cleared,
+    notes: sortNotes([...state.notes, note]),
+    nextNoteId: state.nextNoteId + 1,
+  };
 }
 
 function enterNoteMode(state: TuiState): TuiState {
@@ -377,7 +381,7 @@ const LEAVE_ALT_SCREEN = "\x1b[?1049l";
 const HIDE_CURSOR = "\x1b[?25l";
 const SHOW_CURSOR = "\x1b[?25h";
 
-export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
+export function runTui(options: TuiOptions, io: TuiIo, abort?: AbortSignal): Promise<TuiResult> {
   return new Promise((resolve, reject) => {
     const model = buildModel(options.before, options.after, options.context, options.minFold);
 
@@ -476,6 +480,17 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
       attemptTeardown();
       reject(error instanceof Error ? error : new Error(String(error)));
     };
+
+    // The hook behind this review died, so the review closes clean and its notes go nowhere.
+    abort?.addEventListener(
+      "abort",
+      () => {
+        if (!finished) {
+          finishQuit("clean");
+        }
+      },
+      { once: true },
+    );
 
     try {
       io.write(ENTER_ALT_SCREEN);

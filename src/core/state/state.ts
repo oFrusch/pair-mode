@@ -22,10 +22,50 @@ function realpathLenient(path: string): string {
   }
 }
 
-export function flagPath(directory: string): string {
+const DIGEST_LENGTH = 16;
+
+function digestFor(directory: string): string {
   const real = realpathLenient(directory);
-  const digest = createHash("sha1").update(real).digest("hex").slice(0, 16);
-  return join(stateDir(), `${digest}.on`);
+  return createHash("sha1").update(real).digest("hex").slice(0, DIGEST_LENGTH);
+}
+
+export function flagPath(directory: string): string {
+  return join(stateDir(), `${digestFor(directory)}.on`);
+}
+
+export function sessionsDir(): string {
+  return join(stateDir(), "sessions");
+}
+
+// The watcher and the hook both derive this from the directory, so neither side ever names a session id.
+export function sessionSocketPath(directory: string): string {
+  return join(sessionsDir(), `${digestFor(directory)}.sock`);
+}
+
+// A detached web watcher records its link here, so pair-mode on and off can find and stop it.
+export function sessionUrlPath(directory: string): string {
+  return join(sessionsDir(), `${digestFor(directory)}.url`);
+}
+
+// The watcher runs at the repo root, so the hook walks up from the edited file exactly as isEnabled does.
+export function findSessionSocket(filePath: string): string | null {
+  let current = dirname(realpathLenient(filePath));
+
+  while (true) {
+    const candidate = sessionSocketPath(current);
+
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+
+    const parent = dirname(current);
+
+    if (parent === current) {
+      return null;
+    }
+
+    current = parent;
+  }
 }
 
 export function isEnabled(filePath: string): boolean {

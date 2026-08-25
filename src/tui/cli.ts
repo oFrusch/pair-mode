@@ -1,8 +1,6 @@
-import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { isEntryPoint } from "../adapters/entry-point";
+import { resultFilePath, splitLines } from "../helpers";
 import { DEFAULT_CONTEXT, DEFAULT_MIN_FOLD } from "../core/marks";
 import { supportsTruecolor } from "./paint";
 import type { NotePosition } from "./paint";
@@ -19,18 +17,6 @@ const ANCHORED_NOTES_FLAG = "anchored";
 const TRUE_FLAG_VALUE = "true";
 const FALSE_FLAG_VALUE = "false";
 
-// Same trailing-newline convention as core/run/run.ts: a lone trailing empty element is dropped.
-function splitLines(text: string): string[] {
-  const lines = text.split("\n");
-  const last = lines.at(-1);
-
-  if (last === "") {
-    lines.pop();
-  }
-
-  return lines;
-}
-
 function readLinesOf(path: string | undefined): string[] {
   if (path === undefined) {
     return [];
@@ -41,11 +27,6 @@ function readLinesOf(path: string | undefined): string[] {
   } catch {
     return [];
   }
-}
-
-function fallbackResultFile(): string {
-  const name = `pair-result-${randomBytes(6).toString("hex")}.json`;
-  return join(tmpdir(), name);
 }
 
 // A bare flag name (no following value) is malformed, so it is left out and the caller's default applies.
@@ -123,7 +104,7 @@ async function run(): Promise<number> {
   const syntaxEnabled = toBoolean(args["syntax"], true);
   const context = toPositiveInteger(args["context"], DEFAULT_CONTEXT);
   const minFold = toPositiveInteger(args["min-fold"], DEFAULT_MIN_FOLD);
-  const resultFile = args["result"] ?? fallbackResultFile();
+  const resultFile = args["result"] ?? resultFilePath();
   const truecolor = supportsTruecolor(process.env);
   const { width, height } = readTerminalSize(process.stdout);
 

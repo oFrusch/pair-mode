@@ -565,3 +565,44 @@ describe("runTui", () => {
     await expect(resultPromise).rejects.toThrow("cleanup failed");
   }, 2000);
 });
+
+describe("runTui — abort", () => {
+  test("an aborted signal resolves with quit clean and no questions", async () => {
+    const fake = makeFakeIo();
+    const abort = new AbortController();
+
+    const resultPromise = runTui(makeOptions(), fake.io, abort.signal);
+
+    abort.abort();
+
+    const result = await resultPromise;
+
+    expect(result).toEqual({ quit: "clean", questions: [] });
+    expect(fake.cleanupCalls()).toBe(1);
+  });
+
+  test("an abort after a normal quit never tears down twice", async () => {
+    const fake = makeFakeIo();
+    const abort = new AbortController();
+
+    const resultPromise = runTui(makeOptions(), fake.io, abort.signal);
+
+    fake.feed("\x11");
+    await resultPromise;
+
+    abort.abort();
+
+    expect(fake.cleanupCalls()).toBe(1);
+  });
+
+  test("a signal that is never aborted leaves the normal quit path alone", async () => {
+    const fake = makeFakeIo();
+    const abort = new AbortController();
+
+    const resultPromise = runTui(makeOptions(), fake.io, abort.signal);
+
+    fake.feed("\x11");
+
+    expect(await resultPromise).toEqual({ quit: "clean", questions: [] });
+  });
+});

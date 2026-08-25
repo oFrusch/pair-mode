@@ -3,8 +3,11 @@ export type {
   PairConfig,
   EditorName,
   MultiplexerName,
+  TransportName,
   Layout,
   Theme,
   Pane,
+  Session,
+  Web,
   NotePosition,
 } from "./types";

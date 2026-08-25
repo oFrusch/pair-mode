@@ -254,7 +254,7 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
       console.log(`  ${file}`);
     });
 
-    const doctorReport = runDoctor({
+    const doctorReport = await runDoctor({
       homeDir: home,
       installRoot: root,
       resolvesOnPath: options.resolvesOnPath,
