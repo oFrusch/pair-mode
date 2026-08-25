@@ -1,49 +1,24 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { test, expect, beforeEach, afterEach } from "vitest";
+import { test, expect } from "vitest";
 import { DEFAULT_CONFIG, configPath, loadConfig, saveConfig } from "../src/core/config";
+import { useIsolatedHome } from "./helpers/env";
 
-let xdgConfigHome: string;
-let originalXdgConfigHome: string | undefined;
-let originalHome: string | undefined;
-
-beforeEach(() => {
-  xdgConfigHome = mkdtempSync(join(tmpdir(), "pair-mode-config-"));
-  originalXdgConfigHome = process.env["XDG_CONFIG_HOME"];
-  process.env["XDG_CONFIG_HOME"] = xdgConfigHome;
-
-  originalHome = process.env["HOME"];
-  process.env["HOME"] = mkdtempSync(join(tmpdir(), "pair-mode-home-"));
-});
-
-afterEach(() => {
-  if (originalXdgConfigHome === undefined) {
-    delete process.env["XDG_CONFIG_HOME"];
-  } else {
-    process.env["XDG_CONFIG_HOME"] = originalXdgConfigHome;
-  }
-
-  if (originalHome === undefined) {
-    delete process.env["HOME"];
-  } else {
-    process.env["HOME"] = originalHome;
-  }
-});
+const isolated = useIsolatedHome();
 
 test("configPath honours XDG_CONFIG_HOME", () => {
-  expect(configPath()).toBe(join(xdgConfigHome, "pair-mode", "config.json"));
+  expect(configPath()).toBe(join(isolated.configHome, "pair-mode", "config.json"));
 });
 
 test("absent config file yields the defaults and no errors", () => {
-  const result = loadConfig(join(xdgConfigHome, "missing.json"));
+  const result = loadConfig(join(isolated.configHome, "missing.json"));
 
   expect(result.config).toEqual(DEFAULT_CONFIG);
   expect(result.errors).toEqual([]);
 });
 
 test("malformed JSON yields the defaults and one error", () => {
-  const path = join(xdgConfigHome, "bad.json");
+  const path = join(isolated.configHome, "bad.json");
   writeFileSync(path, "{ not json", "utf-8");
 
   const result = loadConfig(path);
@@ -53,7 +28,7 @@ test("malformed JSON yields the defaults and one error", () => {
 });
 
 test("context: 0 falls back to 5 and reports one error naming context", () => {
-  const path = join(xdgConfigHome, "context.json");
+  const path = join(isolated.configHome, "context.json");
   writeFileSync(path, JSON.stringify({ context: 0 }), "utf-8");
 
   const result = loadConfig(path);
@@ -64,7 +39,7 @@ test("context: 0 falls back to 5 and reports one error naming context", () => {
 });
 
 test("theme.add: red falls back and reports one error naming theme.add", () => {
-  const path = join(xdgConfigHome, "theme.json");
+  const path = join(isolated.configHome, "theme.json");
   writeFileSync(path, JSON.stringify({ theme: { add: "red" } }), "utf-8");
 
   const result = loadConfig(path);
@@ -75,7 +50,7 @@ test("theme.add: red falls back and reports one error naming theme.add", () => {
 });
 
 test("editor as a non-empty string array validates", () => {
-  const path = join(xdgConfigHome, "editor.json");
+  const path = join(isolated.configHome, "editor.json");
   writeFileSync(path, JSON.stringify({ editor: ["kak", "-e", "x"] }), "utf-8");
 
   const result = loadConfig(path);
@@ -85,7 +60,7 @@ test("editor as a non-empty string array validates", () => {
 });
 
 test("saveConfig then loadConfig round-trips", () => {
-  const path = join(xdgConfigHome, "nested", "config.json");
+  const path = join(isolated.configHome, "nested", "config.json");
   const custom = {
     ...DEFAULT_CONFIG,
     editor: "nvim" as const,
@@ -101,7 +76,7 @@ test("saveConfig then loadConfig round-trips", () => {
 });
 
 test("a partial pane object only errors on the field that is actually invalid", () => {
-  const path = join(xdgConfigHome, "pane.json");
+  const path = join(isolated.configHome, "pane.json");
   writeFileSync(path, JSON.stringify({ pane: { width: "50%" } }), "utf-8");
 
   const result = loadConfig(path);
@@ -111,7 +86,7 @@ test("a partial pane object only errors on the field that is actually invalid", 
 });
 
 test("saveConfig creates the parent directory", () => {
-  const dir = join(xdgConfigHome, "deep", "nested", "dir");
+  const dir = join(isolated.configHome, "deep", "nested", "dir");
   const path = join(dir, "config.json");
 
   saveConfig(DEFAULT_CONFIG, path);
@@ -120,13 +95,13 @@ test("saveConfig creates the parent directory", () => {
 });
 
 test("notes defaults to panel", () => {
-  const result = loadConfig(join(xdgConfigHome, "missing.json"));
+  const result = loadConfig(join(isolated.configHome, "missing.json"));
 
   expect(result.config.notes).toBe("panel");
 });
 
 test("notes accepts anchored", () => {
-  const path = join(xdgConfigHome, "notes.json");
+  const path = join(isolated.configHome, "notes.json");
   writeFileSync(path, JSON.stringify({ notes: "anchored" }), "utf-8");
 
   const result = loadConfig(path);
@@ -136,7 +111,7 @@ test("notes accepts anchored", () => {
 });
 
 test("notes: inline is rejected with a ConfigError, since layout already owns that word", () => {
-  const path = join(xdgConfigHome, "notes-inline.json");
+  const path = join(isolated.configHome, "notes-inline.json");
   writeFileSync(path, JSON.stringify({ notes: "inline" }), "utf-8");
 
   const result = loadConfig(path);
@@ -147,13 +122,13 @@ test("notes: inline is rejected with a ConfigError, since layout already owns th
 });
 
 test("syntax defaults to true", () => {
-  const result = loadConfig(join(xdgConfigHome, "missing.json"));
+  const result = loadConfig(join(isolated.configHome, "missing.json"));
 
   expect(result.config.syntax).toBe(true);
 });
 
 test("syntax rejects a non-boolean", () => {
-  const path = join(xdgConfigHome, "syntax.json");
+  const path = join(isolated.configHome, "syntax.json");
   writeFileSync(path, JSON.stringify({ syntax: "yes" }), "utf-8");
 
   const result = loadConfig(path);
@@ -164,13 +139,13 @@ test("syntax rejects a non-boolean", () => {
 });
 
 test("theme.rowBand defaults to true", () => {
-  const result = loadConfig(join(xdgConfigHome, "missing.json"));
+  const result = loadConfig(join(isolated.configHome, "missing.json"));
 
   expect(result.config.theme.rowBand).toBe(true);
 });
 
 test("theme.rowBand rejects a non-boolean", () => {
-  const path = join(xdgConfigHome, "row-band.json");
+  const path = join(isolated.configHome, "row-band.json");
   writeFileSync(path, JSON.stringify({ theme: { rowBand: "yes" } }), "utf-8");
 
   const result = loadConfig(path);
@@ -181,7 +156,7 @@ test("theme.rowBand rejects a non-boolean", () => {
 });
 
 test("editor: pair validates", () => {
-  const path = join(xdgConfigHome, "editor-pair.json");
+  const path = join(isolated.configHome, "editor-pair.json");
   writeFileSync(path, JSON.stringify({ editor: "pair" }), "utf-8");
 
   const result = loadConfig(path);
@@ -191,7 +166,7 @@ test("editor: pair validates", () => {
 });
 
 test("a config file written before this task, with none of the three new fields, loads with every default and zero errors", () => {
-  const path = join(xdgConfigHome, "pre-task-10.json");
+  const path = join(isolated.configHome, "pre-task-10.json");
   const preExisting = {
     editor: "micro",
     multiplexer: "tmux",

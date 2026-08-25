@@ -10,4 +10,5 @@ export type {
   Session,
   Web,
   NotePosition,
+  ConfigResult,
 } from "./types";

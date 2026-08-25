@@ -1,7 +1,6 @@
-import { mkdtempSync, mkdirSync, writeFileSync, openSync, chmodSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync, openSync, chmodSync } from "node:fs";
 import { join } from "node:path";
-import { test, expect, beforeEach, afterEach } from "vitest";
+import { test, expect, beforeEach } from "vitest";
 import { runDoctor } from "../src/cli/doctor";
 import {
   registerClaudeCode,
@@ -11,45 +10,16 @@ import {
 } from "../src/cli/register";
 import { saveConfig } from "../src/core/config";
 import type { PairConfig } from "../src/core/config";
+import { useIsolatedHome } from "./helpers/env";
+
+const isolated = useIsolatedHome();
 
 let homeDir: string;
 let installDir: string;
-let originalHome: string | undefined;
-let originalXdgConfigHome: string | undefined;
-let originalXdgStateHome: string | undefined;
 
 beforeEach(() => {
-  homeDir = mkdtempSync(join(tmpdir(), "pair-mode-home-"));
-  installDir = mkdtempSync(join(tmpdir(), "pair-mode-install-"));
-
-  originalHome = process.env["HOME"];
-  process.env["HOME"] = homeDir;
-
-  originalXdgConfigHome = process.env["XDG_CONFIG_HOME"];
-  process.env["XDG_CONFIG_HOME"] = mkdtempSync(join(tmpdir(), "pair-mode-xdg-config-"));
-
-  originalXdgStateHome = process.env["XDG_STATE_HOME"];
-  process.env["XDG_STATE_HOME"] = mkdtempSync(join(tmpdir(), "pair-mode-xdg-state-"));
-});
-
-afterEach(() => {
-  if (originalHome === undefined) {
-    delete process.env["HOME"];
-  } else {
-    process.env["HOME"] = originalHome;
-  }
-
-  if (originalXdgConfigHome === undefined) {
-    delete process.env["XDG_CONFIG_HOME"];
-  } else {
-    process.env["XDG_CONFIG_HOME"] = originalXdgConfigHome;
-  }
-
-  if (originalXdgStateHome === undefined) {
-    delete process.env["XDG_STATE_HOME"];
-  } else {
-    process.env["XDG_STATE_HOME"] = originalXdgStateHome;
-  }
+  homeDir = isolated.home;
+  installDir = isolated.tempDir("pair-mode-install-");
 });
 
 test("doctor on an unconfigured machine exits 1 and names each failing check", async () => {

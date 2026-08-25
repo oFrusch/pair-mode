@@ -1,7 +1,6 @@
-import { mkdtempSync, mkdirSync, writeFileSync, realpathSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync, realpathSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { test, expect, beforeEach, afterEach } from "vitest";
+import { test, expect, beforeEach } from "vitest";
 import {
   stateDir,
   flagPath,
@@ -11,40 +10,18 @@ import {
   sessionSocketPath,
   findSessionSocket,
 } from "../src/core/state";
+import { useIsolatedHome } from "./helpers/env";
 
-let xdgStateHome: string;
-let originalXdgStateHome: string | undefined;
-let originalHome: string | undefined;
+const isolated = useIsolatedHome();
+
 let repoRoot: string;
 
 beforeEach(() => {
-  xdgStateHome = mkdtempSync(join(tmpdir(), "pair-mode-state-"));
-  originalXdgStateHome = process.env["XDG_STATE_HOME"];
-  process.env["XDG_STATE_HOME"] = xdgStateHome;
-
-  originalHome = process.env["HOME"];
-  process.env["HOME"] = mkdtempSync(join(tmpdir(), "pair-mode-home-"));
-
-  const scratch = mkdtempSync(join(tmpdir(), "pair-mode-repo-"));
-  repoRoot = realpathSync(scratch);
-});
-
-afterEach(() => {
-  if (originalXdgStateHome === undefined) {
-    delete process.env["XDG_STATE_HOME"];
-  } else {
-    process.env["XDG_STATE_HOME"] = originalXdgStateHome;
-  }
-
-  if (originalHome === undefined) {
-    delete process.env["HOME"];
-  } else {
-    process.env["HOME"] = originalHome;
-  }
+  repoRoot = realpathSync(isolated.tempDir("pair-mode-repo-"));
 });
 
 test("stateDir honours XDG_STATE_HOME", () => {
-  expect(stateDir()).toBe(join(xdgStateHome, "pair-mode"));
+  expect(stateDir()).toBe(join(isolated.stateHome, "pair-mode"));
 });
 
 test("flagPath keys by the real path of the directory", () => {
@@ -96,7 +73,7 @@ test("disable returns false when no flag file exists", () => {
 });
 
 test("findSessionSocket walks up from the edited file to the directory holding the socket", () => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "pair-mode-walk-")));
+  const root = realpathSync(isolated.tempDir("pair-mode-walk-"));
   const nested = join(root, "src", "deep");
   mkdirSync(nested, { recursive: true });
 

@@ -1,14 +1,16 @@
-import { mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect, beforeEach } from "vitest";
 import { runConfig, SETTINGS } from "../src/cli/config";
 import { loadConfig, DEFAULT_CONFIG } from "../src/core/config";
+import { useIsolatedHome } from "./helpers/env";
+
+const isolated = useIsolatedHome();
 
 let path: string;
 
 beforeEach(() => {
-  path = join(mkdtempSync(join(tmpdir(), "pair-mode-config-")), "config.json");
+  path = join(isolated.tempDir("pair-mode-config-"), "config.json");
 });
 
 test("a bare config call lists every setting with its current value", () => {
