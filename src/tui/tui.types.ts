@@ -39,6 +39,7 @@ export interface TuiOptions {
 
 export interface TuiIo {
   onKey(handler: (chunk: string) => void): void;
+  onResize?(handler: () => void): void;
   write(text: string): void;
   size(): { width: number; height: number };
   cleanup(): void;

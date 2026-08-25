@@ -21,6 +21,9 @@ export function createStdioIo(): TuiIo {
         handler(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
       });
     },
+    onResize(handler) {
+      process.stdout.on("resize", handler);
+    },
     write(text) {
       process.stdout.write(text);
     },
