@@ -4,6 +4,7 @@ import { runSetup } from "./setup";
 import { runDoctor } from "./doctor";
 import { pairOn, pairOnWeb, pairOff, pairStatus } from "./toggle";
 import { runWatch } from "./watch";
+import { runConfig } from "./config";
 import { startWebWatch } from "../web";
 import { loadConfig } from "../core/config";
 import { installRoot } from "./install-root";
@@ -12,16 +13,19 @@ import { isRecord } from "../helpers";
 const USAGE = `pair-mode <command> [directory]
 
 Commands:
-  setup     interactively configure pair mode and register hooks
-  doctor    diagnose a pair mode install
-  on        turn pair mode on for a directory (default: cwd)
-  on --web  turn pair mode on and serve the review in a browser
-  off       turn pair mode off for a directory (default: cwd)
-  status    report pair mode status for a directory (default: cwd)
-  watch     review edits in this terminal (default: cwd)
-  watch --web  serve the review in a browser and print the link
-  --version print the installed version
-  --help    print this message
+  setup                interactively configure pair mode and register hooks
+  doctor               diagnose a pair mode install
+  config               print every setting and its value
+  config <key>         print one setting
+  config <key> <value> change one setting
+  on [dir]             turn pair mode on for a directory (default: cwd)
+  on --web [dir]       turn pair mode on and serve the review in a browser
+  off [dir]            turn pair mode off for a directory (default: cwd)
+  status [dir]         report pair mode status for a directory (default: cwd)
+  watch [dir]          review edits in this terminal (default: cwd)
+  watch --web [dir]    serve the review in a browser and print the link
+  --version            print the installed version
+  --help               print this message
 `;
 
 function readVersion(): string {
@@ -62,6 +66,12 @@ async function main(): Promise<number> {
     const report = await runDoctor();
     console.log(report.text);
     return report.exitCode;
+  }
+
+  if (command === "config") {
+    const result = runConfig(process.argv.slice(3));
+    console.log(result.text);
+    return result.exitCode;
   }
 
   if (command === "on") {

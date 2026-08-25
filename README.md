@@ -95,6 +95,14 @@ clients, and both remove the multiplexer requirement.
 
 Set `transport` to `"session"`, then pick a client.
 
+```
+pair-mode config transport session
+```
+
+`pair-mode config` with no argument prints every setting and its value. `pair-mode
+config <key>` prints one. `pair-mode config <key> <value>` changes one and validates it
+before it writes.
+
 **Watch mode** reviews in a terminal you own.
 
 ```
