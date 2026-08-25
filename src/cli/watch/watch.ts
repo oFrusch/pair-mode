@@ -1,9 +1,9 @@
 import { createConnection } from "node:net";
 import type { Socket } from "node:net";
-import { unlinkSync } from "node:fs";
+import { paintLayout } from "../../core/config";
 import type { PairConfig } from "../../core/config";
 import { sessionSocketPath } from "../../core/state";
-import { resultFilePath, splitLines } from "../../helpers";
+import { removeQuietly, resultFilePath, splitLines } from "../../helpers";
 import { startSessionServer } from "../../transports/session";
 import { createLineReader, decodeLine, encode } from "../../transports/session";
 import type { ReviewMessage } from "../../transports/session";
@@ -18,12 +18,9 @@ import type { IdleStatus, WatchIo, WatchOptions } from "./watch.types";
 const CLEAR_SCREEN = "\x1b[2J\x1b[H";
 const QUIT_KEYS = ["q", "\x03", "\x04"];
 
-function removeQuietly(path: string): void {
-  try {
-    unlinkSync(path);
-  } catch {
-    // Best-effort cleanup only.
-  }
+// The session errors are held until the alternate screen is gone, so nothing overwrites a frame the user is reading.
+function reportErrors(errors: readonly Error[]): void {
+  errors.forEach((error) => process.stderr.write(`pair-mode: ${error.message}\n`));
 }
 
 function paintIdle(io: WatchIo, status: IdleStatus, truecolor: boolean): void {
@@ -61,7 +58,7 @@ async function optionsFor(
     path: review.path,
     context: config.context,
     minFold: config.minFold,
-    layout: config.layout === "inline" ? "unified" : "split",
+    layout: paintLayout(config.layout),
     notePosition: config.notes,
     rowBand: config.theme.rowBand,
     width,
@@ -74,9 +71,18 @@ async function optionsFor(
 
 export async function runWatch(options: WatchOptions, config: PairConfig): Promise<number> {
   const socketPath = options.socketPath ?? sessionSocketPath(options.directory);
-  const server = await startSessionServer({ socketPath });
+  let errors: readonly Error[] = [];
+
+  // The TUI owns the screen for the whole run, so a session error waits for the screen to be released.
+  const server = await startSessionServer({
+    socketPath,
+    onError: (error) => {
+      errors = [...errors, error];
+    },
+  });
+
   const truecolor = supportsTruecolor(process.env);
-  const io = createWatchIo();
+  const io = options.io ?? createWatchIo();
 
   const status = (): IdleStatus => ({
     directory: options.directory,
@@ -177,6 +183,8 @@ export async function runWatch(options: WatchOptions, config: PairConfig): Promi
   io.shutdown();
   client.destroy();
   await server.close();
+
+  reportErrors(errors);
 
   return 0;
 }

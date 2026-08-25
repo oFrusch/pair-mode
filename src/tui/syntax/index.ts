@@ -1,4 +1,4 @@
-export { createTokenProvider } from "./syntax";
+export { createTokenProvider, MAX_CACHED_LINES } from "./syntax";
 export type {
   HighlighterLoader,
   ShikiHighlighter,
