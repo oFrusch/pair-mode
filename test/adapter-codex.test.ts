@@ -1,10 +1,11 @@
 import { build } from "esbuild";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, chmodSync } from "node:fs";
+import { mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { test, expect, beforeAll } from "vitest";
+import { test, expect, beforeAll, afterAll } from "vitest";
+import { useIsolatedHome } from "./helpers/env";
 import { enable } from "../src/core/state";
 import { parsePatch, extractPatchText } from "../src/adapters/codex";
 import { applyEdit } from "../src/core/simulate";
@@ -12,10 +13,13 @@ import { applyEdit } from "../src/core/simulate";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
 
+const isolated = useIsolatedHome();
+
+let outDir: string;
 let bundlePath: string;
 
 beforeAll(async () => {
-  const outDir = mkdtempSync(join(tmpdir(), "pair-mode-bundle-"));
+  outDir = mkdtempSync(join(tmpdir(), "pair-mode-bundle-"));
   bundlePath = join(outDir, "codex.js");
 
   await build({
@@ -29,6 +33,10 @@ beforeAll(async () => {
       js: 'import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);',
     },
   });
+});
+
+afterAll(() => {
+  rmSync(outDir, { recursive: true, force: true });
 });
 
 // A fake tmux resolved ahead of the real one on PATH, so the harness never needs a real terminal or a real tmux server.
@@ -58,24 +66,18 @@ interface Harness {
 }
 
 function setupHarness(): Harness {
-  const stateHome = mkdtempSync(join(tmpdir(), "pair-mode-state-"));
-  const targetDir = mkdtempSync(join(tmpdir(), "pair-mode-target-"));
+  const stateHome = isolated.tempDir("pair-mode-state-");
+  const targetDir = isolated.tempDir("pair-mode-target-");
   const filePath = join(targetDir, "example.ts");
 
-  const fakeBinDir = mkdtempSync(join(tmpdir(), "pair-mode-bin-"));
+  const fakeBinDir = isolated.tempDir("pair-mode-bin-");
   const tmuxPath = join(fakeBinDir, "tmux");
   writeFileSync(tmuxPath, FAKE_TMUX, "utf-8");
   chmodSync(tmuxPath, 0o755);
 
-  const previousXdgStateHome = process.env["XDG_STATE_HOME"];
   process.env["XDG_STATE_HOME"] = stateHome;
   enable(targetDir);
-
-  if (previousXdgStateHome === undefined) {
-    delete process.env["XDG_STATE_HOME"];
-  } else {
-    process.env["XDG_STATE_HOME"] = previousXdgStateHome;
-  }
+  process.env["XDG_STATE_HOME"] = isolated.stateHome;
 
   return { stateHome, targetDir, filePath, fakeBinDir };
 }
@@ -97,8 +99,8 @@ function runAdapter(
   harness: Harness,
   editorScript: string | null,
 ): { status: number | null; stdout: string; stderr: string } {
-  const configHome = mkdtempSync(join(tmpdir(), "pair-mode-config-"));
-  const fakeHome = mkdtempSync(join(tmpdir(), "pair-mode-home-"));
+  const configHome = isolated.tempDir("pair-mode-config-");
+  const fakeHome = isolated.tempDir("pair-mode-home-");
 
   const env: Record<string, string | undefined> = {
     ...process.env,
@@ -198,10 +200,10 @@ test("an unparseable apply_patch patch exits 0 with no output", () => {
 });
 
 test("a payload for a path with no flag file exits 0", () => {
-  const stateHome = mkdtempSync(join(tmpdir(), "pair-mode-state-"));
-  const targetDir = mkdtempSync(join(tmpdir(), "pair-mode-target-"));
+  const stateHome = isolated.tempDir("pair-mode-state-");
+  const targetDir = isolated.tempDir("pair-mode-target-");
   const filePath = join(targetDir, "example.ts");
-  const fakeBinDir = mkdtempSync(join(tmpdir(), "pair-mode-bin-"));
+  const fakeBinDir = isolated.tempDir("pair-mode-bin-");
 
   const harness: Harness = { stateHome, targetDir, filePath, fakeBinDir };
 
@@ -251,6 +253,48 @@ test("parsePatch reconstructs the exact before and after text for an Update File
   const after = edit === undefined ? null : applyEdit(before, edit);
 
   expect(after).toBe("line one\nline TWO\nline three");
+});
+
+test("parsePatch extracts a single-file Update patch terminated by the End of File sentinel", () => {
+  const patch = [
+    "*** Begin Patch",
+    "*** Update File: /tmp/example.ts",
+    "@@",
+    " line one",
+    "-line two",
+    "+line TWO",
+    "*** End of File",
+    "*** End Patch",
+    "",
+  ].join("\n");
+
+  const parsed = parsePatch(patch);
+
+  expect(parsed).not.toBeNull();
+  expect(parsed?.filePath).toBe("/tmp/example.ts");
+  expect(parsed?.tool).toBe("MultiEdit");
+  expect(parsed?.edits).toEqual([
+    { old_string: "line one\nline two", new_string: "line one\nline TWO" },
+  ]);
+});
+
+test("parsePatch still declines a multi-file patch whose first section ends at End of File", () => {
+  const patch = [
+    "*** Begin Patch",
+    "*** Update File: /tmp/first.ts",
+    "@@",
+    " line one",
+    "+line two",
+    "*** End of File",
+    "*** Update File: /tmp/second.ts",
+    "@@",
+    " line three",
+    "+line four",
+    "*** End Patch",
+    "",
+  ].join("\n");
+
+  expect(parsePatch(patch)).toBeNull();
 });
 
 test("parsePatch reconstructs the exact content for an Add File patch", () => {

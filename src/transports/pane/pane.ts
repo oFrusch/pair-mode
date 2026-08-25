@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { readFileSync, writeFileSync, unlinkSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PairConfig } from "../../core/config";
@@ -35,6 +35,19 @@ function removeQuietly(path: string): void {
   } catch {
     // Best-effort cleanup only.
   }
+}
+
+function removeTreeQuietly(path: string): void {
+  try {
+    rmSync(path, { recursive: true, force: true });
+  } catch {
+    // Best-effort cleanup only.
+  }
+}
+
+// Two concurrent reviews with different themes would otherwise overwrite each other's editor config.
+function reviewConfigDir(): string {
+  return join(stateDir(), "editor", randomBytes(NAME_BYTES).toString("hex"));
 }
 
 // A multiplexer's server spawns the command, so process.env never reaches it. Baking KEY=VALUE into argv does.
@@ -73,7 +86,7 @@ async function reviewInPane(
   const usesResultFile = editor.collectMode === "result-file";
 
   const suffix = editor.bufferSuffix(request.filePath);
-  const configDir = join(stateDir(), "editor");
+  const configDir = reviewConfigDir();
 
   // Inline has one logical buffer: left and right are the same content, so both panes point at the same file.
   let leftFile: string | null = null;
@@ -125,6 +138,7 @@ async function reviewInPane(
     }
 
     removeQuietly(resultFile);
+    removeTreeQuietly(configDir);
   }
 }
 
