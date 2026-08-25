@@ -362,11 +362,14 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
     let previousLines: string[] = [];
     let finished = false;
 
+    // The pane can be laid out after the process starts, so every frame reads the live size rather than the startup one.
     const repaint = () => {
+      const { width, height } = io.size();
+
       const result = paint({
         model: state.model,
-        width: options.width,
-        height: options.height,
+        width,
+        height,
         path: options.path,
         tokens: options.tokens,
         truecolor: options.truecolor,
@@ -447,6 +450,20 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
       return;
     }
 
+    // A resize invalidates the whole frame, so the diff baseline is cleared before the repaint.
+    io.onResize?.(() => {
+      if (finished) {
+        return;
+      }
+
+      try {
+        previousLines = [];
+        repaint();
+      } catch (error) {
+        finishError(error);
+      }
+    });
+
     io.onKey((chunk: string) => {
       if (finished) {
         return;
@@ -459,7 +476,10 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
 
         const events = parseKeys(keys);
 
-        state = events.reduce((current, event) => applyKey(current, event, options.height), state);
+        state = events.reduce(
+          (current, event) => applyKey(current, event, io.size().height),
+          state,
+        );
 
         repaint();
 

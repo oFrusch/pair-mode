@@ -301,6 +301,51 @@ describe("frameDiff", () => {
   });
 });
 
+describe("runTui — terminal size", () => {
+  // The pane can be laid out after the process starts, so a startup size of 80x24 must not pin the frame.
+  test("a resize repaints at the new size", async () => {
+    const size = { width: 80, height: 24 };
+    const resize: { handler: (() => void) | null } = { handler: null };
+    const writes: string[] = [];
+
+    const io: TuiIo = {
+      onKey() {},
+      onResize(handler) {
+        resize.handler = handler;
+      },
+      write(text) {
+        writes.push(text);
+      },
+      size() {
+        return size;
+      },
+      cleanup() {},
+    };
+
+    const pending = runTui(makeOptions({ width: 80, height: 24 }), io);
+    const narrow = writes.join("");
+
+    size.width = 200;
+    size.height = 60;
+    resize.handler?.();
+
+    const wide = writes.join("").slice(narrow.length);
+
+    expect(narrow).not.toBe("");
+    expect(wide).not.toBe("");
+    expect(widestRow(wide)).toBeGreaterThan(widestRow(narrow));
+
+    void pending;
+  });
+});
+
+// The frame is one escape-prefixed string, so the widest painted row measures the frame width.
+function widestRow(frame: string): number {
+  const rows = frame.split("\x1b[").map((part) => part.replace(/^[0-9;]*[A-Za-z]/, ""));
+
+  return Math.max(0, ...rows.map((row) => row.length));
+}
+
 function makeFakeIo() {
   let handler: ((chunk: string) => void) | null = null;
   const writes: string[] = [];
