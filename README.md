@@ -95,8 +95,8 @@ when `XDG_CONFIG_HOME` is not set.
 | `notes`         | `"panel" \| "anchored"`                                                                 | `"panel"`   | A docked notes panel, or a note inline at its anchor.            |
 | `context`       | integer, 1 or more                                                                      | `5`         | Unchanged lines kept around a change before folding.             |
 | `minFold`       | integer, 1 or more                                                                      | `4`         | Minimum run of unchanged lines that folds.                       |
-| `pane.width`    | string                                                                                  | `"90%"`     |                                                                  |
-| `pane.height`   | string                                                                                  | `"90%"`     |                                                                  |
+| `pane.width`    | string                                                                                  | `"95%"`     |                                                                  |
+| `pane.height`   | string                                                                                  | `"95%"`     |                                                                  |
 | `theme.add`     | 6-digit hex colour                                                                      | `"#1e3a1e"` |                                                                  |
 | `theme.del`     | 6-digit hex colour                                                                      | `"#3a1e1e"` |                                                                  |
 | `theme.fold`    | 6-digit hex colour                                                                      | `"#2a2a2a"` |                                                                  |
