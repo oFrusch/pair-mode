@@ -1,5 +1,6 @@
 export type EditorName = "auto" | "pair" | "micro" | "nvim" | "vim" | "nano";
 export type MultiplexerName = "auto" | "zellij" | "tmux" | "none";
+export type TransportName = "pane" | "session";
 export type Layout = "split" | "inline";
 export type NotePosition = "panel" | "anchored";
 

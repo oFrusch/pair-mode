@@ -1,17 +1,8 @@
-import type { Multiplexer } from "../../multiplexers/multiplexer.types";
-import type { Editor } from "../../editors/editor.types";
+import type { PaneDeps, ReviewTransport } from "../../transports";
 
-export interface EditRequest {
-  tool: string;
-  filePath: string;
-  before: string;
-  after: string;
-}
-
-// A test injects its own multiplexer and editor here so runPair never spawns zellij, tmux, or an editor for real.
-export interface RunDeps {
-  multiplexer?: Multiplexer;
-  editor?: Editor;
+// A test injects a whole transport here, or just the pane transport's editor and multiplexer.
+export interface RunDeps extends PaneDeps {
+  transport?: ReviewTransport;
 }
 
 // reviewed distinguishes an allow the user actually saw in the pane from an allow pair mode never showed them.
@@ -19,3 +10,5 @@ export type RunVerdict =
   | { decision: "allow"; reviewed: true }
   | { decision: "allow"; reviewed: false; reason?: string }
   | { decision: "deny"; reason: string };
+
+export type { EditRequest } from "../../transports";

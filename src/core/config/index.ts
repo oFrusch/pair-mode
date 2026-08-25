@@ -3,6 +3,7 @@ export type {
   PairConfig,
   EditorName,
   MultiplexerName,
+  TransportName,
   Layout,
   Theme,
   Pane,
