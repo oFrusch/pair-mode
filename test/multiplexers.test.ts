@@ -95,10 +95,25 @@ test("tmux run signals a wait channel and blocks on the same channel", () => {
   expect(script).toBeDefined();
   expect(script).toContain("wait-for -S pair-");
 
-  const channel = script?.match(/pair-\d+/)?.[0];
+  const channel = script?.match(/pair-[0-9a-f]{16}/)?.[0];
   expect(channel).toBeDefined();
   expect(wait?.command).toBe("tmux");
   expect(wait?.args).toEqual(["wait-for", channel]);
+});
+
+// tmux latches an unconsumed signal, so a repeated channel name would wake the next wait instantly.
+test("tmux run picks a fresh wait channel on every run", () => {
+  const { spawn, calls } = recordingSpawn();
+  const tmux = createTmuxMultiplexer(spawn);
+  const size = { width: "90%", height: "90%" };
+
+  tmux.run(["micro"], size);
+  tmux.run(["micro"], size);
+
+  const channels = calls.filter((call) => call.args[0] === "wait-for").map((call) => call.args[1]);
+
+  expect(channels).toHaveLength(2);
+  expect(channels[0]).not.toBe(channels[1]);
 });
 
 test("tmux run quotes an argv element containing a space", () => {

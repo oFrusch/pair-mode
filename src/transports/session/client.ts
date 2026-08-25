@@ -1,6 +1,5 @@
 import { createConnection } from "node:net";
 import type { Socket } from "node:net";
-import { unlinkSync } from "node:fs";
 import type { PairConfig } from "../../core/config";
 import { findSessionSocket } from "../../core/state";
 import type { EditRequest, ReviewOutcome, ReviewTransport } from "../transport.types";
@@ -8,14 +7,6 @@ import { createLineReader, decodeLine, encode } from "./wire";
 import type { SessionClientOptions } from "./client.types";
 
 const MS_PER_SECOND = 1000;
-
-function removeQuietly(path: string): void {
-  try {
-    unlinkSync(path);
-  } catch {
-    // Best-effort cleanup only.
-  }
-}
 
 function failOpen(detail: string): ReviewOutcome {
   return { reviewed: false, detail };
@@ -63,9 +54,8 @@ function requestReview(
 
     // Any other error kills the socket, so close settles it. Settling here would race close and lose the reason.
     socket.on("error", (error: unknown) => {
-      // A socket file whose watcher died refuses the connection, so the file is stale and goes.
+      // bindSocket and doctor own stale-socket cleanup, so unlinking here could delete a restarted watcher's live socket.
       if (isConnectionRefused(error)) {
-        removeQuietly(options.socketPath);
         settle(failOpen("no pair-mode watcher attached"));
         return;
       }

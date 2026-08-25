@@ -1,7 +1,6 @@
 import { createConnection, createServer } from "node:net";
 import type { Socket } from "node:net";
-import { mkdtempSync, existsSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect, beforeEach, afterEach } from "vitest";
 import {
@@ -11,6 +10,9 @@ import {
   encode,
 } from "../src/transports/session";
 import type { SessionServer, WireMessage } from "../src/transports/session";
+import { useIsolatedHome } from "./helpers/env";
+
+const isolated = useIsolatedHome();
 
 const WAIT_TIMEOUT_MS = 2000;
 const POLL_MS = 5;
@@ -20,18 +22,18 @@ let server: SessionServer | null = null;
 const openSockets: Socket[] = [];
 
 beforeEach(() => {
-  const dir = mkdtempSync(join(tmpdir(), "pair-sess-"));
+  const dir = isolated.tempDir("pair-sess-");
   socketPath = join(dir, "s.sock");
 });
 
 afterEach(async () => {
-  openSockets.forEach((socket) => socket.destroy());
-  openSockets.length = 0;
-
   if (server !== null) {
     await server.close();
     server = null;
   }
+
+  openSockets.forEach((socket) => socket.destroy());
+  openSockets.length = 0;
 });
 
 interface Peer {
@@ -333,3 +335,18 @@ test("close removes the socket file", async () => {
 
   expect(existsSync(socketPath)).toBe(false);
 });
+
+test("close resolves promptly with a bare connection that never identifies itself", async () => {
+  const started = await startWithSequentialIds();
+
+  const bare = createConnection(socketPath);
+  openSockets.push(bare);
+  await new Promise<void>((resolve) => bare.once("connect", () => resolve()));
+
+  const closedAt = Date.now();
+  await started.close();
+  server = null;
+
+  expect(Date.now() - closedAt).toBeLessThan(WAIT_TIMEOUT_MS);
+  expect(existsSync(socketPath)).toBe(false);
+}, 10000);

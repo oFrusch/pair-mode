@@ -27,6 +27,11 @@ function defaultGenerateId(): string {
   return randomBytes(ID_BYTES).toString("hex");
 }
 
+// An accept error must never kill the watcher, so it goes to stderr unless the caller wants it.
+function defaultReportError(error: Error): void {
+  process.stderr.write(`pair-mode session server error: ${error.message}\n`);
+}
+
 function removeQuietly(path: string): void {
   try {
     unlinkSync(path);
@@ -99,10 +104,12 @@ async function bindSocket(server: Server, path: string): Promise<void> {
 
 export async function startSessionServer(options: SessionServerOptions): Promise<SessionServer> {
   const generateId = options.generateId ?? defaultGenerateId;
+  const reportError = options.onError ?? defaultReportError;
 
   let queue: QueueState = emptyQueue();
   const agents = new Map<string, Socket>();
   const clients = new Map<Socket, string | null>();
+  const connections = new Set<Socket>();
   const changeHandlers: Array<() => void> = [];
 
   function announce(): void {
@@ -249,6 +256,7 @@ export async function startSessionServer(options: SessionServerOptions): Promise
   }
 
   function handleConnection(socket: Socket): void {
+    connections.add(socket);
     socket.setEncoding("utf-8");
     const readLines = createLineReader();
 
@@ -259,6 +267,7 @@ export async function startSessionServer(options: SessionServerOptions): Promise
     socket.on("error", () => socket.destroy());
 
     socket.on("close", () => {
+      connections.delete(socket);
       dropAgent(socket);
       dropClient(socket);
     });
@@ -266,6 +275,9 @@ export async function startSessionServer(options: SessionServerOptions): Promise
 
   const server = createServer(handleConnection);
   await bindSocket(server, options.socketPath);
+
+  // listenOn drops its own error listener on success, so an accept error after bind would otherwise be uncaught.
+  server.on("error", reportError);
 
   return {
     socketPath: options.socketPath,
@@ -284,8 +296,8 @@ export async function startSessionServer(options: SessionServerOptions): Promise
 
     close(): Promise<void> {
       return new Promise((resolve) => {
-        [...clients.keys()].forEach((socket) => socket.destroy());
-        [...agents.values()].forEach((socket) => socket.destroy());
+        // net.Server.close waits on every accepted connection, including one that never identified itself.
+        [...connections].forEach((socket) => socket.destroy());
 
         server.close(() => {
           removeQuietly(options.socketPath);
