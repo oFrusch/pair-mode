@@ -1,7 +1,7 @@
 import { mkdtempSync, writeFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test, expect, beforeEach, afterEach } from "vitest";
+import { test, expect, beforeEach, afterEach, describe } from "vitest";
 import { enable } from "../src/core/state";
 import { handleToolCall } from "../src/adapters/pi";
 import type { RunPairFn } from "../src/adapters/pi";
@@ -124,9 +124,10 @@ test("a call for a directory pair mode has not enabled resolves block: false", a
   expect(result).toEqual({ block: false });
 });
 
-test("the module default export is the factory pi calls, and it subscribes to tool_call", async () => {
+test("the module default export is the factory pi calls, and it registers both hooks", async () => {
   const module = await import("../src/adapters/pi");
   const events: string[] = [];
+  const commands: string[] = [];
 
   expect(typeof module.default).toBe("function");
 
@@ -134,7 +135,34 @@ test("the module default export is the factory pi calls, and it subscribes to to
     on: (event) => {
       events.push(event);
     },
+    registerCommand: (name) => {
+      commands.push(name);
+    },
   });
 
   expect(events).toEqual(["tool_call"]);
+  expect(commands).toEqual(["pair"]);
+});
+
+describe("runPairCommand", () => {
+  const directory = mkdtempSync(join(tmpdir(), "pair-pi-cmd-"));
+
+  test("on then status reports ON, off then status reports OFF", async () => {
+    const { runPairCommand } = await import("../src/adapters/pi");
+
+    expect(runPairCommand("on", directory)).toContain("ON");
+    expect(runPairCommand("status", directory)).toContain("ON");
+    expect(runPairCommand("off", directory)).toContain("OFF");
+    expect(runPairCommand("", directory)).toContain("OFF");
+  });
+
+  test("an unknown action names the valid ones and changes nothing", async () => {
+    const { runPairCommand } = await import("../src/adapters/pi");
+
+    runPairCommand("on", directory);
+    const message = runPairCommand("sideways", directory);
+
+    expect(message).toContain("on, off, or status");
+    expect(runPairCommand("status", directory)).toContain("ON");
+  });
 });

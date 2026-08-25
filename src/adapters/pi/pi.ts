@@ -1,8 +1,15 @@
 import { isEnabled } from "../../core/state";
 import { simulate } from "../../core/simulate";
+import { pairOff, pairOn, pairStatus } from "../../cli/toggle";
 import { runPair as defaultRunPair } from "../../core/run";
 import { loadConfig } from "../../core/config";
-import type { PiExtensionAPI, PiToolCallEvent, PiToolCallResult, RunPairFn } from "./types";
+import type {
+  PiCommandContext,
+  PiExtensionAPI,
+  PiToolCallEvent,
+  PiToolCallResult,
+  RunPairFn,
+} from "./types";
 import type { SimulateCall } from "../adapter.types";
 import { isRecord, readFileOrEmpty } from "../../helpers";
 
@@ -90,7 +97,33 @@ export async function handleToolCall(
   }
 }
 
+// pi has no per-directory state of its own, so /pair drives the same flag file the CLI writes.
+export function runPairCommand(args: string, directory: string): string {
+  const action = args.trim().toLowerCase();
+
+  if (action === "on") {
+    return pairOn(directory);
+  }
+
+  if (action === "off") {
+    return pairOff(directory);
+  }
+
+  if (action === "" || action === "status") {
+    return pairStatus(directory);
+  }
+
+  return `pair: unknown action "${action}". Use on, off, or status.`;
+}
+
 // Registered once when pi loads this file as an extension.
 export default function activate(pi: PiExtensionAPI): void {
   pi.on("tool_call", (event) => handleToolCall(event));
+
+  pi.registerCommand("pair", {
+    description: "Turn pair mode on or off for this directory",
+    handler: (args: string, ctx: PiCommandContext) => {
+      ctx.ui.notify(runPairCommand(args, ctx.cwd), "info");
+    },
+  });
 }
