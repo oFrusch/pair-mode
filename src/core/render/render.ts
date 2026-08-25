@@ -1,4 +1,5 @@
 import { align, fold } from "../diff";
+import type { Row } from "../diff/types";
 import type { RenderInput, RenderResult } from "./types";
 
 const HEADER_LEAD: string[] = [
@@ -40,21 +41,23 @@ export function renderInline(input: RenderInput): RenderResult {
   const header = buildHeader(input.tool, input.path, input.headerHint);
   const rows = align(before, after);
 
-  const headerNumbers: (number | null)[] = header.map(() => null);
-
-  const entries = rows.flatMap((row): { line: string; number: number | null }[] => {
+  // Inline stacks both sides into one column, so each entry is a row whose panes are identical.
+  const entries = rows.flatMap((row): Row[] => {
     if (!row.changed) {
-      return [{ line: row.left, number: row.number }];
+      return [{ changed: false, left: row.left, right: row.left, number: row.number }];
     }
 
-    const left = row.left !== "" ? [{ line: row.left, number: null }] : [];
-    const right = row.right !== "" ? [{ line: row.right, number: row.number }] : [];
+    const left =
+      row.left !== "" ? [{ changed: true, left: row.left, right: row.left, number: null }] : [];
+    const right =
+      row.right !== ""
+        ? [{ changed: true, left: row.right, right: row.right, number: row.number }]
+        : [];
 
     return [...left, ...right];
   });
 
-  const lines = [...header, ...entries.map((entry) => entry.line)];
-  const numbers = [...headerNumbers, ...entries.map((entry) => entry.number)];
+  const panes = fold(entries, header, input.context, input.minFold);
 
-  return { left: lines, right: lines, numbers };
+  return { left: panes.left, right: panes.left, numbers: panes.numbers };
 }

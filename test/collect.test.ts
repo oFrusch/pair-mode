@@ -157,3 +157,31 @@ describe("parseNoteResult", () => {
     expect(parseNoteResult(text)).toEqual([{ line: 1, code: "a", text: "spaced" }]);
   });
 });
+
+describe("collect over a replace opcode", () => {
+  test("a question typed over a row anchors to that row, not the one above it", () => {
+    const original = ["func main() {", "\tx := 1", "}"];
+    const numbers = [10, 11, 12];
+    const saved = ["func main() {", "why x=1?", "}"];
+
+    expect(collect(original, numbers, saved)).toEqual([
+      { line: 11, code: "\tx := 1", text: "why x=1?" },
+    ]);
+  });
+});
+
+describe("anchor marker stripping", () => {
+  test("a row marker never reaches the returned code", () => {
+    const original = ["    a", "▌▌+ B"];
+    const numbers = [1, 2];
+
+    expect(anchor(original, numbers, 1)).toEqual({ line: 2, code: "B" });
+  });
+
+  test("an unchanged row keeps its real indentation once the marker is gone", () => {
+    const original = ["        deep"];
+    const numbers = [7];
+
+    expect(anchor(original, numbers, 0)).toEqual({ line: 7, code: "    deep" });
+  });
+});
