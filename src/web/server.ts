@@ -2,7 +2,6 @@ import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomBytes } from "node:crypto";
 import { isRecord } from "../helpers";
-import type { Question } from "../core/collect";
 import { renderPage } from "./page";
 import { webNotesToQuestions } from "./notes";
 import type { WebNote } from "./notes.types";
@@ -17,6 +16,7 @@ const NOT_FOUND = 404;
 const OK = 200;
 const BAD_REQUEST = 400;
 const PAYLOAD_TOO_LARGE = 413;
+const CONFLICT = 409;
 
 // server.address() widens to string | AddressInfo | null, and only the object form carries a port.
 function portOf(address: unknown): number {
@@ -153,12 +153,15 @@ export function startWebServer(options: WebServerOptions): Promise<WebServer> {
     }
 
     const answered = current;
+
+    // A verdict naming any other review would strand the open one, so a stale page click is refused.
+    if (answered === null || answered.id !== verdict.id) {
+      response.writeHead(CONFLICT, { "content-type": "application/json" }).end("{}");
+      return;
+    }
+
     current = null;
-
-    const questions: Question[] =
-      answered === null ? [] : webNotesToQuestions(answered, verdict.notes);
-
-    options.onVerdict(verdict.id, questions);
+    options.onVerdict(verdict.id, webNotesToQuestions(answered, verdict.notes));
     response.writeHead(OK, { "content-type": "application/json" }).end("{}");
   }
 

@@ -508,7 +508,12 @@ function post(payload) {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
-  }).then(() => {
+  }).then((response) => {
+    // A refused verdict means the open review moved on, so the page keeps what it is showing.
+    if (!response.ok) {
+      return;
+    }
+
     review = null;
     notes = [];
     expanded = new Set();

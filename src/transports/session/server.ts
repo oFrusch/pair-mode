@@ -1,7 +1,7 @@
 import { createServer, createConnection } from "node:net";
 import type { Server, Socket } from "node:net";
 import { randomBytes } from "node:crypto";
-import { mkdirSync, unlinkSync } from "node:fs";
+import { chmodSync, mkdirSync, unlinkSync } from "node:fs";
 import { dirname } from "node:path";
 import type { EditRequest } from "../transport.types";
 import type { QueueState } from "./queue.types";
@@ -19,6 +19,8 @@ import type { ServerMessage, VerdictMessage } from "./wire.types";
 import type { SessionServer, SessionServerOptions } from "./server.types";
 
 const ID_BYTES = 8;
+const OWNER_ONLY_DIR = 0o700;
+const OWNER_ONLY_SOCKET = 0o600;
 const STALE_PROBE_TIMEOUT_MS = 250;
 
 function defaultGenerateId(): string {
@@ -64,11 +66,21 @@ function isAddressInUse(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "EADDRINUSE";
 }
 
+// The socket gates every edit, so only its owner may attach as a client.
+function restrictToOwner(path: string): void {
+  try {
+    chmodSync(path, OWNER_ONLY_SOCKET);
+  } catch {
+    // A platform that refuses chmod on a socket still serves the owner.
+  }
+}
+
 async function bindSocket(server: Server, path: string): Promise<void> {
-  mkdirSync(dirname(path), { recursive: true });
+  mkdirSync(dirname(path), { recursive: true, mode: OWNER_ONLY_DIR });
 
   try {
     await listenOn(server, path);
+    restrictToOwner(path);
     return;
   } catch (error) {
     if (!isAddressInUse(error)) {
@@ -82,6 +94,7 @@ async function bindSocket(server: Server, path: string): Promise<void> {
 
   removeQuietly(path);
   await listenOn(server, path);
+  restrictToOwner(path);
 }
 
 export async function startSessionServer(options: SessionServerOptions): Promise<SessionServer> {

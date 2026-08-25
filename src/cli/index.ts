@@ -124,5 +124,15 @@ async function main(): Promise<number> {
   return 1;
 }
 
-const code = await main();
+// A failure here is a message for the user, not a stack trace. Node would print one otherwise.
+async function report(): Promise<number> {
+  try {
+    return await main();
+  } catch (error) {
+    console.error(`pair-mode: ${error instanceof Error ? error.message : String(error)}`);
+    return 1;
+  }
+}
+
+const code = await report();
 process.exit(code);

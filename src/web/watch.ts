@@ -59,7 +59,10 @@ export async function startWebWatch(
       const message = decodeLine(line);
 
       if (message?.type === "review") {
-        void toWebReview(message, config).then((review) => web.offer(review));
+        // A render that throws would otherwise become an unhandled rejection and kill the watcher.
+        void toWebReview(message, config)
+          .then((review) => web.offer(review))
+          .catch(() => client.write(encode({ type: "verdict", id: message.id, questions: [] })));
         return;
       }
 

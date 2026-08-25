@@ -15,6 +15,7 @@ const TOKEN = "0123456789abcdef0123456789abcdef";
 const OK = 200;
 const NOT_FOUND = 404;
 const BAD_REQUEST = 400;
+const CONFLICT = 409;
 
 let web: WebServer | null = null;
 let watcher: WebWatcher | null = null;
@@ -210,6 +211,56 @@ test("two notes on one line arrive in column order", async () => {
     'earlier [re: "b"]',
     'later [re: "3"]',
   ]);
+});
+
+test("a verdict naming another review is refused and leaves the open one alone", async () => {
+  const seen: string[] = [];
+  web = await startPlain((id) => seen.push(id));
+  web.offer(await toWebReview(review, config));
+
+  const response = await fetch(`${web.url}/verdict`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: "bogus", notes: [] }),
+  });
+
+  expect(response.status).toBe(CONFLICT);
+  expect(seen).toEqual([]);
+});
+
+test("the open review survives a refused verdict and still answers the right one", async () => {
+  const seen: string[] = [];
+  web = await startPlain((id) => seen.push(id));
+  web.offer(await toWebReview(review, config));
+
+  await fetch(`${web.url}/verdict`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: "bogus", notes: [] }),
+  });
+
+  const response = await fetch(`${web.url}/verdict`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: "id1", notes: [] }),
+  });
+
+  expect(response.status).toBe(OK);
+  expect(seen).toEqual(["id1"]);
+});
+
+test("a verdict arriving with no review open is refused", async () => {
+  const seen: string[] = [];
+  web = await startPlain((id) => seen.push(id));
+
+  const response = await fetch(`${web.url}/verdict`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: "id1", notes: [] }),
+  });
+
+  expect(response.status).toBe(CONFLICT);
+  expect(seen).toEqual([]);
 });
 
 test("an empty note list produces an approval with no questions", async () => {
