@@ -4,6 +4,8 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import type {
   EditorName,
   MultiplexerName,
+  TransportName,
+  Session,
   Layout,
   Theme,
   Pane,
@@ -18,6 +20,8 @@ import { isHexColor as isHexColorString } from "../../helpers/hexColor";
 
 const EDITOR_NAMES: string[] = ["auto", "pair", "micro", "nvim", "vim", "nano"];
 const MULTIPLEXER_NAMES: string[] = ["auto", "zellij", "tmux", "none"];
+const TRANSPORT_NAMES: string[] = ["pane", "session"];
+const DEFAULT_SESSION_TIMEOUT = 300;
 const LAYOUTS: string[] = ["split", "inline"];
 const NOTE_POSITIONS: string[] = ["panel", "anchored"];
 
@@ -28,6 +32,8 @@ export const DEFAULT_CONFIG: PairConfig = {
   context: DEFAULT_CONTEXT,
   minFold: DEFAULT_MIN_FOLD,
   pane: { width: "95%", height: "95%" },
+  transport: "pane",
+  session: { timeout: DEFAULT_SESSION_TIMEOUT },
   theme: { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a", rowBand: true },
   trace: false,
   autoApprove: true,
@@ -53,6 +59,10 @@ function isEditorList(value: unknown): value is string[] {
 
 function isMultiplexerName(value: unknown): value is MultiplexerName {
   return typeof value === "string" && MULTIPLEXER_NAMES.includes(value);
+}
+
+function isTransportName(value: unknown): value is TransportName {
+  return typeof value === "string" && TRANSPORT_NAMES.includes(value);
 }
 
 function isLayout(value: unknown): value is Layout {
@@ -109,6 +119,45 @@ function validateMultiplexer(raw: Record<string, unknown>, errors: ConfigError[]
 
   errors.push({ path: "multiplexer", message: "must be one of auto, zellij, tmux, none" });
   return DEFAULT_CONFIG.multiplexer;
+}
+
+function validateTransport(raw: Record<string, unknown>, errors: ConfigError[]): TransportName {
+  if (!("transport" in raw)) {
+    return DEFAULT_CONFIG.transport;
+  }
+
+  const value = raw["transport"];
+
+  if (isTransportName(value)) {
+    return value;
+  }
+
+  errors.push({ path: "transport", message: "must be one of pane, session" });
+  return DEFAULT_CONFIG.transport;
+}
+
+function validateSession(raw: Record<string, unknown>, errors: ConfigError[]): Session {
+  if (!("session" in raw)) {
+    return DEFAULT_CONFIG.session;
+  }
+
+  const value = raw["session"];
+
+  if (!isRecord(value)) {
+    errors.push({ path: "session", message: "must be an object" });
+    return DEFAULT_CONFIG.session;
+  }
+
+  if (!("timeout" in value)) {
+    return DEFAULT_CONFIG.session;
+  }
+
+  if (isPositiveInteger(value["timeout"])) {
+    return { timeout: value["timeout"] };
+  }
+
+  errors.push({ path: "session.timeout", message: "must be an integer of 1 or more" });
+  return DEFAULT_CONFIG.session;
 }
 
 function validateLayout(raw: Record<string, unknown>, errors: ConfigError[]): Layout {
@@ -308,6 +357,8 @@ function validate(raw: Record<string, unknown>): ConfigResult {
     context: validatePositiveInteger(raw, "context", DEFAULT_CONFIG.context, errors),
     minFold: validatePositiveInteger(raw, "minFold", DEFAULT_CONFIG.minFold, errors),
     pane: validatePane(raw, errors),
+    transport: validateTransport(raw, errors),
+    session: validateSession(raw, errors),
     theme: validateTheme(raw, errors),
     trace: validateTrace(raw, errors),
     autoApprove: validateAutoApprove(raw, errors),

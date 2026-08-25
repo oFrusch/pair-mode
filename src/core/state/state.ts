@@ -42,6 +42,27 @@ export function sessionSocketPath(directory: string): string {
   return join(sessionsDir(), `${digestFor(directory)}.sock`);
 }
 
+// The watcher runs at the repo root, so the hook walks up from the edited file exactly as isEnabled does.
+export function findSessionSocket(filePath: string): string | null {
+  let current = dirname(realpathLenient(filePath));
+
+  while (true) {
+    const candidate = sessionSocketPath(current);
+
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+
+    const parent = dirname(current);
+
+    if (parent === current) {
+      return null;
+    }
+
+    current = parent;
+  }
+}
+
 export function isEnabled(filePath: string): boolean {
   let current = dirname(realpathLenient(filePath));
 

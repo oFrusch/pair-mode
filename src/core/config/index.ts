@@ -7,5 +7,6 @@ export type {
   Layout,
   Theme,
   Pane,
+  Session,
   NotePosition,
 } from "./types";

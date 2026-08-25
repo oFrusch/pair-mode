@@ -2,12 +2,12 @@ import type { PairConfig } from "../core/config";
 import type { ReviewTransport } from "./transport.types";
 import type { PaneDeps } from "./pane";
 import { createPaneTransport } from "./pane";
+import { createSessionTransport } from "./session";
 
-// The pane transport is the only one built, so config.transport has nothing to select on yet.
-export function resolveTransport(_config: PairConfig, deps: PaneDeps = {}): ReviewTransport {
-  return createPaneTransport(deps);
+export function resolveTransport(config: PairConfig, deps: PaneDeps = {}): ReviewTransport {
+  return config.transport === "session" ? createSessionTransport() : createPaneTransport(deps);
 }
 
-export { createPaneTransport };
+export { createPaneTransport, createSessionTransport };
 export type { PaneDeps };
 export type { EditRequest, ReviewOutcome, ReviewTransport } from "./transport.types";

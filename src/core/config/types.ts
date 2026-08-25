@@ -16,6 +16,10 @@ export interface Pane {
   height: string;
 }
 
+export interface Session {
+  timeout: number;
+}
+
 export interface PairConfig {
   editor: EditorName | string[];
   multiplexer: MultiplexerName;
@@ -23,6 +27,8 @@ export interface PairConfig {
   context: number;
   minFold: number;
   pane: Pane;
+  transport: TransportName;
+  session: Session;
   theme: Theme;
   trace: boolean;
   autoApprove: boolean;

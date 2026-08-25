@@ -6,4 +6,5 @@ export {
   disable,
   sessionsDir,
   sessionSocketPath,
+  findSessionSocket,
 } from "./state";
