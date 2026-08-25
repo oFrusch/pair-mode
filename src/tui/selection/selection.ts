@@ -23,10 +23,20 @@ export function cursorRowIndex(model: DiffModel): number | null {
   return currentRowIndex(model);
 }
 
-export function wholeRowSelection(model: DiffModel, rowIndex: number, pane: "left" | "right"): Selection {
+export function wholeRowSelection(
+  model: DiffModel,
+  rowIndex: number,
+  pane: "left" | "right",
+): Selection {
   const length = paneLineLength(model, rowIndex, pane);
 
-  return { pane, anchorRow: rowIndex, anchorColumn: 0, headRow: rowIndex, headColumn: Math.max(length - 1, 0) };
+  return {
+    pane,
+    anchorRow: rowIndex,
+    anchorColumn: 0,
+    headRow: rowIndex,
+    headColumn: Math.max(length - 1, 0),
+  };
 }
 
 export function moveSelectionHead(state: TuiState, delta: number): TuiState {
@@ -37,7 +47,9 @@ export function moveSelectionHead(state: TuiState, delta: number): TuiState {
   }
 
   const visible = visibleRows(state.model);
-  const currentIndex = visible.findIndex((entry) => entry.kind === "row" && entry.index === selection.headRow);
+  const currentIndex = visible.findIndex(
+    (entry) => entry.kind === "row" && entry.index === selection.headRow,
+  );
 
   if (currentIndex === -1) {
     return state;
@@ -93,7 +105,11 @@ function clampSpan(span: Span, lineLength: number): Span {
   };
 }
 
-export function selectionSpanFor(selection: Selection | null, rowIndex: number, lineLength: number): Span | null {
+export function selectionSpanFor(
+  selection: Selection | null,
+  rowIndex: number,
+  lineLength: number,
+): Span | null {
   if (selection === null) {
     return null;
   }
@@ -105,7 +121,10 @@ export function selectionSpanFor(selection: Selection | null, rowIndex: number, 
   }
 
   if (normalized.anchorRow === normalized.headRow) {
-    return clampSpan({ start: normalized.anchorColumn, end: normalized.headColumn + 1 }, lineLength);
+    return clampSpan(
+      { start: normalized.anchorColumn, end: normalized.headColumn + 1 },
+      lineLength,
+    );
   }
 
   if (rowIndex === normalized.anchorRow) {
@@ -171,7 +190,9 @@ function applyMouseUp(state: TuiState): TuiState {
   }
 
   const normalized = normalizeSelection(selection);
-  const isPlainClick = normalized.anchorRow === normalized.headRow && normalized.anchorColumn === normalized.headColumn;
+  const isPlainClick =
+    normalized.anchorRow === normalized.headRow &&
+    normalized.anchorColumn === normalized.headColumn;
 
   return { ...state, selection: isPlainClick ? null : normalized, mode: "browse" };
 }

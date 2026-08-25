@@ -23,10 +23,22 @@ function stripAnsi(value: string): string {
 function buildFixtureModel(): DiffModel {
   return {
     rows: [
-      { kind: "context", left: "context line", right: "context line", leftNumber: 1, rightNumber: 1 },
+      {
+        kind: "context",
+        left: "context line",
+        right: "context line",
+        leftNumber: 1,
+        rightNumber: 1,
+      },
       { kind: "add", left: "", right: "added line", leftNumber: null, rightNumber: 2 },
       { kind: "del", left: "removed line", right: "", leftNumber: 2, rightNumber: null },
-      { kind: "replace", left: "const x = 1;", right: "const x = 2;", leftNumber: 3, rightNumber: 3 },
+      {
+        kind: "replace",
+        left: "const x = 1;",
+        right: "const x = 2;",
+        leftNumber: 3,
+        rightNumber: 3,
+      },
     ],
     folds: [],
     cursor: 0,
@@ -36,7 +48,13 @@ function buildFixtureModel(): DiffModel {
 function buildNewFileModel(): DiffModel {
   return {
     rows: [
-      { kind: "context", left: "context line", right: "context line", leftNumber: 1, rightNumber: 1 },
+      {
+        kind: "context",
+        left: "context line",
+        right: "context line",
+        leftNumber: 1,
+        rightNumber: 1,
+      },
       { kind: "add", left: "", right: "added line", leftNumber: null, rightNumber: 2 },
     ],
     folds: [],
@@ -67,7 +85,9 @@ function baseOptions(overrides: Partial<PaintOptions> = {}): PaintOptions {
 
 describe("chooseLayout", () => {
   test("a model with only add and context rows returns unified even at width 200 with layout split", () => {
-    const layout = chooseLayout(baseOptions({ model: buildNewFileModel(), width: 200, layout: "split" }));
+    const layout = chooseLayout(
+      baseOptions({ model: buildNewFileModel(), width: 200, layout: "split" }),
+    );
 
     expect(layout).toBe("unified");
   });
@@ -173,7 +193,13 @@ describe("paintUnified — one-column layout", () => {
   test("a long line truncates rather than wraps", () => {
     const longModel: DiffModel = {
       rows: [
-        { kind: "context", left: "x".repeat(500), right: "y".repeat(500), leftNumber: 1, rightNumber: 1 },
+        {
+          kind: "context",
+          left: "x".repeat(500),
+          right: "y".repeat(500),
+          leftNumber: 1,
+          rightNumber: 1,
+        },
       ],
       folds: [],
       cursor: 0,
@@ -193,7 +219,8 @@ describe("paintUnified — one-column layout", () => {
     expect(plain).toHaveLength(width);
 
     const numberWidth = NUMBER_WIDTH_FLOOR;
-    const expectedPaneWidth = width - numberWidth - GUTTER_SPACE_WIDTH - SIGN_BAR_WIDTH - TEXT_GAP_WIDTH;
+    const expectedPaneWidth =
+      width - numberWidth - GUTTER_SPACE_WIDTH - SIGN_BAR_WIDTH - TEXT_GAP_WIDTH;
 
     expect(plain).toContain("y".repeat(expectedPaneWidth));
     expect(plain).not.toContain("y".repeat(expectedPaneWidth + 1));
@@ -202,7 +229,9 @@ describe("paintUnified — one-column layout", () => {
 
 describe("status bar layout override reason", () => {
   test("a new-file model's status bar contains whole file is new", () => {
-    const { lines } = paint(baseOptions({ model: buildNewFileModel(), width: 200, layout: "split" }));
+    const { lines } = paint(
+      baseOptions({ model: buildNewFileModel(), width: 200, layout: "split" }),
+    );
 
     const statusLine = lines[lines.length - 1];
     expect(statusLine).toBeDefined();

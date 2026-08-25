@@ -97,7 +97,14 @@ test("doctor on a fully configured temporary home exits 0", () => {
 
   const distDir = join(installDir, "dist");
   mkdirSync(distDir, { recursive: true });
-  for (const entry of ["cli.js", "claude-code.js", "codex.js", "opencode.js", "pi.js", "pair-tui.js"]) {
+  for (const entry of [
+    "cli.js",
+    "claude-code.js",
+    "codex.js",
+    "opencode.js",
+    "pi.js",
+    "pair-tui.js",
+  ]) {
     const entryPath = join(distDir, entry);
     writeFileSync(entryPath, "#!/usr/bin/env node\n// stub\n", "utf-8");
     chmodSync(entryPath, 0o755);
@@ -150,7 +157,14 @@ test("doctor fails the entry points check when a built file is not executable", 
   const distDir = join(installDir, "dist");
   mkdirSync(distDir, { recursive: true });
 
-  for (const entry of ["cli.js", "claude-code.js", "codex.js", "opencode.js", "pi.js", "pair-tui.js"]) {
+  for (const entry of [
+    "cli.js",
+    "claude-code.js",
+    "codex.js",
+    "opencode.js",
+    "pi.js",
+    "pair-tui.js",
+  ]) {
     const entryPath = join(distDir, entry);
     writeFileSync(entryPath, "#!/usr/bin/env node\n// stub\n", "utf-8");
     chmodSync(entryPath, entry === "claude-code.js" ? 0o644 : 0o755);
@@ -184,7 +198,15 @@ test("doctor fails the entry points check when a built file is not executable", 
 function setUpFullInstall(
   homeDir: string,
   installDir: string,
-): { distDir: string; fakeTtyPath: string; tmuxMultiplexer: { name: "tmux"; available: () => boolean; run: () => { ok: boolean; detail: string } } } {
+): {
+  distDir: string;
+  fakeTtyPath: string;
+  tmuxMultiplexer: {
+    name: "tmux";
+    available: () => boolean;
+    run: () => { ok: boolean; detail: string };
+  };
+} {
   const config: PairConfig = {
     editor: "micro",
     multiplexer: "tmux",

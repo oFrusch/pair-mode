@@ -322,7 +322,12 @@ test("a re-run backs up the existing config and preserves fields the wizard neve
   expect(written.context).toBe(9);
   expect(written.minFold).toBe(7);
   expect(written.pane).toEqual({ width: "70%", height: "60%" });
-  expect(written.theme).toEqual({ add: "#111111", del: "#222222", fold: "#333333", rowBand: false });
+  expect(written.theme).toEqual({
+    add: "#111111",
+    del: "#222222",
+    fold: "#333333",
+    rowBand: false,
+  });
   expect(written.trace).toBe(true);
 });
 

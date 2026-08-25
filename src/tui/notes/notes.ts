@@ -12,13 +12,30 @@ function firstRowOf(selection: Selection): FirstRow {
   const singleRow = selection.anchorRow === selection.headRow;
 
   if (!reversed) {
-    return { row: selection.anchorRow, pane: selection.pane, startColumn: selection.anchorColumn, headColumn: selection.headColumn, singleRow };
+    return {
+      row: selection.anchorRow,
+      pane: selection.pane,
+      startColumn: selection.anchorColumn,
+      headColumn: selection.headColumn,
+      singleRow,
+    };
   }
 
-  return { row: selection.headRow, pane: selection.pane, startColumn: selection.headColumn, headColumn: selection.anchorColumn, singleRow };
+  return {
+    row: selection.headRow,
+    pane: selection.pane,
+    startColumn: selection.headColumn,
+    headColumn: selection.anchorColumn,
+    singleRow,
+  };
 }
 
-export function noteFromSelection(model: DiffModel, selection: Selection, id: number, text: string): Note | null {
+export function noteFromSelection(
+  model: DiffModel,
+  selection: Selection,
+  id: number,
+  text: string,
+): Note | null {
   const trimmed = text.trim();
 
   if (trimmed === "") {

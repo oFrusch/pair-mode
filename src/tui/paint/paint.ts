@@ -1,6 +1,13 @@
 import { diffWordsWithSpace } from "diff";
 import { paintSplit, paintUnified } from "./layout";
-import type { ChangedSpans, LayoutDecision, PaintOptions, PaintResult, Span, TokenProvider } from "./paint.types";
+import type {
+  ChangedSpans,
+  LayoutDecision,
+  PaintOptions,
+  PaintResult,
+  Span,
+  TokenProvider,
+} from "./paint.types";
 
 export const SPAN_SIMILARITY_FLOOR = 0.3;
 export const MIN_SPLIT_WIDTH = 90;
@@ -62,7 +69,11 @@ function decideLayout(options: PaintOptions): LayoutDecision {
   const preferred = options.layout;
   const hasRemoval = options.model.rows.some((row) => row.kind === "del" || row.kind === "replace");
 
-  const forcedReason = !hasRemoval ? NEW_FILE_REASON : options.width < MIN_SPLIT_WIDTH ? NARROW_REASON : null;
+  const forcedReason = !hasRemoval
+    ? NEW_FILE_REASON
+    : options.width < MIN_SPLIT_WIDTH
+      ? NARROW_REASON
+      : null;
 
   if (forcedReason === null) {
     return { layout: preferred, overrideReason: null };

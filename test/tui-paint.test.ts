@@ -20,10 +20,22 @@ function stripAnsi(value: string): string {
 function buildFixtureModel(): DiffModel {
   return {
     rows: [
-      { kind: "context", left: "context line", right: "context line", leftNumber: 1, rightNumber: 1 },
+      {
+        kind: "context",
+        left: "context line",
+        right: "context line",
+        leftNumber: 1,
+        rightNumber: 1,
+      },
       { kind: "add", left: "", right: "ok", leftNumber: null, rightNumber: 2 },
       { kind: "del", left: "removed line", right: "", leftNumber: 2, rightNumber: null },
-      { kind: "replace", left: "const x = 1;", right: "const x = 2;", leftNumber: 3, rightNumber: 3 },
+      {
+        kind: "replace",
+        left: "const x = 1;",
+        right: "const x = 2;",
+        leftNumber: 3,
+        rightNumber: 3,
+      },
       { kind: "context", left: "ctx4", right: "ctx4", leftNumber: 4, rightNumber: 4 },
       { kind: "context", left: "ctx5", right: "ctx5", leftNumber: 5, rightNumber: 5 },
       { kind: "context", left: "ctx6", right: "ctx6", leftNumber: 6, rightNumber: 6 },

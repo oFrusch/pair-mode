@@ -11,7 +11,8 @@ const projectRoot = path.resolve(__dirname, "..");
 const SHEBANG = "#!/usr/bin/env node";
 
 // esbuild leaves a bundled CJS dep's internal require() calls dynamic, which throws under ESM output unless a real require exists.
-const REQUIRE_SHIM = 'import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);';
+const REQUIRE_SHIM =
+  'import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);';
 
 // Define all entry points to build.
 const entryPoints = [

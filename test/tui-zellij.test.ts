@@ -27,9 +27,13 @@ function zellijAction(args: string[]): string {
 }
 
 function runFloatingPane(argv: string[]): string {
-  const result = spawnSync("zellij", ["run", "--floating", "--close-on-exit", "--name", "pair", "--", ...argv], {
-    encoding: "utf-8",
-  });
+  const result = spawnSync(
+    "zellij",
+    ["run", "--floating", "--close-on-exit", "--name", "pair", "--", ...argv],
+    {
+      encoding: "utf-8",
+    },
+  );
 
   const paneId = result.stdout.trim();
 
@@ -44,7 +48,11 @@ function closePane(paneId: string): void {
   spawnSync("zellij", ["action", "close-pane", "-p", paneId]);
 }
 
-async function pollUntil(check: () => boolean, timeoutMs: number, intervalMs: number): Promise<boolean> {
+async function pollUntil(
+  check: () => boolean,
+  timeoutMs: number,
+  intervalMs: number,
+): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
@@ -69,7 +77,11 @@ function writeFixture(dir: string): { leftFile: string; rightFile: string; resul
   const resultFile = join(dir, "result.json");
 
   writeFileSync(leftFile, "line one\nline two\nline three\n", "utf-8");
-  writeFileSync(rightFile, `line one\nline ${RIGHT_REPLACEMENT_TEXT}\nline three\nline four added\n`, "utf-8");
+  writeFileSync(
+    rightFile,
+    `line one\nline ${RIGHT_REPLACEMENT_TEXT}\nline three\nline four added\n`,
+    "utf-8",
+  );
 
   return { leftFile, rightFile, resultFile };
 }

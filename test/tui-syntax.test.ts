@@ -50,7 +50,10 @@ describe("createTokenProvider", () => {
   test("enabled: false returns a provider yielding [], and the loader never runs", async () => {
     const loader = vi.fn<HighlighterLoader>();
 
-    const provider = await createTokenProvider({ path: "main.ts", enabled: false, truecolor: true }, loader);
+    const provider = await createTokenProvider(
+      { path: "main.ts", enabled: false, truecolor: true },
+      loader,
+    );
 
     expect(provider("const x = 1;", 1)).toEqual([]);
     expect(loader).not.toHaveBeenCalled();
@@ -73,7 +76,10 @@ describe("createTokenProvider", () => {
       throw new Error("shiki failed to load");
     };
 
-    const provider = await createTokenProvider({ path: "main.ts", enabled: true, truecolor: true }, loader);
+    const provider = await createTokenProvider(
+      { path: "main.ts", enabled: true, truecolor: true },
+      loader,
+    );
 
     expect(provider("const x = 1;", 1)).toEqual([]);
   });
@@ -82,7 +88,10 @@ describe("createTokenProvider", () => {
     const highlighter = fakeHighlighter({ "const x = 1;": "#79c0ff" });
     const loader: HighlighterLoader = async () => highlighter;
 
-    const provider = await createTokenProvider({ path: "main.ts", enabled: true, truecolor: true }, loader);
+    const provider = await createTokenProvider(
+      { path: "main.ts", enabled: true, truecolor: true },
+      loader,
+    );
 
     expect(provider("const x = 1;", 1)).toEqual([{ start: 0, end: 12, color: "#79c0ff" }]);
   });
@@ -91,7 +100,10 @@ describe("createTokenProvider", () => {
     const codeToTokensBase = vi.fn(fakeHighlighter({}).codeToTokensBase);
     const loader: HighlighterLoader = async () => ({ codeToTokensBase });
 
-    const provider = await createTokenProvider({ path: "main.ts", enabled: true, truecolor: true }, loader);
+    const provider = await createTokenProvider(
+      { path: "main.ts", enabled: true, truecolor: true },
+      loader,
+    );
 
     provider("const x = 1;", 1);
     provider("const x = 1;", 1);
@@ -103,7 +115,10 @@ describe("createTokenProvider", () => {
     const codeToTokensBase = vi.fn(fakeHighlighter({}).codeToTokensBase);
     const loader: HighlighterLoader = async () => ({ codeToTokensBase });
 
-    const provider = await createTokenProvider({ path: "main.ts", enabled: true, truecolor: true }, loader);
+    const provider = await createTokenProvider(
+      { path: "main.ts", enabled: true, truecolor: true },
+      loader,
+    );
 
     provider("const x = 1;", 1);
     provider("const x = 2;", 2);
@@ -114,7 +129,10 @@ describe("createTokenProvider", () => {
   test("an empty line returns []", async () => {
     const loader: HighlighterLoader = async () => fakeHighlighter({});
 
-    const provider = await createTokenProvider({ path: "main.ts", enabled: true, truecolor: true }, loader);
+    const provider = await createTokenProvider(
+      { path: "main.ts", enabled: true, truecolor: true },
+      loader,
+    );
 
     expect(provider("", 1)).toEqual([]);
   });

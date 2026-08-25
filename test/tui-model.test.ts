@@ -1,11 +1,5 @@
 import { test, expect, describe } from "vitest";
-import {
-  buildModel,
-  visibleRows,
-  toggleFold,
-  moveCursor,
-  resolveClick,
-} from "../src/tui/model";
+import { buildModel, visibleRows, toggleFold, moveCursor, resolveClick } from "../src/tui/model";
 import type { ScreenMap } from "../src/tui/model";
 
 describe("buildModel — row construction", () => {
@@ -132,8 +126,38 @@ describe("buildModel — line sanitising", () => {
 
 describe("buildModel — folds", () => {
   test("two hunks far apart produce one fold between them", () => {
-    const before = ["c0", "c1", "c2", "old", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12"];
-    const after = ["c0", "c1", "c2", "new", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12"];
+    const before = [
+      "c0",
+      "c1",
+      "c2",
+      "old",
+      "c3",
+      "c4",
+      "c5",
+      "c6",
+      "c7",
+      "c8",
+      "c9",
+      "c10",
+      "c11",
+      "c12",
+    ];
+    const after = [
+      "c0",
+      "c1",
+      "c2",
+      "new",
+      "c3",
+      "c4",
+      "c5",
+      "c6",
+      "c7",
+      "c8",
+      "c9",
+      "c10",
+      "c11",
+      "c12",
+    ];
 
     const model = buildModel(before, after, 1, 4);
 
@@ -150,8 +174,38 @@ describe("buildModel — folds", () => {
   });
 
   test("context rows either side of a change stay visible", () => {
-    const before = ["c0", "c1", "c2", "c3", "c4", "old", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12"];
-    const after = ["c0", "c1", "c2", "c3", "c4", "new", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12"];
+    const before = [
+      "c0",
+      "c1",
+      "c2",
+      "c3",
+      "c4",
+      "old",
+      "c5",
+      "c6",
+      "c7",
+      "c8",
+      "c9",
+      "c10",
+      "c11",
+      "c12",
+    ];
+    const after = [
+      "c0",
+      "c1",
+      "c2",
+      "c3",
+      "c4",
+      "new",
+      "c5",
+      "c6",
+      "c7",
+      "c8",
+      "c9",
+      "c10",
+      "c11",
+      "c12",
+    ];
 
     const model = buildModel(before, after, 2, 4);
     const visible = visibleRows(model);
@@ -176,8 +230,38 @@ describe("buildModel — folds", () => {
 
 describe("visibility and transitions", () => {
   function twoHunkModel() {
-    const before = ["c0", "c1", "c2", "old", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12"];
-    const after = ["c0", "c1", "c2", "new", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12"];
+    const before = [
+      "c0",
+      "c1",
+      "c2",
+      "old",
+      "c3",
+      "c4",
+      "c5",
+      "c6",
+      "c7",
+      "c8",
+      "c9",
+      "c10",
+      "c11",
+      "c12",
+    ];
+    const after = [
+      "c0",
+      "c1",
+      "c2",
+      "new",
+      "c3",
+      "c4",
+      "c5",
+      "c6",
+      "c7",
+      "c8",
+      "c9",
+      "c10",
+      "c11",
+      "c12",
+    ];
 
     return buildModel(before, after, 1, 4);
   }
@@ -275,6 +359,11 @@ describe("resolveClick", () => {
       panes: [{ pane: "left", gutterStart: 0, textStart: 0, textEnd: 5 }],
     };
 
-    expect(resolveClick(chromeAtOrigin, 1, 1)).toEqual({ kind: "row", index: 0, pane: "left", column: 0 });
+    expect(resolveClick(chromeAtOrigin, 1, 1)).toEqual({
+      kind: "row",
+      index: 0,
+      pane: "left",
+      column: 0,
+    });
   });
 });

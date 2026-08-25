@@ -149,7 +149,9 @@ describe("paintSplit — anchored note rows", () => {
     const { map } = paintSplit(paintOptions({ notes: [note] }));
 
     const anchorPosition = map.rows.findIndex((row) => row.kind === "row" && row.index === 0);
-    const nextRowPosition = map.rows.findIndex((row, index) => index > anchorPosition && row.kind === "row" && row.index === 1);
+    const nextRowPosition = map.rows.findIndex(
+      (row, index) => index > anchorPosition && row.kind === "row" && row.index === 1,
+    );
 
     expect(nextRowPosition).toBe(anchorPosition + 2);
 
@@ -188,7 +190,9 @@ function selection(overrides: Partial<Selection> = {}): Selection {
 
 describe("paintSplit — the live draft in note mode", () => {
   test("the draft renders as a note row under the selection's first row", () => {
-    const { lines, map } = paintSplit(paintOptions({ mode: "note", draft: "why?", selection: selection() }));
+    const { lines, map } = paintSplit(
+      paintOptions({ mode: "note", draft: "why?", selection: selection() }),
+    );
 
     const anchorPosition = map.rows.findIndex((row) => row.kind === "row" && row.index === 1);
     const draftLine = lines[anchorPosition + 1];
@@ -202,7 +206,9 @@ describe("paintSplit — the live draft in note mode", () => {
 describe("paintUnified — anchored notes on a replace row", () => {
   test("an anchored note on a replace row renders after both terminal rows of that model row", () => {
     const note = makeNote({ rowIndex: 0, pane: "right", text: "which one" });
-    const { lines, map } = paintUnified(paintOptions({ model: buildReplaceModel(), notes: [note] }));
+    const { lines, map } = paintUnified(
+      paintOptions({ model: buildReplaceModel(), notes: [note] }),
+    );
 
     const rowPositions = map.rows.reduce<number[]>((positions, row, index) => {
       return row.kind === "row" && row.index === 0 ? [...positions, index] : positions;

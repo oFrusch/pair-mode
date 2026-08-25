@@ -133,7 +133,9 @@ export function buildModel(
 }
 
 export function visibleRows(model: DiffModel): VisibleRow[] {
-  const foldByStart = new Map(model.folds.map((foldGroup, foldIndex) => [foldGroup.start, foldIndex]));
+  const foldByStart = new Map(
+    model.folds.map((foldGroup, foldIndex) => [foldGroup.start, foldIndex]),
+  );
   const result: VisibleRow[] = [];
   let index = 0;
 
@@ -206,5 +208,10 @@ export function resolveClick(
     return null;
   }
 
-  return { kind: "row", index: screenRow.index, pane: bounds.pane, column: column - bounds.textStart };
+  return {
+    kind: "row",
+    index: screenRow.index,
+    pane: bounds.pane,
+    column: column - bounds.textStart,
+  };
 }

@@ -6,7 +6,13 @@ import { buildModel, moveCursor, toggleFold, visibleRows } from "./model";
 import type { DiffModel, VisibleRow } from "./model";
 import { noteFromSelection, toQuestions, writeResult } from "./notes";
 import { bodyHeight, paint } from "./paint";
-import { applyMouse, cursorRowIndex, moveSelectionHead, startSelection, wholeRowSelection } from "./selection";
+import {
+  applyMouse,
+  cursorRowIndex,
+  moveSelectionHead,
+  startSelection,
+  wholeRowSelection,
+} from "./selection";
 import type { TuiIo, TuiOptions, TuiResult, TuiState } from "./tui.types";
 
 const OVERLAP_ROWS = 1;
@@ -16,10 +22,18 @@ const NOTE_PANE = "right";
 export { bodyHeight };
 
 function pageSize(state: TuiState, height: number): number {
-  return Math.max(bodyHeight(height, state.notes.length, state.mode, state.notePosition) - OVERLAP_ROWS, MIN_PAGE);
+  return Math.max(
+    bodyHeight(height, state.notes.length, state.mode, state.notePosition) - OVERLAP_ROWS,
+    MIN_PAGE,
+  );
 }
 
-function followScroll(state: TuiState, model: DiffModel, scrollTop: number, height: number): number {
+function followScroll(
+  state: TuiState,
+  model: DiffModel,
+  scrollTop: number,
+  height: number,
+): number {
   const bodyRows = bodyHeight(height, state.notes.length, state.mode, state.notePosition);
   const lastBodyRow = scrollTop + bodyRows - 1;
 
@@ -125,7 +139,12 @@ function enterNoteMode(state: TuiState): TuiState {
     return state;
   }
 
-  return { ...state, selection: wholeRowSelection(state.model, rowIndex, NOTE_PANE), mode: "note", draft: "" };
+  return {
+    ...state,
+    selection: wholeRowSelection(state.model, rowIndex, NOTE_PANE),
+    mode: "note",
+    draft: "",
+  };
 }
 
 function focusNextNote(state: TuiState): TuiState {
@@ -392,7 +411,9 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
       try {
         io.cleanup();
       } catch (cleanupError) {
-        teardownError = teardownError ?? (cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)));
+        teardownError =
+          teardownError ??
+          (cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)));
       }
 
       return teardownError;

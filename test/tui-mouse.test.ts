@@ -18,11 +18,15 @@ const SHIFT_PRESS = "\x1b[<4;10;5M";
 
 describe("parseMouse", () => {
   test("a press report yields down with the right button, row, and column", () => {
-    expect(parseMouse(PRESS)).toEqual([{ kind: "down", button: 0, row: 5, column: 10, shift: false }]);
+    expect(parseMouse(PRESS)).toEqual([
+      { kind: "down", button: 0, row: 5, column: 10, shift: false },
+    ]);
   });
 
   test("a release report ending in m yields up", () => {
-    expect(parseMouse(RELEASE)).toEqual([{ kind: "up", button: 0, row: 5, column: 10, shift: false }]);
+    expect(parseMouse(RELEASE)).toEqual([
+      { kind: "up", button: 0, row: 5, column: 10, shift: false },
+    ]);
   });
 
   test("a word with bit 32 yields drag", () => {
@@ -94,7 +98,13 @@ describe("selectionSpanFor", () => {
   });
 
   test("a single-row selection returns the anchor-to-head range, inclusive of the head column", () => {
-    expect(selectionSpanFor(selection({ anchorRow: 3, anchorColumn: 2, headRow: 3, headColumn: 5 }), 3, 10)).toEqual({
+    expect(
+      selectionSpanFor(
+        selection({ anchorRow: 3, anchorColumn: 2, headRow: 3, headColumn: 5 }),
+        3,
+        10,
+      ),
+    ).toEqual({
       start: 2,
       end: 6,
     });
@@ -102,24 +112,42 @@ describe("selectionSpanFor", () => {
 
   test("the first row of a multi-row selection runs to the line end", () => {
     expect(
-      selectionSpanFor(selection({ anchorRow: 3, anchorColumn: 2, headRow: 5, headColumn: 1 }), 3, 10),
+      selectionSpanFor(
+        selection({ anchorRow: 3, anchorColumn: 2, headRow: 5, headColumn: 1 }),
+        3,
+        10,
+      ),
     ).toEqual({ start: 2, end: 10 });
   });
 
   test("the last row runs from column 0", () => {
     expect(
-      selectionSpanFor(selection({ anchorRow: 3, anchorColumn: 2, headRow: 5, headColumn: 1 }), 5, 10),
+      selectionSpanFor(
+        selection({ anchorRow: 3, anchorColumn: 2, headRow: 5, headColumn: 1 }),
+        5,
+        10,
+      ),
     ).toEqual({ start: 0, end: 2 });
   });
 
   test("a middle row covers the whole line", () => {
     expect(
-      selectionSpanFor(selection({ anchorRow: 3, anchorColumn: 2, headRow: 5, headColumn: 1 }), 4, 10),
+      selectionSpanFor(
+        selection({ anchorRow: 3, anchorColumn: 2, headRow: 5, headColumn: 1 }),
+        4,
+        10,
+      ),
     ).toEqual({ start: 0, end: 10 });
   });
 
   test("a span clamps to lineLength", () => {
-    expect(selectionSpanFor(selection({ anchorRow: 3, anchorColumn: 2, headRow: 3, headColumn: 20 }), 3, 5)).toEqual({
+    expect(
+      selectionSpanFor(
+        selection({ anchorRow: 3, anchorColumn: 2, headRow: 3, headColumn: 20 }),
+        3,
+        5,
+      ),
+    ).toEqual({
       start: 2,
       end: 5,
     });
@@ -217,7 +245,13 @@ describe("applyMouse", () => {
 
     const next = applyMouse(state, mouseEvent({ kind: "down", row: 3, column: 20 }));
 
-    expect(next.selection).toEqual({ pane: "right", anchorRow: 1, anchorColumn: 2, headRow: 1, headColumn: 2 });
+    expect(next.selection).toEqual({
+      pane: "right",
+      anchorRow: 1,
+      anchorColumn: 2,
+      headRow: 1,
+      headColumn: 2,
+    });
     expect(next.mode).toBe("select");
   });
 
@@ -235,7 +269,13 @@ describe("applyMouse", () => {
 
     const next = applyMouse(pressed, mouseEvent({ kind: "drag", row: 4, column: 19 }));
 
-    expect(next.selection).toEqual({ pane: "right", anchorRow: 1, anchorColumn: 2, headRow: 2, headColumn: 1 });
+    expect(next.selection).toEqual({
+      pane: "right",
+      anchorRow: 1,
+      anchorColumn: 2,
+      headRow: 2,
+      headColumn: 1,
+    });
   });
 
   test("a drag into the other pane keeps the anchor's pane", () => {
@@ -257,7 +297,10 @@ describe("applyMouse", () => {
   });
 
   test("two plain clicks on the same spot, with the release SGR always delivers between them, never opens a note", () => {
-    const firstDown = applyMouse(buildMouseState(), mouseEvent({ kind: "down", row: 3, column: 20 }));
+    const firstDown = applyMouse(
+      buildMouseState(),
+      mouseEvent({ kind: "down", row: 3, column: 20 }),
+    );
     const firstUp = applyMouse(firstDown, mouseEvent({ kind: "up", row: 3, column: 20 }));
 
     const secondDown = applyMouse(firstUp, mouseEvent({ kind: "down", row: 3, column: 20 }));
@@ -273,7 +316,13 @@ describe("applyMouse", () => {
 
     const next = applyMouse(backwards, mouseEvent({ kind: "up", row: 3, column: 20 }));
 
-    expect(next.selection).toEqual({ pane: "right", anchorRow: 1, anchorColumn: 2, headRow: 2, headColumn: 1 });
+    expect(next.selection).toEqual({
+      pane: "right",
+      anchorRow: 1,
+      anchorColumn: 2,
+      headRow: 2,
+      headColumn: 1,
+    });
     expect(next.mode).toBe("browse");
   });
 
@@ -322,7 +371,13 @@ describe("applyKey — selection", () => {
 
     const next = applyKey(state, key("v"), 24);
 
-    expect(next.selection).toEqual({ pane: "right", anchorRow: 2, anchorColumn: 0, headRow: 2, headColumn: 0 });
+    expect(next.selection).toEqual({
+      pane: "right",
+      anchorRow: 2,
+      anchorColumn: 0,
+      headRow: 2,
+      headColumn: 0,
+    });
     expect(next.mode).toBe("select");
   });
 
@@ -445,7 +500,13 @@ function buildPaintModel(): DiffModel {
 
 describe("paintSplit — selection layer", () => {
   test("a painted row covered by a selection carries the selection background code", () => {
-    const paintSelection: Selection = { pane: "right", anchorRow: 0, anchorColumn: 0, headRow: 0, headColumn: 1 };
+    const paintSelection: Selection = {
+      pane: "right",
+      anchorRow: 0,
+      anchorColumn: 0,
+      headRow: 0,
+      headColumn: 1,
+    };
 
     const { lines } = paintSplit({
       model: buildPaintModel(),
@@ -469,7 +530,13 @@ describe("paintSplit — selection layer", () => {
   });
 
   test("a painted row outside the selection does not carry the selection background code", () => {
-    const paintSelection: Selection = { pane: "right", anchorRow: 0, anchorColumn: 0, headRow: 0, headColumn: 1 };
+    const paintSelection: Selection = {
+      pane: "right",
+      anchorRow: 0,
+      anchorColumn: 0,
+      headRow: 0,
+      headColumn: 1,
+    };
 
     const { lines } = paintSplit({
       model: buildPaintModel(),

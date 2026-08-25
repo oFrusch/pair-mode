@@ -18,16 +18,16 @@ The external editors stay. A user who wants vim keeps vim.
 Owen made these calls on 2026-08-23. They are settled. Do not re-open them during
 implementation.
 
-| Decision | Value |
-|---|---|
-| Editor name | `pair`. The `auto` preference resolves to it first. |
-| Layout | Split and unified. The user chooses. Split is the default. |
-| Note position | Docked panel and inline. The user chooses. Panel is the default. |
-| Change colour | A sign bar in the gutter, plus a background on the changed words only. |
-| Full-row band | On by default. A config flag turns it off for word-level spans. |
-| Syntax colour | Shiki. |
-| Note anchor | The model holds a span. The wire payload holds a line number. |
-| Batched changesets | Out of scope. One pane per tool call, the same as today. |
+| Decision           | Value                                                                  |
+| ------------------ | ---------------------------------------------------------------------- |
+| Editor name        | `pair`. The `auto` preference resolves to it first.                    |
+| Layout             | Split and unified. The user chooses. Split is the default.             |
+| Note position      | Docked panel and inline. The user chooses. Panel is the default.       |
+| Change colour      | A sign bar in the gutter, plus a background on the changed words only. |
+| Full-row band      | On by default. A config flag turns it off for word-level spans.        |
+| Syntax colour      | Shiki.                                                                 |
+| Note anchor        | The model holds a span. The wire payload holds a line number.          |
+| Batched changesets | Out of scope. One pane per tool call, the same as today.               |
 
 ### Why the batch is out of scope
 
@@ -181,36 +181,36 @@ the behaviour every terminal already trains people to expect.
 
 ### Keys
 
-| Key | Mouse | Action |
-|---|---|---|
-| `j` `k` `↑` `↓` | none | Move the row cursor. A fold moves as one unit. |
-| `^d` `^u` | none | Page down and page up. |
-| `n` `N` | none | Jump to the next and the previous hunk. |
-| `v` then a motion | drag | Select a span. |
-| `a` | none | Open a note on the selection or the current row. |
-| `⏎` | none | Save the note. `esc` discards it. |
-| `tab` | click a note | Cycle the focused note. The diff scrolls to its anchor. |
-| `d` | none | Delete the focused note. |
-| `space` | click a fold | Expand or collapse a fold row. |
-| `u` | none | Swap between the split layout and the unified layout. |
-| `^s` | none | Send the notes. The hook denies the edit. |
-| `^q` | none | Quit. Zero notes applies the edit. |
-| `?` | none | Toggle the keymap overlay. |
+| Key               | Mouse        | Action                                                  |
+| ----------------- | ------------ | ------------------------------------------------------- |
+| `j` `k` `↑` `↓`   | none         | Move the row cursor. A fold moves as one unit.          |
+| `^d` `^u`         | none         | Page down and page up.                                  |
+| `n` `N`           | none         | Jump to the next and the previous hunk.                 |
+| `v` then a motion | drag         | Select a span.                                          |
+| `a`               | none         | Open a note on the selection or the current row.        |
+| `⏎`               | none         | Save the note. `esc` discards it.                       |
+| `tab`             | click a note | Cycle the focused note. The diff scrolls to its anchor. |
+| `d`               | none         | Delete the focused note.                                |
+| `space`           | click a fold | Expand or collapse a fold row.                          |
+| `u`               | none         | Swap between the split layout and the unified layout.   |
+| `^s`              | none         | Send the notes. The hook denies the edit.               |
+| `^q`              | none         | Quit. Zero notes applies the edit.                      |
+| `?`               | none         | Toggle the keymap overlay.                              |
 
 ## Colour
 
 Every value is truecolor hex.
 
-| Token | Hex | Use |
-|---|---|---|
-| add bar | `#3FB950` | The sign column on an added row. |
-| add span | `#1F5B2E` | The background behind added words. |
-| del bar | `#F85149` | The sign column on a removed row. |
-| del span | `#6B2126` | The background behind removed words. |
+| Token     | Hex       | Use                                                   |
+| --------- | --------- | ----------------------------------------------------- |
+| add bar   | `#3FB950` | The sign column on an added row.                      |
+| add span  | `#1F5B2E` | The background behind added words.                    |
+| del bar   | `#F85149` | The sign column on a removed row.                     |
+| del span  | `#6B2126` | The background behind removed words.                  |
 | selection | `#16324F` | The span under an active drag, and an annotated span. |
-| note | `#D2A8FF` | Note markers, the notes panel, the anchor dot. |
-| fold | `#6E7681` | Collapsed run rows and the line-number gutter. |
-| chrome | `#E8A33D` | The header brand, the cursor, the active mode. |
+| note      | `#D2A8FF` | Note markers, the notes panel, the anchor dot.        |
+| fold      | `#6E7681` | Collapsed run rows and the line-number gutter.        |
+| chrome    | `#E8A33D` | The header brand, the cursor, the active mode.        |
 
 The TUI reads `COLORTERM`. A value of `truecolor` or `24bit` selects the table above. Any other
 value selects the ANSI 16 named colours, so a plain `xterm` still reads correctly.
@@ -245,11 +245,11 @@ The token cache lives in memory for the life of the process. A repaint never re-
 `PairConfig` gains three fields. Every field has a default, so an existing config file keeps
 working.
 
-| Field | Type | Default | Meaning |
-|---|---|---|---|
-| `notes` | `"panel" \| "inline"` | `"panel"` | Where a note renders. |
-| `theme.rowBand` | `boolean` | `true` | Paint the whole changed row. |
-| `syntax` | `boolean` | `true` | Load Shiki. |
+| Field           | Type                  | Default   | Meaning                      |
+| --------------- | --------------------- | --------- | ---------------------------- |
+| `notes`         | `"panel" \| "inline"` | `"panel"` | Where a note renders.        |
+| `theme.rowBand` | `boolean`             | `true`    | Paint the whole changed row. |
+| `syntax`        | `boolean`             | `true`    | Load Shiki.                  |
 
 `editor` gains `"pair"` as a value. The `"auto"` preference resolves to `pair` first, then
 micro, then nvim, then vim, then nano.

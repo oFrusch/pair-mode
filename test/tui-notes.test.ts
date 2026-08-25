@@ -37,7 +37,12 @@ function selection(overrides: Partial<Selection> = {}): Selection {
 
 describe("noteFromSelection", () => {
   test("a right-pane selection takes rightNumber and the right text", () => {
-    const note = noteFromSelection(buildNotesModel(), selection({ pane: "right", anchorRow: 0, headRow: 0 }), 1, "hi");
+    const note = noteFromSelection(
+      buildNotesModel(),
+      selection({ pane: "right", anchorRow: 0, headRow: 0 }),
+      1,
+      "hi",
+    );
 
     expect(note?.line).toBe(1);
     expect(note?.code).toBe("aaaa");
@@ -93,13 +98,17 @@ function makeNote(overrides: Partial<Note> = {}): Note {
 
 describe("toQuestions", () => {
   test("a whole-line note produces the bare text", () => {
-    const [question] = toQuestions([makeNote({ startColumn: 0, endColumn: 4, code: "aaaa", text: "why" })]);
+    const [question] = toQuestions([
+      makeNote({ startColumn: 0, endColumn: 4, code: "aaaa", text: "why" }),
+    ]);
 
     expect(question?.text).toBe("why");
   });
 
   test("a partial-span note appends the quoted selected text", () => {
-    const [question] = toQuestions([makeNote({ startColumn: 1, endColumn: 3, code: "aaaa", text: "why" })]);
+    const [question] = toQuestions([
+      makeNote({ startColumn: 1, endColumn: 3, code: "aaaa", text: "why" }),
+    ]);
 
     expect(question?.text).toBe('why [re: "aa"]');
   });
@@ -120,7 +129,10 @@ describe("toQuestions", () => {
 describe("writeResult", () => {
   test("the written file parses back through parseNoteResult to the same questions", () => {
     const path = tempPath();
-    const notes = [makeNote({ id: 1, text: "why this" }), makeNote({ id: 2, rowIndex: 1, text: "and this" })];
+    const notes = [
+      makeNote({ id: 1, text: "why this" }),
+      makeNote({ id: 2, rowIndex: 1, text: "and this" }),
+    ];
 
     writeResult(path, notes);
 
@@ -198,7 +210,10 @@ describe("applyKey — a and note drafting", () => {
   });
 
   test("enter commits a note and clears the draft and the selection", () => {
-    const typed = { ...applyKey(makeState({ selection: selection() }), key("a"), 24), draft: "why" };
+    const typed = {
+      ...applyKey(makeState({ selection: selection() }), key("a"), 24),
+      draft: "why",
+    };
 
     const next = applyKey(typed, key("enter"), 24);
 
@@ -217,7 +232,10 @@ describe("applyKey — a and note drafting", () => {
   });
 
   test("escape in note discards", () => {
-    const typed = { ...applyKey(makeState({ selection: selection() }), key("a"), 24), draft: "why" };
+    const typed = {
+      ...applyKey(makeState({ selection: selection() }), key("a"), 24),
+      draft: "why",
+    };
 
     const next = applyKey(typed, key("escape"), 24);
 

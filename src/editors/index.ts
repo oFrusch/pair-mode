@@ -67,7 +67,9 @@ export function resolve(
     return createNanoEditor(resolvesOnPath);
   }
 
-  const available = candidates(resolvesOnPath, checkPairBundle).find((candidate) => candidate.available());
+  const available = candidates(resolvesOnPath, checkPairBundle).find((candidate) =>
+    candidate.available(),
+  );
 
   return available ?? vimEditor("vim", resolvesOnPath);
 }

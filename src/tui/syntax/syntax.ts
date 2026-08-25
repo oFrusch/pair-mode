@@ -1,13 +1,21 @@
 import { shikiLanguage } from "../../editors/languages";
 import { noTokens } from "../paint/paint";
 import type { SyntaxToken, TokenProvider } from "../paint/paint.types";
-import type { HighlighterLoader, ShikiHighlighter, ShikiToken, SyntaxOptions } from "./syntax.types";
+import type {
+  HighlighterLoader,
+  ShikiHighlighter,
+  ShikiToken,
+  SyntaxOptions,
+} from "./syntax.types";
 import type { BundledLanguage, BundledTheme } from "shiki";
 
 // Matches the palette in src/tui/paint/theme.ts.
 const THEME_ID = "github-dark";
 
-function isBundledLanguage(lang: string, bundled: Record<string, unknown>): lang is BundledLanguage {
+function isBundledLanguage(
+  lang: string,
+  bundled: Record<string, unknown>,
+): lang is BundledLanguage {
   return lang in bundled;
 }
 
@@ -18,7 +26,10 @@ function isBundledTheme(id: string, bundled: Record<string, unknown>): id is Bun
 const loadShikiHighlighter: HighlighterLoader = async (lang, theme) => {
   const shiki = await import("shiki");
 
-  if (!isBundledLanguage(lang, shiki.bundledLanguages) || !isBundledTheme(theme, shiki.bundledThemes)) {
+  if (
+    !isBundledLanguage(lang, shiki.bundledLanguages) ||
+    !isBundledTheme(theme, shiki.bundledThemes)
+  ) {
     throw new Error(`shiki does not bundle language "${lang}" or theme "${theme}"`);
   }
 
@@ -26,7 +37,10 @@ const loadShikiHighlighter: HighlighterLoader = async (lang, theme) => {
 
   return {
     codeToTokensBase(code, options) {
-      if (!isBundledLanguage(options.lang, shiki.bundledLanguages) || !isBundledTheme(options.theme, shiki.bundledThemes)) {
+      if (
+        !isBundledLanguage(options.lang, shiki.bundledLanguages) ||
+        !isBundledTheme(options.theme, shiki.bundledThemes)
+      ) {
         return [[]];
       }
 

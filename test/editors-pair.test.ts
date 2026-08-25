@@ -46,19 +46,31 @@ test("available checks existence of the path the resolver returns", () => {
 });
 
 test("auto falls through to micro when the pair bundle is missing", () => {
-  const editor = resolve("auto", () => true, () => false);
+  const editor = resolve(
+    "auto",
+    () => true,
+    () => false,
+  );
 
   expect(editor.name).toBe("micro");
 });
 
 test("auto returns pair when the pair bundle is present", () => {
-  const editor = resolve("auto", () => true, () => true);
+  const editor = resolve(
+    "auto",
+    () => true,
+    () => true,
+  );
 
   expect(editor.name).toBe("pair");
 });
 
 test("explicit pair still resolves even when the bundle is missing", () => {
-  const editor = resolve("pair", () => true, () => false);
+  const editor = resolve(
+    "pair",
+    () => true,
+    () => false,
+  );
 
   expect(editor.name).toBe("pair");
 });
@@ -72,7 +84,11 @@ test("headerHint is empty", () => {
 });
 
 test("resolve(auto) returns the pair editor when the bundle is present", () => {
-  const editor = resolve("auto", () => false, () => true);
+  const editor = resolve(
+    "auto",
+    () => false,
+    () => true,
+  );
 
   expect(editor.name).toBe("pair");
 });
@@ -133,7 +149,9 @@ test("prepare emits every argv flag", () => {
 
 test("prepare emits --context and --min-fold from config", () => {
   const editor = createPairEditor(fakeResolveTuiEntry);
-  const launch = editor.prepare(context({ config: { ...DEFAULT_CONFIG, context: 20, minFold: 7 } }));
+  const launch = editor.prepare(
+    context({ config: { ...DEFAULT_CONFIG, context: 20, minFold: 7 } }),
+  );
 
   const contextIndex = launch.argv.indexOf("--context");
   const minFoldIndex = launch.argv.indexOf("--min-fold");

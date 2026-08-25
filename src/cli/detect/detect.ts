@@ -78,8 +78,14 @@ function detectInsideMultiplexer(): string | null {
 }
 
 // pair ships as a bundled file rather than a PATH binary, so its presence comes from the bundle's own availability check, not resolvesOnPath.
-function detectEditors(resolvesOnPath: PathResolver, checkPairBundle?: BundleExistsChecker): EditorDetection[] {
-  const pairEditor = checkPairBundle === undefined ? createPairEditor() : createPairEditor(undefined, checkPairBundle);
+function detectEditors(
+  resolvesOnPath: PathResolver,
+  checkPairBundle?: BundleExistsChecker,
+): EditorDetection[] {
+  const pairEditor =
+    checkPairBundle === undefined
+      ? createPairEditor()
+      : createPairEditor(undefined, checkPairBundle);
 
   return [
     { name: "pair", onPath: pairEditor.available() },

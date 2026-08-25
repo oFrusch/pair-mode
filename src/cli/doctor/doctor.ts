@@ -143,7 +143,14 @@ function hasShebang(path: string): boolean {
 }
 
 function checkEntryPoints(root: string): DoctorCheck {
-  const entryPoints = ["cli.js", "claude-code.js", "codex.js", "opencode.js", "pi.js", "pair-tui.js"];
+  const entryPoints = [
+    "cli.js",
+    "claude-code.js",
+    "codex.js",
+    "opencode.js",
+    "pi.js",
+    "pair-tui.js",
+  ];
   const missing = entryPoints.filter((entry) => !existsSync(join(root, "dist", entry)));
   const present = entryPoints.filter((entry) => !missing.includes(entry));
   const notExecutable = present.filter((entry) => !isExecutable(join(root, "dist", entry)));
@@ -189,7 +196,9 @@ function checkShiki(resolvesShiki?: () => boolean): DoctorCheck {
     name: "shiki (syntax colour)",
     passed: resolved,
     warnOnly: true,
-    detail: resolved ? "resolves from node_modules" : "not found in node_modules; syntax colour disabled",
+    detail: resolved
+      ? "resolves from node_modules"
+      : "not found in node_modules; syntax colour disabled",
   };
 }
 
@@ -243,7 +252,10 @@ export function runDoctor(options: DoctorOptions = {}): DoctorReport {
 
   const exitCode = checks.every((check) => check.passed || check.warnOnly) ? 0 : 1;
   const text = checks
-    .map((check) => `[${check.passed ? "PASS" : check.warnOnly ? "WARN" : "FAIL"}] ${check.name}: ${check.detail}`)
+    .map(
+      (check) =>
+        `[${check.passed ? "PASS" : check.warnOnly ? "WARN" : "FAIL"}] ${check.name}: ${check.detail}`,
+    )
     .join("\n");
 
   return { checks, exitCode, text };
