@@ -3,8 +3,8 @@ import type { KeyEvent } from "./input.types";
 const ESC = "\x1b";
 const CSI_FINAL_START = 0x40;
 const CSI_FINAL_END = 0x7e;
-const CSI_PARAM_START = 0x20;
-const CSI_PARAM_END = 0x3f;
+// Leading run of CSI parameter bytes, the 0x20 to 0x3f range.
+const CSI_PARAM_RUN = /^[\x20-\x3f]*/;
 
 const ARROW_NAMES: Record<string, string> = {
   A: "up",
@@ -32,23 +32,12 @@ function consumeMouseSequence(chunk: string, start: number): number {
 }
 
 function consumeUnknownCsi(chunk: string, start: number): number {
-  let index = start;
+  const params = CSI_PARAM_RUN.exec(chunk.slice(start))?.[0] ?? "";
+  const afterParams = start + params.length;
+  const code = chunk.charCodeAt(afterParams);
 
-  while (index < chunk.length) {
-    const code = chunk.charCodeAt(index);
-
-    if (code >= CSI_FINAL_START && code <= CSI_FINAL_END) {
-      return index + 1;
-    }
-
-    if (code < CSI_PARAM_START || code > CSI_PARAM_END) {
-      return index;
-    }
-
-    index += 1;
-  }
-
-  return index;
+  // A NaN code means the chunk ended, so both comparisons fail and the run stops here.
+  return code >= CSI_FINAL_START && code <= CSI_FINAL_END ? afterParams + 1 : afterParams;
 }
 
 function parseEscape(chunk: string, index: number): { event: KeyEvent | null; next: number } {

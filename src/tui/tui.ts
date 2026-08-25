@@ -59,6 +59,13 @@ function isChangedEntry(model: DiffModel, entry: VisibleRow): boolean {
   return entry.kind === "row" && model.rows[entry.index]!.kind !== "context";
 }
 
+// Every in-bounds index from `from`, walking in `direction`.
+function walkFrom(from: number, length: number, direction: 1 | -1): number[] {
+  const count = direction === 1 ? length - from : from + 1;
+
+  return Array.from({ length: Math.max(0, count) }, (_, step) => from + step * direction);
+}
+
 function jumpToRun(model: DiffModel, direction: 1 | -1): DiffModel {
   const visible = visibleRows(model);
 
@@ -66,35 +73,17 @@ function jumpToRun(model: DiffModel, direction: 1 | -1): DiffModel {
     return model;
   }
 
-  let index = model.cursor;
+  const walk = walkFrom(model.cursor, visible.length, direction);
+  const current = visible[model.cursor];
+  const onRun = current !== undefined && isChangedEntry(model, current);
 
-  const currentEntry = visible[index];
+  const runEnd = walk.findIndex((index) => !isChangedEntry(model, visible[index]!));
 
-  if (currentEntry !== undefined && isChangedEntry(model, currentEntry)) {
-    while (index >= 0 && index < visible.length) {
-      const entry = visible[index]!;
+  // A cursor already inside a run skips the rest of that run before it looks for the next one.
+  const rest = onRun ? (runEnd === -1 ? [] : walk.slice(runEnd)) : walk.slice(1);
+  const target = rest.find((index) => isChangedEntry(model, visible[index]!));
 
-      if (!isChangedEntry(model, entry)) {
-        break;
-      }
-
-      index += direction;
-    }
-  } else {
-    index += direction;
-  }
-
-  while (index >= 0 && index < visible.length) {
-    const entry = visible[index]!;
-
-    if (isChangedEntry(model, entry)) {
-      return { ...model, cursor: index };
-    }
-
-    index += direction;
-  }
-
-  return model;
+  return target === undefined ? model : { ...model, cursor: target };
 }
 
 function toggleFoldAtCursor(model: DiffModel): DiffModel {

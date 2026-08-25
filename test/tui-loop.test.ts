@@ -126,6 +126,56 @@ describe("applyKey — hunk jumps", () => {
   });
 });
 
+// The imperative jumpToRun this refactor replaced, kept as the differential oracle.
+function referenceJump(model: ReturnType<typeof buildModel>, direction: 1 | -1): number {
+  const visible = visibleRows(model);
+  const changed = (position: number) => {
+    const entry = visible[position];
+    return (
+      entry !== undefined && entry.kind === "row" && model.rows[entry.index]!.kind !== "context"
+    );
+  };
+
+  let index = model.cursor;
+
+  if (changed(index)) {
+    while (index >= 0 && index < visible.length && changed(index)) {
+      index += direction;
+    }
+  } else {
+    index += direction;
+  }
+
+  while (index >= 0 && index < visible.length) {
+    if (changed(index)) {
+      return index;
+    }
+
+    index += direction;
+  }
+
+  return model.cursor;
+}
+
+describe("applyKey — hunk jumps match the imperative reference", () => {
+  const model = buildTwoRunModel();
+  const total = visibleRows(model).length;
+
+  test("n and N agree with the reference from every cursor position", () => {
+    const mismatches = Array.from({ length: total }, (_, cursor) => cursor).flatMap((cursor) =>
+      ([1, -1] as const).flatMap((direction) => {
+        const state = makeState({ model: { ...model, cursor } });
+        const actual = applyKey(state, key(direction === 1 ? "n" : "N"), 24).model.cursor;
+        const expected = referenceJump({ ...model, cursor }, direction);
+
+        return actual === expected ? [] : [{ cursor, direction, actual, expected }];
+      }),
+    );
+
+    expect(mismatches).toEqual([]);
+  });
+});
+
 describe("applyKey — folds", () => {
   test("space on a fold row expands it, and visibleRows then grows", () => {
     const model = buildTwoRunModel();

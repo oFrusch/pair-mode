@@ -19,6 +19,14 @@ export interface Span {
   end: number;
 }
 
+export interface SpanScan {
+  left: Span[];
+  right: Span[];
+  sharedLength: number;
+  leftCursor: number;
+  rightCursor: number;
+}
+
 export interface ChangedSpans {
   left: Span[];
   right: Span[];
@@ -28,6 +36,12 @@ export interface SyntaxToken {
   start: number;
   end: number;
   color: string;
+}
+
+export interface PaneTextScan {
+  output: string;
+  currentFg: string | null | undefined;
+  currentBg: string | null | undefined;
 }
 
 export type TokenProvider = (line: string, lineNumber: number | null) => SyntaxToken[];

@@ -20,6 +20,7 @@ import type {
   NotePosition,
   PaintOptions,
   PaintResult,
+  PaneTextScan,
   SignBarStyle,
   Span,
   SyntaxToken,
@@ -160,42 +161,54 @@ function renderPaneText(
   highlightSpans: Span[],
 ): string {
   const textLength = Math.min(text.length, paneWidth);
-  let output = "";
-  let currentFg: string | null | undefined;
-  let currentBg: string | null | undefined;
+  const columns = Array.from({ length: paneWidth }, (_, column) => column);
 
-  for (let column = 0; column < paneWidth; column += 1) {
-    const char = column < textLength ? text.charAt(column) : " ";
-    const token =
-      column < textLength
-        ? tokens.find((candidate) => column >= candidate.start && column < candidate.end)
-        : undefined;
-    const desiredFg = token === undefined ? null : token.color;
+  const scan = columns.reduce<PaneTextScan>(
+    (state, column) => {
+      const char = column < textLength ? text.charAt(column) : " ";
+      const token =
+        column < textLength
+          ? tokens.find((candidate) => column >= candidate.start && column < candidate.end)
+          : undefined;
+      const desiredFg = token === undefined ? null : token.color;
 
-    const withinSpan = changeSpansForSide.some((span) => column >= span.start && column < span.end);
-    const withinHighlight = highlightSpans.some(
-      (span) => column >= span.start && column < span.end,
-    );
-    const desiredBg = withinHighlight
-      ? theme.selection
-      : changeColor !== null && (rowBand || withinSpan)
-        ? changeColor
-        : null;
+      const withinSpan = changeSpansForSide.some(
+        (span) => column >= span.start && column < span.end,
+      );
+      const withinHighlight = highlightSpans.some(
+        (span) => column >= span.start && column < span.end,
+      );
+      const desiredBg = withinHighlight
+        ? theme.selection
+        : changeColor !== null && (rowBand || withinSpan)
+          ? changeColor
+          : null;
 
-    if (desiredFg !== currentFg) {
-      output += desiredFg === null ? DEFAULT_FG : fg(desiredFg, truecolor);
-      currentFg = desiredFg;
-    }
+      // An escape goes out only where the wanted colour differs from the colour already in force.
+      const fgEscape =
+        desiredFg === state.currentFg
+          ? ""
+          : desiredFg === null
+            ? DEFAULT_FG
+            : fg(desiredFg, truecolor);
 
-    if (desiredBg !== currentBg) {
-      output += desiredBg === null ? DEFAULT_BG : bg(desiredBg, truecolor);
-      currentBg = desiredBg;
-    }
+      const bgEscape =
+        desiredBg === state.currentBg
+          ? ""
+          : desiredBg === null
+            ? DEFAULT_BG
+            : bg(desiredBg, truecolor);
 
-    output += char;
-  }
+      return {
+        output: state.output + fgEscape + bgEscape + char,
+        currentFg: desiredFg,
+        currentBg: desiredBg,
+      };
+    },
+    { output: "", currentFg: undefined, currentBg: undefined },
+  );
 
-  return output;
+  return scan.output;
 }
 
 function paintModelRow(

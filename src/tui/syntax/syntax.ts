@@ -64,6 +64,18 @@ function tokenizeLine(highlighter: ShikiHighlighter, lang: string, line: string)
   }));
 }
 
+async function tryLoadHighlighter(
+  load: HighlighterLoader,
+  lang: string,
+  theme: string,
+): Promise<ShikiHighlighter | null> {
+  try {
+    return await load(lang, theme);
+  } catch {
+    return null;
+  }
+}
+
 export async function createTokenProvider(
   options: SyntaxOptions,
   loadHighlighter: HighlighterLoader = loadShikiHighlighter,
@@ -78,11 +90,9 @@ export async function createTokenProvider(
     return noTokens;
   }
 
-  let highlighter: ShikiHighlighter;
+  const highlighter = await tryLoadHighlighter(loadHighlighter, lang, THEME_ID);
 
-  try {
-    highlighter = await loadHighlighter(lang, THEME_ID);
-  } catch {
+  if (highlighter === null) {
     return noTokens;
   }
 

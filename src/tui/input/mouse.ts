@@ -37,31 +37,18 @@ function toMouseEvent(match: RegExpExecArray): MouseEvent {
 }
 
 export function parseMouse(chunk: string): MouseEvent[] {
-  const events: MouseEvent[] = [];
-  const pattern = mouseReportPattern();
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(chunk)) !== null) {
-    events.push(toMouseEvent(match));
-  }
-
-  return events;
+  return [...chunk.matchAll(mouseReportPattern())].map(toMouseEvent);
 }
 
 export function splitInput(chunk: string): { keys: string; mouse: MouseEvent[] } {
-  const mouse: MouseEvent[] = [];
-  const pattern = mouseReportPattern();
-  let keys = "";
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
+  const matches = [...chunk.matchAll(mouseReportPattern())];
 
-  while ((match = pattern.exec(chunk)) !== null) {
-    keys += chunk.slice(lastIndex, match.index);
-    mouse.push(toMouseEvent(match));
-    lastIndex = pattern.lastIndex;
-  }
+  // Each key segment starts where the previous mouse report ended, and the last one runs to the end.
+  const segmentStarts = [0, ...matches.map((match) => match.index + match[0].length)];
 
-  keys += chunk.slice(lastIndex);
+  const keys = segmentStarts
+    .map((start, position) => chunk.slice(start, matches[position]?.index))
+    .join("");
 
-  return { keys, mouse };
+  return { keys, mouse: matches.map(toMouseEvent) };
 }

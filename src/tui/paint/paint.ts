@@ -5,7 +5,7 @@ import type {
   LayoutDecision,
   PaintOptions,
   PaintResult,
-  Span,
+  SpanScan,
   TokenProvider,
 } from "./paint.types";
 
@@ -25,31 +25,37 @@ function indentWidth(line: string): number {
 export function changedSpans(before: string, after: string): ChangedSpans {
   const chunks = diffWordsWithSpace(before, after);
 
-  let leftCursor = 0;
-  let rightCursor = 0;
-  let sharedLength = 0;
-  const left: Span[] = [];
-  const right: Span[] = [];
+  const scan = chunks.reduce<SpanScan>(
+    (state, chunk) => {
+      const length = chunk.value.length;
 
-  chunks.forEach((chunk) => {
-    const length = chunk.value.length;
+      if (chunk.removed === true) {
+        return {
+          ...state,
+          left: [...state.left, { start: state.leftCursor, end: state.leftCursor + length }],
+          leftCursor: state.leftCursor + length,
+        };
+      }
 
-    if (chunk.removed === true) {
-      left.push({ start: leftCursor, end: leftCursor + length });
-      leftCursor += length;
-      return;
-    }
+      if (chunk.added === true) {
+        return {
+          ...state,
+          right: [...state.right, { start: state.rightCursor, end: state.rightCursor + length }],
+          rightCursor: state.rightCursor + length,
+        };
+      }
 
-    if (chunk.added === true) {
-      right.push({ start: rightCursor, end: rightCursor + length });
-      rightCursor += length;
-      return;
-    }
+      return {
+        ...state,
+        sharedLength: state.sharedLength + length,
+        leftCursor: state.leftCursor + length,
+        rightCursor: state.rightCursor + length,
+      };
+    },
+    { left: [], right: [], sharedLength: 0, leftCursor: 0, rightCursor: 0 },
+  );
 
-    sharedLength += length;
-    leftCursor += length;
-    rightCursor += length;
-  });
+  const { left, right, sharedLength } = scan;
 
   const indent = Math.min(indentWidth(before), indentWidth(after));
   const longer = Math.max(before.length, after.length) - indent;

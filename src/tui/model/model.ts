@@ -15,51 +15,46 @@ const CONTROL_BYTE_PLACEHOLDER = "?";
 
 // Runs once when the model is built, so the painter and resolveClick always agree on the same sanitised string and its column math.
 function sanitizeLine(text: string): string {
-  let output = "";
-  let column = 0;
+  // Split by code unit, not by code point, so a surrogate pair keeps its two columns of tab math.
+  const scan = text.split("").reduce(
+    (state, char) => {
+      if (char === "\t") {
+        const width = TAB_WIDTH - (state.column % TAB_WIDTH);
 
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index]!;
+        return { output: state.output + " ".repeat(width), column: state.column + width };
+      }
 
-    if (char === "\t") {
-      const width = TAB_WIDTH - (column % TAB_WIDTH);
-      output += " ".repeat(width);
-      column += width;
-      continue;
-    }
+      if (char.charCodeAt(0) < CONTROL_BYTE_CEILING) {
+        return {
+          output: state.output + CONTROL_BYTE_PLACEHOLDER,
+          column: state.column + 1,
+        };
+      }
 
-    if (char.charCodeAt(0) < CONTROL_BYTE_CEILING) {
-      output += CONTROL_BYTE_PLACEHOLDER;
-      column += 1;
-      continue;
-    }
+      return { output: state.output + char, column: state.column + 1 };
+    },
+    { output: "", column: 0 },
+  );
 
-    output += char;
-    column += 1;
-  }
-
-  return output;
+  return scan.output;
 }
 
 function buildRows(before: string[], after: string[]): ModelRow[] {
-  const rows: ModelRow[] = [];
-  let leftCounter = 0;
-  let rightCounter = 0;
-
-  for (const opcode of opcodes(before, after)) {
+  return opcodes(before, after).flatMap((opcode) => {
     const removed = before.slice(opcode.i1, opcode.i2);
     const added = after.slice(opcode.j1, opcode.j2);
     const rowCount = Math.max(removed.length, added.length);
 
-    for (let row = 0; row < rowCount; row += 1) {
+    return Array.from({ length: rowCount }, (_, row): ModelRow => {
       const removedLine = removed[row];
       const addedLine = added[row];
 
       const left = removedLine === undefined ? "" : sanitizeLine(removedLine);
       const right = addedLine === undefined ? "" : sanitizeLine(addedLine);
 
-      const leftNumber = removedLine === undefined ? null : (leftCounter += 1);
-      const rightNumber = addedLine === undefined ? null : (rightCounter += 1);
+      // Opcodes cover both sides contiguously, so the opcode offset plus the row is the running count.
+      const leftNumber = removedLine === undefined ? null : opcode.i1 + row + 1;
+      const rightNumber = addedLine === undefined ? null : opcode.j1 + row + 1;
 
       const kind: RowKind =
         opcode.tag === "equal"
@@ -70,11 +65,9 @@ function buildRows(before: string[], after: string[]): ModelRow[] {
               ? "del"
               : "add";
 
-      rows.push({ kind, left, right, leftNumber, rightNumber });
-    }
-  }
-
-  return rows;
+      return { kind, left, right, leftNumber, rightNumber };
+    });
+  });
 }
 
 function buildFolds(rows: ModelRow[], context: number, minFold: number): FoldGroup[] {
@@ -95,29 +88,19 @@ function buildFolds(rows: ModelRow[], context: number, minFold: number): FoldGro
     return [];
   }
 
-  const folds: FoldGroup[] = [];
-  let index = 0;
+  // A run of hidden rows opens where the row is dropped and the row before it is kept.
+  const runStarts = keep.flatMap((kept, index) =>
+    kept || (index > 0 && keep[index - 1] === false) ? [] : [index],
+  );
 
-  while (index < rows.length) {
-    if (keep[index]) {
-      index += 1;
-      continue;
-    }
+  return runStarts
+    .map((start): FoldGroup => {
+      const nextKept = keep.indexOf(true, start);
+      const end = nextKept === -1 ? rows.length : nextKept;
 
-    const start = index;
-
-    while (index < rows.length && !keep[index]) {
-      index += 1;
-    }
-
-    const span = index - start;
-
-    if (span >= minFold) {
-      folds.push({ start, count: span, expanded: false });
-    }
-  }
-
-  return folds;
+      return { start, count: end - start, expanded: false };
+    })
+    .filter((fold) => fold.count >= minFold);
 }
 
 export function buildModel(
@@ -136,24 +119,25 @@ export function visibleRows(model: DiffModel): VisibleRow[] {
   const foldByStart = new Map(
     model.folds.map((foldGroup, foldIndex) => [foldGroup.start, foldIndex]),
   );
-  const result: VisibleRow[] = [];
-  let index = 0;
+  // A collapsed fold swallows every row it covers, and the fold marker stands in for the first of them.
+  const hidden = new Set(
+    model.folds.flatMap((foldGroup) =>
+      foldGroup.expanded
+        ? []
+        : Array.from({ length: foldGroup.count }, (_, offset) => foldGroup.start + offset),
+    ),
+  );
 
-  while (index < model.rows.length) {
+  return model.rows.flatMap((_, index): VisibleRow[] => {
     const foldIndex = foldByStart.get(index);
     const foldGroup = foldIndex === undefined ? undefined : model.folds[foldIndex];
 
     if (foldGroup !== undefined && foldIndex !== undefined && !foldGroup.expanded) {
-      result.push({ kind: "fold", foldIndex });
-      index += foldGroup.count;
-      continue;
+      return [{ kind: "fold", foldIndex }];
     }
 
-    result.push({ kind: "row", index });
-    index += 1;
-  }
-
-  return result;
+    return hidden.has(index) ? [] : [{ kind: "row", index }];
+  });
 }
 
 export function toggleFold(model: DiffModel, foldIndex: number): DiffModel {
