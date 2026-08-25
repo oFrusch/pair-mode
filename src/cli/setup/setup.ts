@@ -16,7 +16,7 @@ import {
 } from "../register";
 import type { Prompter, SetupOptions, SetupResult } from "./types";
 
-const EDITOR_NAMES: EditorName[] = ["auto", "micro", "nvim", "vim", "nano"];
+const EDITOR_NAMES: EditorName[] = ["auto", "pair", "micro", "nvim", "vim", "nano"];
 const MULTIPLEXER_NAMES: MultiplexerName[] = ["auto", "zellij", "tmux", "none"];
 const LAYOUTS: Layout[] = ["split", "inline"];
 
@@ -65,7 +65,11 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
   const changedFiles: string[] = [];
 
   try {
-    const report = detectInstalls({ resolvesOnPath: options.resolvesOnPath, homeDir: home });
+    const report = detectInstalls({
+      resolvesOnPath: options.resolvesOnPath,
+      homeDir: home,
+      checkPairBundle: options.checkPairBundle,
+    });
 
     console.log("Detected on this machine:");
 

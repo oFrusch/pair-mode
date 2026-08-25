@@ -39,3 +39,28 @@ export function syntaxName(sourcePath: string): string | null {
   const ext = extname(sourcePath).toLowerCase();
   return LANGS[ext] ?? null;
 }
+
+export function knownExtensions(): string[] {
+  return Object.keys(LANGS);
+}
+
+// A micro syntax name that Shiki spells differently, or not at all.
+const SHIKI_TRANSLATIONS: Record<string, string> = {
+  python3: "python",
+  sh: "shellscript",
+  zsh: "shellscript",
+  fish: "fish",
+  proto: "proto",
+  dockerfile: "docker",
+  terraform: "terraform",
+};
+
+export function shikiLanguage(sourcePath: string): string | null {
+  const name = syntaxName(sourcePath);
+
+  if (name === null) {
+    return null;
+  }
+
+  return SHIKI_TRANSLATIONS[name] ?? name;
+}

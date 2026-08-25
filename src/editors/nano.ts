@@ -28,6 +28,7 @@ function writeNanorc(configDir: string, theme: EditorContext["theme"]): string {
 export function createNanoEditor(resolvesOnPath: PathResolver = defaultResolvesOnPath): Editor {
   return {
     name: "nano",
+    collectMode: "buffer-diff",
 
     available(): boolean {
       return resolvesOnPath("nano");

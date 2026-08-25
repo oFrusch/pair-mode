@@ -1,14 +1,17 @@
 import type { PairConfig } from "../core/config";
 import type { Editor, EditorContext, EditorLaunch, PathResolver } from "./editor.types";
+import type { BundleExistsChecker } from "./pair.types";
 import { createMicroEditor } from "./micro";
 import { vimEditor } from "./vim";
 import { createNanoEditor } from "./nano";
+import { createPairEditor } from "./pair";
 import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
 
 // A string array is a raw command. It bypasses every adapter and every syntax feature.
 function createPassthroughEditor(command: string[]): Editor {
   return {
     name: "custom",
+    collectMode: "buffer-diff",
 
     available(): boolean {
       return true;
@@ -28,8 +31,9 @@ function createPassthroughEditor(command: string[]): Editor {
   };
 }
 
-function candidates(resolvesOnPath: PathResolver): Editor[] {
+function candidates(resolvesOnPath: PathResolver, checkPairBundle?: BundleExistsChecker): Editor[] {
   return [
+    checkPairBundle ? createPairEditor(undefined, checkPairBundle) : createPairEditor(),
     createMicroEditor(resolvesOnPath),
     vimEditor("nvim", resolvesOnPath),
     vimEditor("vim", resolvesOnPath),
@@ -40,9 +44,15 @@ function candidates(resolvesOnPath: PathResolver): Editor[] {
 export function resolve(
   preference: PairConfig["editor"],
   resolvesOnPath: PathResolver = defaultResolvesOnPath,
+  checkPairBundle?: BundleExistsChecker,
 ): Editor {
   if (Array.isArray(preference)) {
     return createPassthroughEditor(preference);
+  }
+
+  // An explicit editor: "pair" resolves unconditionally, so a misconfigured install fails loudly instead of silently downgrading.
+  if (preference === "pair") {
+    return createPairEditor();
   }
 
   if (preference === "micro") {
@@ -57,7 +67,9 @@ export function resolve(
     return createNanoEditor(resolvesOnPath);
   }
 
-  const available = candidates(resolvesOnPath).find((candidate) => candidate.available());
+  const available = candidates(resolvesOnPath, checkPairBundle).find((candidate) =>
+    candidate.available(),
+  );
 
   return available ?? vimEditor("vim", resolvesOnPath);
 }

@@ -1,4 +1,5 @@
 import { opcodes } from "../diff";
+import { isRecord } from "../../helpers/isRecord";
 import type { Question } from "./types";
 
 export function anchor(
@@ -48,4 +49,44 @@ export function formatQuestions(questions: Question[], path: string): string {
   });
 
   return [...header, ...body].join("\n");
+}
+
+function parseNoteEntry(entry: unknown): Question[] {
+  if (!isRecord(entry)) {
+    return [];
+  }
+
+  const { line, code, text } = entry;
+
+  if (typeof line !== "number" && line !== null) {
+    return [];
+  }
+
+  if (typeof code !== "string" || typeof text !== "string") {
+    return [];
+  }
+
+  const trimmed = text.trim();
+
+  if (trimmed === "") {
+    return [];
+  }
+
+  return [{ line, code, text: trimmed }];
+}
+
+export function parseNoteResult(text: string): Question[] {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return [];
+  }
+
+  if (!isRecord(parsed) || !Array.isArray(parsed["questions"])) {
+    return [];
+  }
+
+  return parsed["questions"].flatMap(parseNoteEntry);
 }

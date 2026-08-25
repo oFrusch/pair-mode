@@ -7,7 +7,7 @@ import type { EditRequest, RunDeps, RunVerdict } from "./types";
 import type { RenderInput } from "../render";
 import { renderSplit, renderInline } from "../render";
 import { isEnabled, stateDir } from "../state";
-import { collect, formatQuestions } from "../collect";
+import { collect, formatQuestions, parseNoteResult } from "../collect";
 import { resolve } from "../../editors";
 import { detect } from "../../multiplexers";
 
@@ -35,6 +35,19 @@ function tempFile(prefix: string, suffix: string, content: string): string {
   const path = join(tmpdir(), name);
   writeFileSync(path, content, "utf-8");
   return path;
+}
+
+function readResultFile(path: string): string {
+  try {
+    return readFileSync(path, "utf-8");
+  } catch {
+    return "";
+  }
+}
+
+function resultFilePath(): string {
+  const name = `pair-result-${randomBytes(6).toString("hex")}.json`;
+  return join(tmpdir(), name);
 }
 
 function removeQuietly(path: string): void {
@@ -71,7 +84,7 @@ export async function runPair(
 
   const override = process.env["CC_PAIR_EDITOR"] || process.env["VISUAL"] || process.env["EDITOR"];
   const preference = override ? splitCommand(override) : config.editor;
-  const editor = resolve(preference);
+  const editor = deps.editor ?? resolve(preference);
   const multiplexer = deps.multiplexer ?? detect(config.multiplexer);
 
   const renderInput: RenderInput = {
@@ -86,6 +99,7 @@ export async function runPair(
 
   const isInline = config.layout === "inline";
   const rendered = isInline ? renderInline(renderInput) : renderSplit(renderInput);
+  const usesResultFile = editor.collectMode === "result-file";
 
   const suffix = editor.bufferSuffix(request.filePath);
   const configDir = join(stateDir(), "editor");
@@ -93,9 +107,14 @@ export async function runPair(
   // Inline has one logical buffer: left and right are the same content, so both panes point at the same file.
   let leftFile: string | null = null;
   let rightFile: string | null = null;
+  const resultFile = resultFilePath();
 
   try {
-    if (isInline) {
+    if (usesResultFile) {
+      // A result-file editor does its own diffing and folding, so it gets the raw before/after text, not the pre-rendered marker view.
+      leftFile = tempFile("pair-current-", suffix, request.before);
+      rightFile = tempFile("pair-proposed-", suffix, request.after);
+    } else if (isInline) {
       leftFile = tempFile("pair-inline-", suffix, rendered.left.join("\n") + "\n");
       rightFile = leftFile;
     } else {
@@ -106,9 +125,11 @@ export async function runPair(
     const launch = editor.prepare({
       leftFile,
       rightFile,
+      resultFile,
       sourcePath: request.filePath,
       theme: config.theme,
       configDir,
+      config,
     });
 
     const argv = withEnvPrefix(launch.argv, launch.env);
@@ -118,8 +139,9 @@ export async function runPair(
       return { decision: "allow", reviewed: false, reason: result.detail };
     }
 
-    const saved = splitLines(readFileSync(rightFile, "utf-8"));
-    const questions = collect(rendered.right, rendered.numbers, saved);
+    const questions = usesResultFile
+      ? parseNoteResult(readResultFile(resultFile))
+      : collect(rendered.right, rendered.numbers, splitLines(readFileSync(rightFile, "utf-8")));
 
     if (questions.length === 0) {
       return { decision: "allow", reviewed: true };
@@ -134,5 +156,7 @@ export async function runPair(
     if (rightFile !== null) {
       removeQuietly(rightFile);
     }
+
+    removeQuietly(resultFile);
   }
 }

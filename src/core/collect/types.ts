@@ -3,3 +3,7 @@ export interface Question {
   code: string;
   text: string;
 }
+
+export interface NoteResult {
+  questions: Question[];
+}

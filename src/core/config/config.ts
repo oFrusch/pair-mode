@@ -10,14 +10,16 @@ import type {
   PairConfig,
   ConfigError,
   ConfigResult,
+  NotePosition,
 } from "./types";
 import { DEFAULT_CONTEXT, DEFAULT_MIN_FOLD } from "../marks";
 import { isRecord } from "../../helpers/isRecord";
 import { isHexColor as isHexColorString } from "../../helpers/hexColor";
 
-const EDITOR_NAMES: string[] = ["auto", "micro", "nvim", "vim", "nano"];
+const EDITOR_NAMES: string[] = ["auto", "pair", "micro", "nvim", "vim", "nano"];
 const MULTIPLEXER_NAMES: string[] = ["auto", "zellij", "tmux", "none"];
 const LAYOUTS: string[] = ["split", "inline"];
+const NOTE_POSITIONS: string[] = ["panel", "anchored"];
 
 export const DEFAULT_CONFIG: PairConfig = {
   editor: "auto",
@@ -26,9 +28,11 @@ export const DEFAULT_CONFIG: PairConfig = {
   context: DEFAULT_CONTEXT,
   minFold: DEFAULT_MIN_FOLD,
   pane: { width: "90%", height: "90%" },
-  theme: { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a" },
+  theme: { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a", rowBand: true },
   trace: false,
   autoApprove: true,
+  notes: "panel",
+  syntax: true,
 };
 
 // homeDir lets a caller (setup, in particular) resolve the config path for an explicit home rather than the process's real one.
@@ -53,6 +57,10 @@ function isMultiplexerName(value: unknown): value is MultiplexerName {
 
 function isLayout(value: unknown): value is Layout {
   return typeof value === "string" && LAYOUTS.includes(value);
+}
+
+function isNotePosition(value: unknown): value is NotePosition {
+  return typeof value === "string" && NOTE_POSITIONS.includes(value);
 }
 
 function isPositiveInteger(value: unknown): value is number {
@@ -83,7 +91,7 @@ function validateEditor(
 
   errors.push({
     path: "editor",
-    message: "must be one of auto, micro, nvim, vim, nano, or a non-empty array of strings",
+    message: "must be one of auto, pair, micro, nvim, vim, nano, or a non-empty array of strings",
   });
   return DEFAULT_CONFIG.editor;
 }
@@ -195,6 +203,21 @@ function validateThemeField(
   return DEFAULT_CONFIG.theme[field];
 }
 
+function validateRowBand(raw: Record<string, unknown>, errors: ConfigError[]): boolean {
+  if (!("rowBand" in raw)) {
+    return DEFAULT_CONFIG.theme.rowBand;
+  }
+
+  const value = raw["rowBand"];
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  errors.push({ path: "theme.rowBand", message: "must be a boolean" });
+  return DEFAULT_CONFIG.theme.rowBand;
+}
+
 function validateTheme(raw: Record<string, unknown>, errors: ConfigError[]): Theme {
   if (!("theme" in raw)) {
     return DEFAULT_CONFIG.theme;
@@ -211,6 +234,7 @@ function validateTheme(raw: Record<string, unknown>, errors: ConfigError[]): The
     add: validateThemeField(value, "add", errors),
     del: validateThemeField(value, "del", errors),
     fold: validateThemeField(value, "fold", errors),
+    rowBand: validateRowBand(value, errors),
   };
 }
 
@@ -244,6 +268,36 @@ function validateAutoApprove(raw: Record<string, unknown>, errors: ConfigError[]
   return DEFAULT_CONFIG.autoApprove;
 }
 
+function validateNotes(raw: Record<string, unknown>, errors: ConfigError[]): NotePosition {
+  if (!("notes" in raw)) {
+    return DEFAULT_CONFIG.notes;
+  }
+
+  const value = raw["notes"];
+
+  if (isNotePosition(value)) {
+    return value;
+  }
+
+  errors.push({ path: "notes", message: "must be one of panel, anchored" });
+  return DEFAULT_CONFIG.notes;
+}
+
+function validateSyntax(raw: Record<string, unknown>, errors: ConfigError[]): boolean {
+  if (!("syntax" in raw)) {
+    return DEFAULT_CONFIG.syntax;
+  }
+
+  const value = raw["syntax"];
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  errors.push({ path: "syntax", message: "must be a boolean" });
+  return DEFAULT_CONFIG.syntax;
+}
+
 function validate(raw: Record<string, unknown>): ConfigResult {
   const errors: ConfigError[] = [];
 
@@ -257,6 +311,8 @@ function validate(raw: Record<string, unknown>): ConfigResult {
     theme: validateTheme(raw, errors),
     trace: validateTrace(raw, errors),
     autoApprove: validateAutoApprove(raw, errors),
+    notes: validateNotes(raw, errors),
+    syntax: validateSyntax(raw, errors),
   };
 
   return { config, errors };

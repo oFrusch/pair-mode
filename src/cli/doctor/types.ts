@@ -4,6 +4,8 @@ export interface DoctorCheck {
   name: string;
   passed: boolean;
   detail: string;
+  // A failing check with warnOnly true is reported as WARN and does not fail the doctor exit code.
+  warnOnly?: boolean;
 }
 
 export interface DoctorOptions {
@@ -12,6 +14,7 @@ export interface DoctorOptions {
   resolvesOnPath?: (command: string) => boolean;
   openTty?: () => number;
   multiplexerAdapters?: DetectAdapters;
+  resolvesShiki?: () => boolean;
 }
 
 export interface DoctorReport {

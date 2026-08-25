@@ -1,11 +1,13 @@
-export type EditorName = "auto" | "micro" | "nvim" | "vim" | "nano";
+export type EditorName = "auto" | "pair" | "micro" | "nvim" | "vim" | "nano";
 export type MultiplexerName = "auto" | "zellij" | "tmux" | "none";
 export type Layout = "split" | "inline";
+export type NotePosition = "panel" | "anchored";
 
 export interface Theme {
   add: string;
   del: string;
   fold: string;
+  rowBand: boolean;
 }
 
 export interface Pane {
@@ -23,6 +25,8 @@ export interface PairConfig {
   theme: Theme;
   trace: boolean;
   autoApprove: boolean;
+  notes: NotePosition;
+  syntax: boolean;
 }
 
 export interface ConfigError {

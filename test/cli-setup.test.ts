@@ -294,9 +294,11 @@ test("a re-run backs up the existing config and preserves fields the wizard neve
     context: 9,
     minFold: 7,
     pane: { width: "70%", height: "60%" },
-    theme: { add: "#111111", del: "#222222", fold: "#333333" },
+    theme: { add: "#111111", del: "#222222", fold: "#333333", rowBand: false },
     trace: true,
     autoApprove: false,
+    notes: "panel",
+    syntax: true,
   };
   saveConfig(customized, configFilePath);
 
@@ -320,6 +322,55 @@ test("a re-run backs up the existing config and preserves fields the wizard neve
   expect(written.context).toBe(9);
   expect(written.minFold).toBe(7);
   expect(written.pane).toEqual({ width: "70%", height: "60%" });
-  expect(written.theme).toEqual({ add: "#111111", del: "#222222", fold: "#333333" });
+  expect(written.theme).toEqual({
+    add: "#111111",
+    del: "#222222",
+    fold: "#333333",
+    rowBand: false,
+  });
   expect(written.trace).toBe(true);
+});
+
+test("the wizard defaults to pair when no editor is configured and the pair bundle is present", async () => {
+  const prompter = scriptedPrompter([
+    "", // editor: accept the default
+    "tmux", // multiplexer
+    "split", // layout
+    "", // CLIs
+  ]);
+
+  const result = await runSetup({
+    prompter,
+    homeDir: homeDir,
+    installRoot: installDir,
+    resolvesOnPath: (command) => command === "tmux",
+    checkPairBundle: () => true,
+  });
+
+  expect(result.stopped).toBe(false);
+
+  const written = loadConfig(configPath(homeDir)).config;
+  expect(written.editor).toBe("pair");
+});
+
+test("the wizard falls back past pair to a PATH editor when the pair bundle is missing", async () => {
+  const prompter = scriptedPrompter([
+    "", // editor: accept the default
+    "tmux", // multiplexer
+    "split", // layout
+    "", // CLIs
+  ]);
+
+  const result = await runSetup({
+    prompter,
+    homeDir: homeDir,
+    installRoot: installDir,
+    resolvesOnPath: (command) => command === "tmux" || command === "micro",
+    checkPairBundle: () => false,
+  });
+
+  expect(result.stopped).toBe(false);
+
+  const written = loadConfig(configPath(homeDir)).config;
+  expect(written.editor).toBe("micro");
 });

@@ -1,4 +1,5 @@
 import type { Multiplexer } from "../../multiplexers/multiplexer.types";
+import type { Editor } from "../../editors/editor.types";
 
 export interface EditRequest {
   tool: string;
@@ -7,9 +8,10 @@ export interface EditRequest {
   after: string;
 }
 
-// A test injects its own multiplexer here so runPair never spawns zellij, tmux, or an editor for real.
+// A test injects its own multiplexer and editor here so runPair never spawns zellij, tmux, or an editor for real.
 export interface RunDeps {
   multiplexer?: Multiplexer;
+  editor?: Editor;
 }
 
 // reviewed distinguishes an allow the user actually saw in the pane from an allow pair mode never showed them.

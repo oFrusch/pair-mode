@@ -11,7 +11,8 @@ const projectRoot = path.resolve(__dirname, "..");
 const SHEBANG = "#!/usr/bin/env node";
 
 // esbuild leaves a bundled CJS dep's internal require() calls dynamic, which throws under ESM output unless a real require exists.
-const REQUIRE_SHIM = 'import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);';
+const REQUIRE_SHIM =
+  'import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);';
 
 // Define all entry points to build.
 const entryPoints = [
@@ -20,6 +21,7 @@ const entryPoints = [
   { src: "src/adapters/codex/codex.ts", out: "dist/codex.js" },
   { src: "src/adapters/opencode/opencode.ts", out: "dist/opencode.js" },
   { src: "src/adapters/pi/pi.ts", out: "dist/pi.js" },
+  { src: "src/tui/cli.ts", out: "dist/pair-tui.js", external: ["shiki"] },
 ];
 
 // Check which entry points exist.
@@ -55,6 +57,7 @@ for (const entry of tooBuild) {
       format: "esm",
       target: "node20",
       sourcemap: false,
+      external: entry.external ?? [],
       banner: { js: `${SHEBANG}\n${REQUIRE_SHIM}` },
     });
 

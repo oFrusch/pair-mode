@@ -1,6 +1,8 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { createPairEditor } from "../../editors/pair";
+import type { BundleExistsChecker } from "../../editors/pair.types";
 import type {
   CliDetection,
   CliName,
@@ -75,8 +77,18 @@ function detectInsideMultiplexer(): string | null {
   return null;
 }
 
-function detectEditors(resolvesOnPath: PathResolver): EditorDetection[] {
+// pair ships as a bundled file rather than a PATH binary, so its presence comes from the bundle's own availability check, not resolvesOnPath.
+function detectEditors(
+  resolvesOnPath: PathResolver,
+  checkPairBundle?: BundleExistsChecker,
+): EditorDetection[] {
+  const pairEditor =
+    checkPairBundle === undefined
+      ? createPairEditor()
+      : createPairEditor(undefined, checkPairBundle);
+
   return [
+    { name: "pair", onPath: pairEditor.available() },
     { name: "micro", onPath: resolvesOnPath("micro") },
     { name: "nvim", onPath: resolvesOnPath("nvim") },
     { name: "vim", onPath: resolvesOnPath("vim") },
@@ -92,6 +104,6 @@ export function detectInstalls(adapters: DetectAdapters = {}): InstallReport {
     clis: detectClis(home, resolvesOnPath),
     multiplexers: detectMultiplexers(resolvesOnPath),
     insideMultiplexer: detectInsideMultiplexer(),
-    editors: detectEditors(resolvesOnPath),
+    editors: detectEditors(resolvesOnPath, adapters.checkPairBundle),
   };
 }
