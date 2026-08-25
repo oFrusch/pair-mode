@@ -1,11 +1,17 @@
 import { test, expect, describe } from "vitest";
 import { chooseLayout, MIN_SPLIT_WIDTH, noTokens, paint, paintUnified } from "../src/tui/paint";
 import { resolveClick } from "../src/tui/model";
+import { createTokenProvider } from "../src/tui/syntax";
+import type { ShikiHighlighter } from "../src/tui/syntax";
 import type { DiffModel } from "../src/tui/model";
 import type { PaintOptions } from "../src/tui/paint";
 
 const ADD_BAR_FG = "\x1b[38;2;63;185;80m";
 const DEL_BAR_FG = "\x1b[38;2;248;81;73m";
+const ADD_SPAN_BG = "\x1b[48;2;31;91;46m";
+const DEL_SPAN_BG = "\x1b[48;2;107;33;38m";
+const SYNTAX_FG = "\x1b[38;2;255;0;170m";
+const ANY_BACKGROUND = "48;2;";
 
 const NUMBER_WIDTH_FLOOR = 2;
 const GUTTER_SPACE_WIDTH = 1;
@@ -294,5 +300,74 @@ describe("status bar layout override reason", () => {
 
     expect(plain).toContain("whole file is new");
     expect(plain).not.toContain("j/k move");
+  });
+});
+
+function buildAllDeleteModel(): DiffModel {
+  return {
+    rows: [
+      { kind: "del", left: "gone one", right: "", leftNumber: 1, rightNumber: null },
+      { kind: "del", left: "gone two", right: "", leftNumber: 2, rightNumber: null },
+    ],
+    folds: [],
+    cursor: 0,
+  };
+}
+
+// The status bar fills itself with theme.chrome, so a background scan must skip it.
+function bodyLines(lines: string[]): string[] {
+  return lines.slice(2, lines.length - 1);
+}
+
+function fakeHighlighter(color: string): ShikiHighlighter {
+  return {
+    codeToTokensBase(code) {
+      return code === "" ? [[]] : [[{ content: code, offset: 0, color }]];
+    },
+  };
+}
+
+describe("paintUnified — a whole new file drops the change background", () => {
+  test("a model with no removals paints no background escape in the body", () => {
+    const { lines } = paintUnified(baseOptions({ model: buildNewFileModel(), rowBand: true }));
+
+    bodyLines(lines).forEach((line) => expect(line).not.toContain(ANY_BACKGROUND));
+  });
+
+  test("a model with no removals still paints the add sign bar", () => {
+    const { lines } = paintUnified(baseOptions({ model: buildNewFileModel(), rowBand: true }));
+
+    expect(bodyLines(lines).join("")).toContain(ADD_BAR_FG);
+  });
+
+  test("a model with no removals keeps its syntax foreground colours", async () => {
+    const tokens = await createTokenProvider(
+      { path: "src/example.ts", enabled: true, truecolor: true },
+      async () => fakeHighlighter("#ff00aa"),
+    );
+
+    const { lines } = paintUnified(
+      baseOptions({ model: buildNewFileModel(), rowBand: true, tokens }),
+    );
+
+    const body = bodyLines(lines).join("");
+
+    expect(body).toContain(SYNTAX_FG);
+    expect(body).not.toContain(ANY_BACKGROUND);
+  });
+
+  test("a mixed diff still paints the add and del backgrounds", () => {
+    const { lines } = paintUnified(baseOptions({ rowBand: true }));
+
+    const body = bodyLines(lines).join("");
+
+    expect(body).toContain(ADD_SPAN_BG);
+    expect(body).toContain(DEL_SPAN_BG);
+  });
+
+  test("an all-delete model keeps its del band", () => {
+    const { lines } = paintUnified(baseOptions({ model: buildAllDeleteModel(), rowBand: true }));
+
+    expect(bodyLines(lines).join("")).toContain(DEL_SPAN_BG);
   });
 });

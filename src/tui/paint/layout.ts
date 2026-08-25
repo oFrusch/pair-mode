@@ -14,7 +14,7 @@ import type { Note } from "../notes/notes.types";
 import { selectionSpanFor } from "../selection";
 import type { Selection } from "../selection/selection.types";
 import type { Mode } from "../tui.types";
-import { changedSpans, layoutStatusMessage } from "./paint";
+import { changedSpans, hasRemovals, layoutStatusMessage } from "./paint";
 import { bg, DEFAULT_BG, DEFAULT_FG, fg, RESET, theme } from "./theme";
 import type {
   NotePosition,
@@ -227,6 +227,7 @@ function paintModelRow(
   numberWidth: number,
   tokens: TokenProvider,
   rowBand: boolean,
+  changeBackground: boolean,
   truecolor: boolean,
   selection: Selection | null,
   notes: Note[],
@@ -237,8 +238,10 @@ function paintModelRow(
   const bar = SIGN_BAR[row.kind];
   const spans = changedSpans(row.left, row.right);
 
-  const leftColor = row.kind === "del" || row.kind === "replace" ? theme.delSpan : null;
-  const rightColor = row.kind === "add" || row.kind === "replace" ? theme.addSpan : null;
+  const leftColor =
+    changeBackground && (row.kind === "del" || row.kind === "replace") ? theme.delSpan : null;
+  const rightColor =
+    changeBackground && (row.kind === "add" || row.kind === "replace") ? theme.addSpan : null;
 
   const leftPaneWidth = leftBounds.textEnd - leftBounds.textStart;
   const rightPaneWidth = rightBounds.textEnd - rightBounds.textStart;
@@ -620,6 +623,7 @@ export function paintSplit(options: PaintOptions): PaintResult {
   } = options;
 
   const numberWidth = computeNumberWidth(model);
+  const changeBackground = hasRemovals(model);
   const hasLeftMarkerColumn = hasPaneNotes(notes, "left");
   const hasRightMarkerColumn = hasPaneNotes(notes, "right");
   const leftMarkerWidth = hasLeftMarkerColumn ? MARKER_WIDTH : 0;
@@ -679,6 +683,7 @@ export function paintSplit(options: PaintOptions): PaintResult {
       numberWidth,
       tokens,
       rowBand,
+      changeBackground,
       truecolor,
       selection,
       notes,
@@ -768,6 +773,7 @@ function paintUnifiedBodyEntry(
   width: number,
   tokens: TokenProvider,
   rowBand: boolean,
+  changeBackground: boolean,
   truecolor: boolean,
   selection: Selection | null,
   notes: Note[],
@@ -785,6 +791,9 @@ function paintUnifiedBodyEntry(
   const spans = changedSpans(row.left, row.right);
   const screenRow: ScreenRow = { kind: "row", index: entry.index };
   const hasSelection = selection !== null && selection.pane === "right";
+
+  const addColor = changeBackground ? theme.addSpan : null;
+  const delColor = changeBackground ? theme.delSpan : null;
 
   if (row.kind === "context") {
     const selectionSpan = hasSelection
@@ -828,7 +837,7 @@ function paintUnifiedBodyEntry(
       row.right,
       tokens(row.right, row.rightNumber),
       spans.right,
-      theme.addSpan,
+      addColor,
       numberWidth,
       textWidth,
       rowBand,
@@ -856,7 +865,7 @@ function paintUnifiedBodyEntry(
       row.left,
       tokens(row.left, row.leftNumber),
       spans.left,
-      theme.delSpan,
+      delColor,
       numberWidth,
       textWidth,
       rowBand,
@@ -891,7 +900,7 @@ function paintUnifiedBodyEntry(
     row.left,
     tokens(row.left, row.leftNumber),
     spans.left,
-    theme.delSpan,
+    delColor,
     numberWidth,
     textWidth,
     rowBand,
@@ -908,7 +917,7 @@ function paintUnifiedBodyEntry(
     row.right,
     tokens(row.right, row.rightNumber),
     spans.right,
-    theme.addSpan,
+    addColor,
     numberWidth,
     textWidth,
     rowBand,
@@ -939,6 +948,7 @@ export function paintUnified(options: PaintOptions): PaintResult {
   } = options;
 
   const numberWidth = computeNumberWidth(model);
+  const changeBackground = hasRemovals(model);
   const hasMarkerColumn = notes.length > 0;
   const markerWidth = hasMarkerColumn ? MARKER_WIDTH : 0;
 
@@ -970,6 +980,7 @@ export function paintUnified(options: PaintOptions): PaintResult {
       width,
       tokens,
       rowBand,
+      changeBackground,
       truecolor,
       selection,
       notes,

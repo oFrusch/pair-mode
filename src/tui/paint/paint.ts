@@ -1,4 +1,5 @@
 import { diffWordsWithSpace } from "diff";
+import type { DiffModel } from "../model/model.types";
 import { paintSplit, paintUnified } from "./layout";
 import type {
   ChangedSpans,
@@ -16,6 +17,11 @@ const NEW_FILE_REASON = "whole file is new · unified";
 const NARROW_REASON = "narrow · unified";
 
 export const noTokens: TokenProvider = () => [];
+
+// A model with no removals is a whole new file, which changes both the layout and the change background.
+export function hasRemovals(model: DiffModel): boolean {
+  return model.rows.some((row) => row.kind === "del" || row.kind === "replace");
+}
 
 // Shared indent inflates the similarity fraction, so an otherwise-rewritten row keeps word-level spans.
 function indentWidth(line: string): number {
@@ -73,9 +79,8 @@ export function changedSpans(before: string, after: string): ChangedSpans {
 
 function decideLayout(options: PaintOptions): LayoutDecision {
   const preferred = options.layout;
-  const hasRemoval = options.model.rows.some((row) => row.kind === "del" || row.kind === "replace");
 
-  const forcedReason = !hasRemoval
+  const forcedReason = !hasRemovals(options.model)
     ? NEW_FILE_REASON
     : options.width < MIN_SPLIT_WIDTH
       ? NARROW_REASON
