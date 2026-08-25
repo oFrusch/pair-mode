@@ -176,6 +176,46 @@ describe("applyKey — hunk jumps match the imperative reference", () => {
   });
 });
 
+// zellij claims Ctrl s and Ctrl q, so the plain letters must work without a modifier.
+describe("applyKey — send and quit without a modifier", () => {
+  test("s sends", () => {
+    expect(applyKey(makeState(), key("s", false, "s"), 24).quit).toBe("send");
+  });
+
+  test("q with no notes quits clean", () => {
+    expect(applyKey(makeState(), key("q", false, "q"), 24).quit).toBe("clean");
+  });
+
+  test("q with a note asks to confirm rather than discarding it", () => {
+    const withNote = makeState({
+      notes: [
+        {
+          id: 1,
+          rowIndex: 0,
+          endRowIndex: 0,
+          pane: "right",
+          startColumn: 0,
+          endColumn: 1,
+          line: 1,
+          endLine: 1,
+          code: "line0",
+          text: "why?",
+        },
+      ],
+    });
+
+    const next = applyKey(withNote, key("q", false, "q"), 24);
+
+    expect(next.quit).toBe("none");
+    expect(next.mode).toBe("confirm");
+  });
+
+  test("the ctrl forms still work as aliases", () => {
+    expect(applyKey(makeState(), key("s", true), 24).quit).toBe("send");
+    expect(applyKey(makeState(), key("q", true), 24).quit).toBe("clean");
+  });
+});
+
 describe("applyKey — folds", () => {
   test("space on a fold row expands it, and visibleRows then grows", () => {
     const model = buildTwoRunModel();

@@ -296,6 +296,15 @@ export function applyKey(state: TuiState, key: KeyEvent, height: number): TuiSta
     return state;
   }
 
+  // zellij claims ctrl s and ctrl q, so the plain letters are the primary bindings and the ctrl forms are aliases.
+  if (key.name === "s") {
+    return { ...state, quit: "send" };
+  }
+
+  if (key.name === "q") {
+    return state.notes.length === 0 ? { ...state, quit: "clean" } : { ...state, mode: "confirm" };
+  }
+
   if (key.name === "v") {
     return startSelection(state);
   }
