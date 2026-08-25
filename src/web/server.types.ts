@@ -1,6 +1,8 @@
 import type { Question } from "../core/collect";
 import type { WebReview } from "./review.types";
 
+export type BodyResult = { kind: "ok"; body: string } | { kind: "too-large" } | { kind: "error" };
+
 export interface WebServerOptions {
   port: number;
   token?: string;

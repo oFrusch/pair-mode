@@ -54,19 +54,37 @@ export async function startWebWatch(
 
   const readLines = createLineReader();
 
+  // Rendering awaits shiki, so a cancel can land mid-render and the finished review must not be offered.
+  let ownedId: string | null = null;
+
   client.on("data", (chunk: string) => {
     readLines(chunk).forEach((line) => {
       const message = decodeLine(line);
 
       if (message?.type === "review") {
+        const id = message.id;
+        ownedId = id;
+
         // A render that throws would otherwise become an unhandled rejection and kill the watcher.
         void toWebReview(message, config)
-          .then((review) => web.offer(review))
-          .catch(() => client.write(encode({ type: "verdict", id: message.id, questions: [] })));
+          .then((review) => {
+            if (ownedId === id) {
+              web.offer(review);
+            }
+          })
+          .catch(() => {
+            if (ownedId === id) {
+              client.write(encode({ type: "verdict", id, questions: [] }));
+            }
+          });
         return;
       }
 
       if (message?.type === "cancel") {
+        if (ownedId === message.id) {
+          ownedId = null;
+        }
+
         web.withdraw(message.id);
       }
     });

@@ -6,7 +6,7 @@ import { renderPage } from "./page";
 import { webNotesToQuestions } from "./notes";
 import type { WebNote } from "./notes.types";
 import type { WebReview } from "./review.types";
-import type { WebServer, WebServerOptions } from "./server.types";
+import type { BodyResult, WebServer, WebServerOptions } from "./server.types";
 
 const HOST = "127.0.0.1";
 const TOKEN_BYTES = 16;
@@ -59,27 +59,41 @@ function isWebNote(value: unknown): value is WebNote {
   );
 }
 
-function readBody(request: IncomingMessage): Promise<string | null> {
+// The cap is named in bytes, so the chunks stay buffers until the whole body is known to fit.
+function readBody(request: IncomingMessage): Promise<BodyResult> {
   return new Promise((resolve) => {
-    const chunks: string[] = [];
+    let chunks: Buffer[] = [];
     let size = 0;
+    let done = false;
 
-    request.setEncoding("utf-8");
+    function settle(result: BodyResult): void {
+      if (done) {
+        return;
+      }
 
-    request.on("data", (chunk: string) => {
-      size += chunk.length;
+      done = true;
+      chunks = [];
+      resolve(result);
+    }
+
+    // The rest of an oversized upload is drained and dropped, because a paused socket would never close.
+    request.on("data", (chunk: Buffer) => {
+      if (done) {
+        return;
+      }
+
+      size += chunk.byteLength;
 
       if (size > MAX_BODY_BYTES) {
-        resolve(null);
-        request.destroy();
+        settle({ kind: "too-large" });
         return;
       }
 
       chunks.push(chunk);
     });
 
-    request.on("end", () => resolve(chunks.join("")));
-    request.on("error", () => resolve(null));
+    request.on("end", () => settle({ kind: "ok", body: Buffer.concat(chunks).toString("utf-8") }));
+    request.on("error", () => settle({ kind: "error" }));
   });
 }
 
@@ -137,15 +151,26 @@ export function startWebServer(options: WebServerOptions): Promise<WebServer> {
     }
   }
 
-  async function handleVerdict(request: IncomingMessage, response: ServerResponse): Promise<void> {
-    const body = await readBody(request);
+  function broadcastCancel(id: string): void {
+    const data = JSON.stringify({ id });
+    viewers.forEach((viewer) => sendEvent(viewer, "cancel", data));
+  }
 
-    if (body === null) {
+  async function handleVerdict(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    const result = await readBody(request);
+
+    // Destroying the request instead would hand the client a broken pipe in place of the status.
+    if (result.kind === "too-large") {
       response.writeHead(PAYLOAD_TOO_LARGE).end();
       return;
     }
 
-    const verdict = parseVerdict(body);
+    if (result.kind === "error") {
+      response.writeHead(BAD_REQUEST).end();
+      return;
+    }
+
+    const verdict = parseVerdict(result.body);
 
     if (verdict === null) {
       response.writeHead(BAD_REQUEST).end();
@@ -161,6 +186,9 @@ export function startWebServer(options: WebServerOptions): Promise<WebServer> {
     }
 
     current = null;
+
+    // A second tab still shows this review, so it learns the answer landed before its own notes are lost.
+    broadcastCancel(verdict.id);
     options.onVerdict(verdict.id, webNotesToQuestions(answered, verdict.notes));
     response.writeHead(OK, { "content-type": "application/json" }).end("{}");
   }
@@ -212,9 +240,13 @@ export function startWebServer(options: WebServerOptions): Promise<WebServer> {
           viewers.forEach((viewer) => sendEvent(viewer, "review", data));
         },
 
+        // A withdrawal for an older review must leave the one now open alone.
         withdraw(id: string): void {
-          current = null;
-          viewers.forEach((viewer) => sendEvent(viewer, "cancel", JSON.stringify({ id })));
+          if (current?.id === id) {
+            current = null;
+          }
+
+          broadcastCancel(id);
         },
 
         close(): Promise<void> {
