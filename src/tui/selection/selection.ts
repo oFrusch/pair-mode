@@ -23,19 +23,21 @@ export function cursorRowIndex(model: DiffModel): number | null {
   return currentRowIndex(model);
 }
 
+function lastColumn(model: DiffModel, rowIndex: number, pane: "left" | "right"): number {
+  return Math.max(paneLineLength(model, rowIndex, pane) - 1, 0);
+}
+
 export function wholeRowSelection(
   model: DiffModel,
   rowIndex: number,
   pane: "left" | "right",
 ): Selection {
-  const length = paneLineLength(model, rowIndex, pane);
-
   return {
     pane,
     anchorRow: rowIndex,
     anchorColumn: 0,
     headRow: rowIndex,
-    headColumn: Math.max(length - 1, 0),
+    headColumn: lastColumn(model, rowIndex, pane),
   };
 }
 
@@ -59,7 +61,10 @@ export function moveSelectionHead(state: TuiState, delta: number): TuiState {
   const entry = visible[nextIndex];
   const headRow = entry !== undefined && entry.kind === "row" ? entry.index : selection.headRow;
 
-  return { ...state, selection: { ...selection, headRow } };
+  // The head column belongs to the row it lands on, so a shorter or longer row moves the end of the selection.
+  const headColumn = lastColumn(state.model, headRow, selection.pane);
+
+  return { ...state, selection: { ...selection, headRow, headColumn } };
 }
 
 export function startSelection(state: TuiState): TuiState {
@@ -69,13 +74,7 @@ export function startSelection(state: TuiState): TuiState {
     return state;
   }
 
-  const selection: Selection = {
-    pane: "right",
-    anchorRow: rowIndex,
-    anchorColumn: 0,
-    headRow: rowIndex,
-    headColumn: 0,
-  };
+  const selection = wholeRowSelection(state.model, rowIndex, "right");
 
   return { ...state, selection, mode: "select" };
 }

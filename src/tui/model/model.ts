@@ -115,7 +115,7 @@ export function buildModel(
   return { rows, folds, cursor: 0 };
 }
 
-export function visibleRows(model: DiffModel): VisibleRow[] {
+function computeVisibleRows(model: DiffModel): VisibleRow[] {
   const foldByStart = new Map(
     model.folds.map((foldGroup, foldIndex) => [foldGroup.start, foldIndex]),
   );
@@ -138,6 +138,25 @@ export function visibleRows(model: DiffModel): VisibleRow[] {
 
     return hidden.has(index) ? [] : [{ kind: "row", index }];
   });
+}
+
+// A cursor move clones the model every keypress, so the cache keys on the two arrays the result really depends on.
+const visibleRowsCache = new WeakMap<ModelRow[], WeakMap<FoldGroup[], VisibleRow[]>>();
+
+export function visibleRows(model: DiffModel): VisibleRow[] {
+  const byFolds = visibleRowsCache.get(model.rows) ?? new WeakMap<FoldGroup[], VisibleRow[]>();
+  const cached = byFolds.get(model.folds);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const computed = computeVisibleRows(model);
+
+  byFolds.set(model.folds, computed);
+  visibleRowsCache.set(model.rows, byFolds);
+
+  return computed;
 }
 
 export function toggleFold(model: DiffModel, foldIndex: number): DiffModel {

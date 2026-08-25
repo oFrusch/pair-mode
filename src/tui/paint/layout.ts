@@ -14,13 +14,16 @@ import type { Note } from "../notes/notes.types";
 import { selectionSpanFor } from "../selection";
 import type { Selection } from "../selection/selection.types";
 import type { Mode } from "../tui.types";
-import { changedSpans, hasRemovals, layoutStatusMessage } from "./paint";
+import { changedSpans, hasRemovals, layoutStatusMessage, MIN_SPLIT_WIDTH } from "./paint";
 import { bg, DEFAULT_BG, DEFAULT_FG, fg, RESET, theme } from "./theme";
 import type {
+  BodyFill,
+  ChangeCounts,
+  ChangedSpans,
   NotePosition,
   PaintOptions,
   PaintResult,
-  PaneTextScan,
+  ScrollGeometry,
   SignBarStyle,
   Span,
   SyntaxToken,
@@ -53,6 +56,12 @@ const NO_PANEL_HEIGHT = 0;
 const ANCHORED_CONNECTOR = "╰─";
 const ANCHORED_FOCUSED_CONNECTOR = "╰▸";
 const ANCHORED_CONNECTOR_GAP = " ";
+const UNIFIED_REPLACE_LINES = 2;
+const SINGLE_LINE = 1;
+const MIN_PAGE_ROWS = 1;
+
+// A context row never paints a change span, so the word diff behind one is thrown away unread.
+const NO_SPANS: ChangedSpans = { left: [], right: [] };
 
 const SIGN_BAR: Record<RowKind, SignBarStyle> = {
   context: { leftChar: " ", leftColor: null, rightChar: " ", rightColor: null },
@@ -86,6 +95,122 @@ export function bodyHeight(
     height - HEADER_ROWS - STATUS_ROWS - panelHeight(noteCount, mode, notePosition),
     MIN_BODY_HEIGHT,
   );
+}
+
+// A narrow terminal forces unified regardless of the preference, and unified is where a replace row costs two lines.
+function isUnified(geometry: ScrollGeometry): boolean {
+  return (
+    geometry.layout === "unified" ||
+    geometry.width < MIN_SPLIT_WIDTH ||
+    !hasRemovals(geometry.model)
+  );
+}
+
+function anchoredExtraLines(geometry: ScrollGeometry, rowIndex: number): number {
+  if (geometry.notePosition !== "anchored") {
+    return 0;
+  }
+
+  const noteLines = geometry.notes.filter((note) => note.endRowIndex === rowIndex).length;
+  const draftLines =
+    geometry.mode === "note" && draftAnchorRowFor(geometry.selection) === rowIndex ? 1 : 0;
+
+  return noteLines + draftLines;
+}
+
+function entryLineCount(geometry: ScrollGeometry, entry: VisibleRow): number {
+  if (entry.kind === "fold") {
+    return SINGLE_LINE;
+  }
+
+  const row = lookupRow(geometry.model, entry.index);
+  const base = isUnified(geometry) && row.kind === "replace" ? UNIFIED_REPLACE_LINES : SINGLE_LINE;
+
+  return base + anchoredExtraLines(geometry, entry.index);
+}
+
+function geometryBodyRows(geometry: ScrollGeometry): number {
+  return bodyHeight(geometry.height, geometry.notes.length, geometry.mode, geometry.notePosition);
+}
+
+// The body fills with screen lines, so the count of visible rows it holds depends on which rows those are.
+function rowsThatFit(geometry: ScrollGeometry, scrollTop: number): number {
+  const visible = visibleRows(geometry.model);
+  const bodyRows = geometryBodyRows(geometry);
+
+  let used = 0;
+  let count = 0;
+
+  for (let index = scrollTop; index < visible.length; index += 1) {
+    const cost = entryLineCount(geometry, visible[index]!);
+
+    if (count > 0 && used + cost > bodyRows) {
+      break;
+    }
+
+    used += cost;
+    count += 1;
+
+    if (used >= bodyRows) {
+      break;
+    }
+  }
+
+  return count;
+}
+
+export function lastFittingRow(geometry: ScrollGeometry, scrollTop: number): number {
+  return scrollTop + Math.max(rowsThatFit(geometry, scrollTop), SINGLE_LINE) - 1;
+}
+
+// The highest top that still paints the given row whole.
+function scrollTopForRow(geometry: ScrollGeometry, row: number): number {
+  const visible = visibleRows(geometry.model);
+  const entry = visible[row];
+
+  if (entry === undefined) {
+    return 0;
+  }
+
+  const bodyRows = geometryBodyRows(geometry);
+
+  let used = entryLineCount(geometry, entry);
+  let top = row;
+
+  for (let index = row - 1; index >= 0; index -= 1) {
+    const cost = entryLineCount(geometry, visible[index]!);
+
+    if (used + cost > bodyRows) {
+      break;
+    }
+
+    used += cost;
+    top = index;
+  }
+
+  return top;
+}
+
+export function followScrollTop(geometry: ScrollGeometry, scrollTop: number): number {
+  const cursor = geometry.model.cursor;
+
+  if (cursor < scrollTop) {
+    return cursor;
+  }
+
+  return cursor <= lastFittingRow(geometry, scrollTop)
+    ? scrollTop
+    : scrollTopForRow(geometry, cursor);
+}
+
+export function maxScrollTop(geometry: ScrollGeometry): number {
+  const visible = visibleRows(geometry.model);
+
+  return visible.length === 0 ? 0 : scrollTopForRow(geometry, visible.length - 1);
+}
+
+export function pageRowStep(geometry: ScrollGeometry, scrollTop: number): number {
+  return Math.max(lastFittingRow(geometry, scrollTop) - scrollTop, MIN_PAGE_ROWS);
 }
 
 function hasPaneNotes(notes: Note[], pane: "left" | "right"): boolean {
@@ -130,14 +255,51 @@ function paintMarkerColumn(hasColumn: boolean, annotated: boolean, truecolor: bo
   return annotated ? fg(theme.note, truecolor) + NOTE_MARKER + DEFAULT_FG : " ";
 }
 
+// Spreading every line number into Math.max overflows the argument limit on a large diff, so this folds instead.
+function widestNumber(rows: ModelRow[]): number {
+  return rows.reduce(
+    (widest, row) => Math.max(widest, row.leftNumber ?? 0, row.rightNumber ?? 0),
+    0,
+  );
+}
+
+// Row scans run once per model rather than once per frame, and a new rows array is a new model.
+const numberWidthCache = new WeakMap<ModelRow[], number>();
+
 function computeNumberWidth(model: DiffModel): number {
-  const numbers = model.rows
-    .flatMap((row) => [row.leftNumber, row.rightNumber])
-    .filter((value): value is number => value !== null);
+  const cached = numberWidthCache.get(model.rows);
 
-  const maxNumber = numbers.length === 0 ? 0 : Math.max(...numbers);
+  if (cached !== undefined) {
+    return cached;
+  }
 
-  return Math.max(NUMBER_WIDTH_FLOOR, String(maxNumber).length);
+  const width = Math.max(NUMBER_WIDTH_FLOOR, String(widestNumber(model.rows)).length);
+
+  numberWidthCache.set(model.rows, width);
+
+  return width;
+}
+
+const changeCountCache = new WeakMap<ModelRow[], ChangeCounts>();
+
+function changeCounts(model: DiffModel): ChangeCounts {
+  const cached = changeCountCache.get(model.rows);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const counts = model.rows.reduce<ChangeCounts>(
+    (running, row) => ({
+      add: running.add + (row.kind === "add" || row.kind === "replace" ? 1 : 0),
+      del: running.del + (row.kind === "del" || row.kind === "replace" ? 1 : 0),
+    }),
+    { add: 0, del: 0 },
+  );
+
+  changeCountCache.set(model.rows, counts);
+
+  return counts;
 }
 
 function lookupRow(model: DiffModel, index: number): ModelRow {
@@ -178,6 +340,26 @@ function paintSignBar(char: string, color: string | null, truecolor: boolean): s
   return color === null ? DEFAULT_FG + char : fg(color, truecolor) + char;
 }
 
+// Notes and a selection can overlap on one row, so the highlight list is merged before a cursor may walk it.
+function mergeSpans(spans: Span[]): Span[] {
+  if (spans.length < 2) {
+    return spans;
+  }
+
+  return [...spans]
+    .sort((left, right) => left.start - right.start)
+    .reduce<Span[]>((merged, span) => {
+      const last = merged[merged.length - 1];
+
+      if (last === undefined || span.start > last.end) {
+        return [...merged, span];
+      }
+
+      return [...merged.slice(0, -1), { start: last.start, end: Math.max(last.end, span.end) }];
+    }, []);
+}
+
+// One pass with three advancing cursors, because a per-column find over sorted spans is the hottest loop in a frame.
 function renderPaneText(
   text: string,
   tokens: SyntaxToken[],
@@ -189,54 +371,63 @@ function renderPaneText(
   highlightSpans: Span[],
 ): string {
   const textLength = Math.min(text.length, paneWidth);
-  const columns = Array.from({ length: paneWidth }, (_, column) => column);
+  const highlights = mergeSpans(highlightSpans);
 
-  const scan = columns.reduce<PaneTextScan>(
-    (state, column) => {
-      const char = column < textLength ? text.charAt(column) : " ";
-      const token =
-        column < textLength
-          ? tokens.find((candidate) => column >= candidate.start && column < candidate.end)
-          : undefined;
-      const desiredFg = token === undefined ? null : token.color;
+  const parts: string[] = [];
 
-      const withinSpan = changeSpansForSide.some(
-        (span) => column >= span.start && column < span.end,
-      );
-      const withinHighlight = highlightSpans.some(
-        (span) => column >= span.start && column < span.end,
-      );
-      const desiredBg = withinHighlight
-        ? theme.selection
-        : changeColor !== null && (rowBand || withinSpan)
-          ? changeColor
-          : null;
+  let currentFg: string | null | undefined = undefined;
+  let currentBg: string | null | undefined = undefined;
+  let tokenCursor = 0;
+  let spanCursor = 0;
+  let highlightCursor = 0;
 
-      // An escape goes out only where the wanted colour differs from the colour already in force.
-      const fgEscape =
-        desiredFg === state.currentFg
-          ? ""
-          : desiredFg === null
-            ? DEFAULT_FG
-            : fg(desiredFg, truecolor);
+  for (let column = 0; column < paneWidth; column += 1) {
+    while (tokenCursor < tokens.length && tokens[tokenCursor]!.end <= column) {
+      tokenCursor += 1;
+    }
 
-      const bgEscape =
-        desiredBg === state.currentBg
-          ? ""
-          : desiredBg === null
-            ? DEFAULT_BG
-            : bg(desiredBg, truecolor);
+    while (
+      spanCursor < changeSpansForSide.length &&
+      changeSpansForSide[spanCursor]!.end <= column
+    ) {
+      spanCursor += 1;
+    }
 
-      return {
-        output: state.output + fgEscape + bgEscape + char,
-        currentFg: desiredFg,
-        currentBg: desiredBg,
-      };
-    },
-    { output: "", currentFg: undefined, currentBg: undefined },
-  );
+    while (highlightCursor < highlights.length && highlights[highlightCursor]!.end <= column) {
+      highlightCursor += 1;
+    }
 
-  return scan.output;
+    const token = tokens[tokenCursor];
+    const span = changeSpansForSide[spanCursor];
+    const highlight = highlights[highlightCursor];
+
+    const char = column < textLength ? text.charAt(column) : " ";
+    const desiredFg =
+      column < textLength && token !== undefined && column >= token.start ? token.color : null;
+
+    const withinSpan = span !== undefined && column >= span.start;
+    const withinHighlight = highlight !== undefined && column >= highlight.start;
+    const desiredBg = withinHighlight
+      ? theme.selection
+      : changeColor !== null && (rowBand || withinSpan)
+        ? changeColor
+        : null;
+
+    // An escape goes out only where the wanted colour differs from the colour already in force.
+    if (desiredFg !== currentFg) {
+      parts.push(desiredFg === null ? DEFAULT_FG : fg(desiredFg, truecolor));
+      currentFg = desiredFg;
+    }
+
+    if (desiredBg !== currentBg) {
+      parts.push(desiredBg === null ? DEFAULT_BG : bg(desiredBg, truecolor));
+      currentBg = desiredBg;
+    }
+
+    parts.push(char);
+  }
+
+  return parts.join("");
 }
 
 function paintModelRow(
@@ -256,7 +447,7 @@ function paintModelRow(
   cursorRow: boolean,
 ): string {
   const bar = SIGN_BAR[row.kind];
-  const spans = changedSpans(row.left, row.right);
+  const spans = row.kind === "context" ? NO_SPANS : changedSpans(row.left, row.right);
 
   const leftColor =
     changeBackground && (row.kind === "del" || row.kind === "replace") ? theme.delSpan : null;
@@ -587,6 +778,30 @@ function buildPanel(options: PaintOptions, width: number, truecolor: boolean): U
   return { lines, screenRows: lines.map(() => chromeRow) };
 }
 
+// An entry that would overflow the body is left out whole, so its row never counts as painted.
+function takeBodyEntries(entries: UnifiedBodyEntry[], bodyRows: number): BodyFill {
+  const lines: string[] = [];
+  const screenRows: ScreenRow[] = [];
+
+  let count = 0;
+
+  for (const entry of entries) {
+    if (count > 0 && lines.length + entry.lines.length > bodyRows) {
+      break;
+    }
+
+    lines.push(...entry.lines);
+    screenRows.push(...entry.screenRows);
+    count += 1;
+
+    if (lines.length >= bodyRows) {
+      break;
+    }
+  }
+
+  return { lines: lines.slice(0, bodyRows), screenRows: screenRows.slice(0, bodyRows), count };
+}
+
 function assembleScreen(
   header: string,
   rule: string,
@@ -600,6 +815,7 @@ function assembleScreen(
   height: number,
   truecolor: boolean,
   panes: PaneBounds[],
+  lastRow: number,
 ): PaintResult {
   const padCount = Math.max(0, bodyRows - bodyLines.length);
   const padLines = Array.from({ length: padCount }, () => paintBlankLine(width));
@@ -630,7 +846,7 @@ function assembleScreen(
 
   const map: ScreenMap = { rows, panes };
 
-  return { lines, map };
+  return { lines, map, lastRow };
 }
 
 export function paintSplit(options: PaintOptions): PaintResult {
@@ -685,8 +901,7 @@ export function paintSplit(options: PaintOptions): PaintResult {
     textEnd: rightTextEnd,
   };
 
-  const addCount = model.rows.filter((row) => row.kind === "add" || row.kind === "replace").length;
-  const delCount = model.rows.filter((row) => row.kind === "del" || row.kind === "replace").length;
+  const counts = changeCounts(model);
 
   const bodyRows = bodyHeight(height, notes.length, mode, notePosition);
   const visible = visibleRows(model).slice(scrollTop, scrollTop + bodyRows);
@@ -727,16 +942,15 @@ export function paintSplit(options: PaintOptions): PaintResult {
     return { lines: [line, ...extras.lines], screenRows: [screenRow, ...extras.screenRows] };
   });
 
-  const bodyLines = bodyEntries.flatMap((entry) => entry.lines).slice(0, bodyRows);
-  const bodyScreenRows = bodyEntries.flatMap((entry) => entry.screenRows).slice(0, bodyRows);
+  const fill = takeBodyEntries(bodyEntries, bodyRows);
 
   const panel = buildPanel(options, width, truecolor);
 
   return assembleScreen(
-    paintHeader(path, addCount, delCount, width, truecolor),
+    paintHeader(path, counts.add, counts.del, width, truecolor),
     paintRule(width, truecolor),
-    bodyLines,
-    bodyScreenRows,
+    fill.lines,
+    fill.screenRows,
     bodyRows,
     panel.lines,
     panel.screenRows,
@@ -745,6 +959,7 @@ export function paintSplit(options: PaintOptions): PaintResult {
     height,
     truecolor,
     [leftBounds, rightBounds],
+    scrollTop + Math.max(fill.count, 1) - 1,
   );
 }
 
@@ -815,7 +1030,7 @@ function paintUnifiedBodyEntry(
   }
 
   const row = lookupRow(model, entry.index);
-  const spans = changedSpans(row.left, row.right);
+  const spans = row.kind === "context" ? NO_SPANS : changedSpans(row.left, row.right);
   const screenRow: ScreenRow = { kind: "row", index: entry.index };
   const hasSelection = selection !== null && selection.pane === "right";
 
@@ -989,8 +1204,7 @@ export function paintUnified(options: PaintOptions): PaintResult {
 
   const rightBounds: PaneBounds = { pane: "right", gutterStart: 0, textStart, textEnd };
 
-  const addCount = model.rows.filter((row) => row.kind === "add" || row.kind === "replace").length;
-  const delCount = model.rows.filter((row) => row.kind === "del" || row.kind === "replace").length;
+  const counts = changeCounts(model);
 
   const bodyRows = bodyHeight(height, notes.length, mode, notePosition);
   const visible = visibleRows(model).slice(scrollTop, scrollTop + bodyRows);
@@ -1027,20 +1241,16 @@ export function paintUnified(options: PaintOptions): PaintResult {
     };
   });
 
-  const rawBodyLines = entries.flatMap((entry) => entry.lines);
-  const rawBodyScreenRows = entries.flatMap((entry) => entry.screenRows);
-
-  const bodyLines = rawBodyLines.slice(0, bodyRows);
-  const bodyScreenRows = rawBodyScreenRows.slice(0, bodyRows);
+  const fill = takeBodyEntries(entries, bodyRows);
 
   const statusMessage = layoutStatusMessage(options);
   const panel = buildPanel(options, width, truecolor);
 
   return assembleScreen(
-    paintHeader(path, addCount, delCount, width, truecolor),
+    paintHeader(path, counts.add, counts.del, width, truecolor),
     paintRule(width, truecolor),
-    bodyLines,
-    bodyScreenRows,
+    fill.lines,
+    fill.screenRows,
     bodyRows,
     panel.lines,
     panel.screenRows,
@@ -1049,5 +1259,6 @@ export function paintUnified(options: PaintOptions): PaintResult {
     height,
     truecolor,
     [rightBounds],
+    scrollTop + Math.max(fill.count, 1) - 1,
   );
 }

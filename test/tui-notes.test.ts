@@ -189,7 +189,7 @@ describe("applyKey — a and note drafting", () => {
   test("a with a selection enters note mode", () => {
     const state = makeState({ selection: selection() });
 
-    const next = applyKey(state, key("a"), 24);
+    const next = applyKey(state, key("a"), 24, 120);
 
     expect(next.mode).toBe("note");
     expect(next.draft).toBe("");
@@ -198,29 +198,34 @@ describe("applyKey — a and note drafting", () => {
   test("a with no selection selects the cursor row and enters note mode", () => {
     const state = makeState({ model: { ...buildNotesModel(), cursor: 0 } });
 
-    const next = applyKey(state, key("a"), 24);
+    const next = applyKey(state, key("a"), 24, 120);
 
     expect(next.mode).toBe("note");
     expect(next.selection).not.toBeNull();
   });
 
   test("typing appends to the draft, and backspace removes", () => {
-    const noted = applyKey(makeState({ selection: selection() }), key("a"), 24);
+    const noted = applyKey(makeState({ selection: selection() }), key("a"), 24, 120);
 
-    const typed = applyKey(applyKey(noted, key("h", false, "h"), 24), key("i", false, "i"), 24);
+    const typed = applyKey(
+      applyKey(noted, key("h", false, "h"), 24, 120),
+      key("i", false, "i"),
+      24,
+      120,
+    );
     expect(typed.draft).toBe("hi");
 
-    const backspaced = applyKey(typed, key("backspace"), 24);
+    const backspaced = applyKey(typed, key("backspace"), 24, 120);
     expect(backspaced.draft).toBe("h");
   });
 
   test("enter commits a note and clears the draft and the selection", () => {
     const typed = {
-      ...applyKey(makeState({ selection: selection() }), key("a"), 24),
+      ...applyKey(makeState({ selection: selection() }), key("a"), 24, 120),
       draft: "why",
     };
 
-    const next = applyKey(typed, key("enter"), 24);
+    const next = applyKey(typed, key("enter"), 24, 120);
 
     expect(next.notes).toHaveLength(1);
     expect(next.draft).toBe("");
@@ -229,20 +234,20 @@ describe("applyKey — a and note drafting", () => {
   });
 
   test("enter on an empty draft commits nothing", () => {
-    const noted = applyKey(makeState({ selection: selection() }), key("a"), 24);
+    const noted = applyKey(makeState({ selection: selection() }), key("a"), 24, 120);
 
-    const next = applyKey(noted, key("enter"), 24);
+    const next = applyKey(noted, key("enter"), 24, 120);
 
     expect(next.notes).toHaveLength(0);
   });
 
   test("escape in note discards", () => {
     const typed = {
-      ...applyKey(makeState({ selection: selection() }), key("a"), 24),
+      ...applyKey(makeState({ selection: selection() }), key("a"), 24, 120),
       draft: "why",
     };
 
-    const next = applyKey(typed, key("escape"), 24);
+    const next = applyKey(typed, key("escape"), 24, 120);
 
     expect(next.mode).toBe("browse");
     expect(next.draft).toBe("");
@@ -253,7 +258,7 @@ describe("applyKey — a and note drafting", () => {
     const state = makeState({ selection: selection() });
     const clone = structuredClone(state);
 
-    applyKey(state, key("a"), 24);
+    applyKey(state, key("a"), 24, 120);
 
     expect(state).toEqual(clone);
   });
@@ -271,23 +276,23 @@ describe("applyKey — tab and d", () => {
   test("tab cycles focus by id and wraps", () => {
     const state = makeState({ notes: threeNotes() });
 
-    const first = applyKey(state, key("tab"), 24);
+    const first = applyKey(state, key("tab"), 24, 120);
     expect(first.focusedNote).toBe(1);
 
-    const second = applyKey(first, key("tab"), 24);
+    const second = applyKey(first, key("tab"), 24, 120);
     expect(second.focusedNote).toBe(2);
 
-    const third = applyKey(second, key("tab"), 24);
+    const third = applyKey(second, key("tab"), 24, 120);
     expect(third.focusedNote).toBe(3);
 
-    const wrapped = applyKey(third, key("tab"), 24);
+    const wrapped = applyKey(third, key("tab"), 24, 120);
     expect(wrapped.focusedNote).toBe(1);
   });
 
   test("d deletes the focused note and moves focus", () => {
     const state = makeState({ notes: threeNotes(), focusedNote: 1 });
 
-    const next = applyKey(state, key("d", false, "d"), 24);
+    const next = applyKey(state, key("d", false, "d"), 24, 120);
 
     expect(next.notes.map((note) => note.id)).toEqual([2, 3]);
     expect(next.focusedNote).toBe(2);
@@ -296,7 +301,7 @@ describe("applyKey — tab and d", () => {
   test("d on the last remaining note sets focus to null", () => {
     const state = makeState({ notes: [makeNote({ id: 1 })], focusedNote: 1 });
 
-    const next = applyKey(state, key("d", false, "d"), 24);
+    const next = applyKey(state, key("d", false, "d"), 24, 120);
 
     expect(next.notes).toHaveLength(0);
     expect(next.focusedNote).toBeNull();
@@ -316,7 +321,7 @@ describe("applyKey — quit and confirm", () => {
   test("ctrl q with zero notes quits clean", () => {
     const state = makeState();
 
-    const next = applyKey(state, key("q", true), 24);
+    const next = applyKey(state, key("q", true), 24, 120);
 
     expect(next.quit).toBe("clean");
   });
@@ -324,7 +329,7 @@ describe("applyKey — quit and confirm", () => {
   test("ctrl q with notes enters confirm", () => {
     const state = makeState({ notes: threeNotes() });
 
-    const next = applyKey(state, key("q", true), 24);
+    const next = applyKey(state, key("q", true), 24, 120);
 
     expect(next.mode).toBe("confirm");
     expect(next.quit).toBe("none");
@@ -333,7 +338,7 @@ describe("applyKey — quit and confirm", () => {
   test("s in confirm sends", () => {
     const state = makeState({ notes: threeNotes(), mode: "confirm" });
 
-    const next = applyKey(state, key("s", false, "s"), 24);
+    const next = applyKey(state, key("s", false, "s"), 24, 120);
 
     expect(next.quit).toBe("send");
   });
@@ -341,7 +346,7 @@ describe("applyKey — quit and confirm", () => {
   test("d in confirm discards", () => {
     const state = makeState({ notes: threeNotes(), mode: "confirm" });
 
-    const next = applyKey(state, key("d", false, "d"), 24);
+    const next = applyKey(state, key("d", false, "d"), 24, 120);
 
     expect(next.quit).toBe("clean");
   });
@@ -349,7 +354,7 @@ describe("applyKey — quit and confirm", () => {
   test("escape in confirm returns to browse", () => {
     const state = makeState({ notes: threeNotes(), mode: "confirm" });
 
-    const next = applyKey(state, key("escape"), 24);
+    const next = applyKey(state, key("escape"), 24, 120);
 
     expect(next.mode).toBe("browse");
     expect(next.quit).toBe("none");

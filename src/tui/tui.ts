@@ -6,6 +6,8 @@ import { buildModel, moveCursor, toggleFold, visibleRows } from "./model";
 import type { DiffModel, VisibleRow } from "./model";
 import { noteFromSelection, sortNotes, toQuestions, writeResult } from "./notes";
 import { bodyHeight, paint } from "./paint";
+import { followScrollTop, maxScrollTop, pageRowStep } from "./paint/layout";
+import type { ScrollGeometry } from "./paint/paint.types";
 import {
   applyMouse,
   cursorRowIndex,
@@ -15,37 +17,31 @@ import {
 } from "./selection";
 import type { TuiIo, TuiOptions, TuiResult, TuiState } from "./tui.types";
 
-const OVERLAP_ROWS = 1;
-const MIN_PAGE = 1;
 const NOTE_PANE = "right";
 
 export { bodyHeight };
 
-function pageSize(state: TuiState, height: number): number {
-  return Math.max(
-    bodyHeight(height, state.notes.length, state.mode, state.notePosition) - OVERLAP_ROWS,
-    MIN_PAGE,
-  );
-}
-
-function followScroll(
+// Scroll and cursor arithmetic counts screen lines, so it needs the width that decides the layout too.
+function geometryFor(
   state: TuiState,
   model: DiffModel,
-  scrollTop: number,
   height: number,
-): number {
-  const bodyRows = bodyHeight(height, state.notes.length, state.mode, state.notePosition);
-  const lastBodyRow = scrollTop + bodyRows - 1;
+  width: number,
+): ScrollGeometry {
+  return {
+    model,
+    layout: state.layout,
+    width,
+    height,
+    notes: state.notes,
+    mode: state.mode,
+    notePosition: state.notePosition,
+    selection: state.selection,
+  };
+}
 
-  if (model.cursor < scrollTop) {
-    return model.cursor;
-  }
-
-  if (model.cursor > lastBodyRow) {
-    return model.cursor - bodyRows + 1;
-  }
-
-  return scrollTop;
+function pageSize(state: TuiState, height: number, width: number): number {
+  return pageRowStep(geometryFor(state, state.model, height, width), state.scrollTop);
 }
 
 function visibleIndexForRow(model: DiffModel, rowIndex: number): number {
@@ -110,23 +106,24 @@ function wheelStep(button: number): number {
   return button === WHEEL_DOWN_BUTTON ? WHEEL_ROWS : 0;
 }
 
-// The wheel moves the viewport alone. followScroll pulls it back to the cursor on the next key.
-function applyScroll(state: TuiState, event: MouseEvent, height: number): TuiState {
+// The wheel moves the viewport alone. followScrollTop pulls it back to the cursor on the next key.
+function applyScroll(state: TuiState, event: MouseEvent, height: number, width: number): TuiState {
   const step = wheelStep(event.button);
 
   if (step === 0) {
     return state;
   }
 
-  const bodyRows = bodyHeight(height, state.notes.length, state.mode, state.notePosition);
-  const maxScroll = Math.max(0, visibleRows(state.model).length - bodyRows);
+  const maxScroll = maxScrollTop(geometryFor(state, state.model, height, width));
   const scrollTop = Math.min(maxScroll, Math.max(0, state.scrollTop + step));
 
   return scrollTop === state.scrollTop ? state : { ...state, scrollTop };
 }
 
-function withScroll(state: TuiState, model: DiffModel, height: number): TuiState {
-  return { ...state, model, scrollTop: followScroll(state, model, state.scrollTop, height) };
+function withScroll(state: TuiState, model: DiffModel, height: number, width: number): TuiState {
+  const scrollTop = followScrollTop(geometryFor(state, model, height, width), state.scrollTop);
+
+  return { ...state, model, scrollTop };
 }
 
 function commitDraft(state: TuiState): TuiState {
@@ -255,7 +252,7 @@ function applyNoteKey(state: TuiState, key: KeyEvent): TuiState {
   return state;
 }
 
-export function applyKey(state: TuiState, key: KeyEvent, height: number): TuiState {
+export function applyKey(state: TuiState, key: KeyEvent, height: number, width: number): TuiState {
   if (state.mode === "confirm") {
     return applyConfirmKey(state, key);
   }
@@ -282,11 +279,21 @@ export function applyKey(state: TuiState, key: KeyEvent, height: number): TuiSta
 
   if (key.ctrl) {
     if (key.name === "d") {
-      return withScroll(state, moveCursor(state.model, pageSize(state, height)), height);
+      return withScroll(
+        state,
+        moveCursor(state.model, pageSize(state, height, width)),
+        height,
+        width,
+      );
     }
 
     if (key.name === "u") {
-      return withScroll(state, moveCursor(state.model, -pageSize(state, height)), height);
+      return withScroll(
+        state,
+        moveCursor(state.model, -pageSize(state, height, width)),
+        height,
+        width,
+      );
     }
 
     if (key.name === "s") {
@@ -340,23 +347,23 @@ export function applyKey(state: TuiState, key: KeyEvent, height: number): TuiSta
   }
 
   if (key.name === "j" || key.name === "down") {
-    return withScroll(state, moveCursor(state.model, 1), height);
+    return withScroll(state, moveCursor(state.model, 1), height, width);
   }
 
   if (key.name === "k" || key.name === "up") {
-    return withScroll(state, moveCursor(state.model, -1), height);
+    return withScroll(state, moveCursor(state.model, -1), height, width);
   }
 
   if (key.name === "n") {
-    return withScroll(state, jumpToRun(state.model, 1), height);
+    return withScroll(state, jumpToRun(state.model, 1), height, width);
   }
 
   if (key.name === "N") {
-    return withScroll(state, jumpToRun(state.model, -1), height);
+    return withScroll(state, jumpToRun(state.model, -1), height, width);
   }
 
   if (key.name === " ") {
-    return withScroll(state, toggleFoldAtCursor(state.model), height);
+    return withScroll(state, toggleFoldAtCursor(state.model), height, width);
   }
 
   if (key.name === "u") {
@@ -527,7 +534,7 @@ export function runTui(options: TuiOptions, io: TuiIo, abort?: AbortSignal): Pro
         state = mouse.reduce(
           (current, event) =>
             event.kind === "scroll" && !event.shift
-              ? applyScroll(current, event, io.size().height)
+              ? applyScroll(current, event, io.size().height, io.size().width)
               : applyMouse(current, event),
           state,
         );
@@ -535,7 +542,7 @@ export function runTui(options: TuiOptions, io: TuiIo, abort?: AbortSignal): Pro
         const events = parseKeys(keys);
 
         state = events.reduce(
-          (current, event) => applyKey(current, event, io.size().height),
+          (current, event) => applyKey(current, event, io.size().height, io.size().width),
           state,
         );
 
