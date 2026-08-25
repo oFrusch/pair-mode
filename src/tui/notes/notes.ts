@@ -2,31 +2,29 @@ import { writeFileSync } from "node:fs";
 import type { Question } from "../../core/collect";
 import type { DiffModel } from "../model";
 import type { Selection } from "../selection/selection.types";
-import type { FirstRow, Note } from "./notes.types";
+import type { Note, NoteRange } from "./notes.types";
 
-function firstRowOf(selection: Selection): FirstRow {
+function rangeOf(selection: Selection): NoteRange {
   const reversed =
     selection.anchorRow > selection.headRow ||
     (selection.anchorRow === selection.headRow && selection.anchorColumn > selection.headColumn);
 
-  const singleRow = selection.anchorRow === selection.headRow;
-
   if (!reversed) {
     return {
-      row: selection.anchorRow,
+      startRow: selection.anchorRow,
+      endRow: selection.headRow,
       pane: selection.pane,
       startColumn: selection.anchorColumn,
-      headColumn: selection.headColumn,
-      singleRow,
+      endColumn: selection.headColumn + 1,
     };
   }
 
   return {
-    row: selection.headRow,
+    startRow: selection.headRow,
+    endRow: selection.anchorRow,
     pane: selection.pane,
     startColumn: selection.headColumn,
-    headColumn: selection.anchorColumn,
-    singleRow,
+    endColumn: selection.anchorColumn + 1,
   };
 }
 
@@ -42,35 +40,43 @@ export function noteFromSelection(
     return null;
   }
 
-  const first = firstRowOf(selection);
-  const row = model.rows[first.row];
+  const range = rangeOf(selection);
+  const startRow = model.rows[range.startRow];
+  const endRow = model.rows[range.endRow];
 
-  if (row === undefined) {
+  if (startRow === undefined || endRow === undefined) {
     return null;
   }
 
-  const line = first.pane === "right" ? row.rightNumber : row.leftNumber;
-  const code = first.pane === "right" ? row.right : row.left;
-  const endColumn = first.singleRow ? first.headColumn + 1 : code.length;
+  const line = range.pane === "right" ? startRow.rightNumber : startRow.leftNumber;
+  const endLine = range.pane === "right" ? endRow.rightNumber : endRow.leftNumber;
+  const code = range.pane === "right" ? startRow.right : startRow.left;
 
   return {
     id,
-    rowIndex: first.row,
-    pane: first.pane,
-    startColumn: first.startColumn,
-    endColumn,
+    rowIndex: range.startRow,
+    endRowIndex: range.endRow,
+    pane: range.pane,
+    startColumn: range.startColumn,
+    endColumn: range.endColumn,
     line,
+    endLine,
     code,
     text: trimmed,
   };
 }
 
+// A multi-row note covers the rest of its first line, whatever its end column on the last row.
+function firstRowEndColumn(note: Note): number {
+  return note.endRowIndex > note.rowIndex ? note.code.length : note.endColumn;
+}
+
 function isWholeLine(note: Note): boolean {
-  return note.startColumn === 0 && note.endColumn >= note.code.length;
+  return note.startColumn === 0 && firstRowEndColumn(note) >= note.code.length;
 }
 
 function withSpanSuffix(note: Note): string {
-  const selected = note.code.slice(note.startColumn, note.endColumn);
+  const selected = note.code.slice(note.startColumn, firstRowEndColumn(note));
 
   return `${note.text} [re: "${selected}"]`;
 }

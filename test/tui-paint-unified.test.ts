@@ -270,7 +270,7 @@ describe("status bar layout override reason", () => {
 
     expect(plain).toContain("j/k move");
     expect(plain).toContain("a note");
-    expect(plain).toContain("^q quit");
+    expect(plain).toContain("q quit");
   });
 
   test("the status bar paints a dark foreground over the chrome background", () => {

@@ -1,18 +1,20 @@
 export interface Note {
   id: number;
   rowIndex: number;
+  endRowIndex: number;
   pane: "left" | "right";
   startColumn: number;
   endColumn: number;
   line: number | null;
+  endLine: number | null;
   code: string;
   text: string;
 }
 
-export interface FirstRow {
-  row: number;
+export interface NoteRange {
+  startRow: number;
+  endRow: number;
   pane: "left" | "right";
   startColumn: number;
-  headColumn: number;
-  singleRow: boolean;
+  endColumn: number;
 }

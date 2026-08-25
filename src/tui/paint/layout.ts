@@ -92,14 +92,34 @@ function hasPaneNotes(notes: Note[], pane: "left" | "right"): boolean {
   return notes.some((note) => note.pane === pane);
 }
 
-function noteSpansFor(notes: Note[], rowIndex: number, pane: "left" | "right"): Span[] {
+function coversRow(note: Note, rowIndex: number, pane: "left" | "right"): boolean {
+  return note.pane === pane && rowIndex >= note.rowIndex && rowIndex <= note.endRowIndex;
+}
+
+// A row inside a note's range covers the whole line, so only the two end rows carry a column.
+function noteSpanFor(note: Note, rowIndex: number, lineLength: number): Span {
+  const start = rowIndex === note.rowIndex ? note.startColumn : 0;
+  const end = rowIndex === note.endRowIndex ? note.endColumn : lineLength;
+
+  return {
+    start: Math.min(Math.max(start, 0), lineLength),
+    end: Math.min(Math.max(end, 0), lineLength),
+  };
+}
+
+function noteSpansFor(
+  notes: Note[],
+  rowIndex: number,
+  pane: "left" | "right",
+  lineLength: number,
+): Span[] {
   return notes
-    .filter((note) => note.rowIndex === rowIndex && note.pane === pane)
-    .map((note) => ({ start: note.startColumn, end: note.endColumn }));
+    .filter((note) => coversRow(note, rowIndex, pane))
+    .map((note) => noteSpanFor(note, rowIndex, lineLength));
 }
 
 function isAnnotatedRow(notes: Note[], rowIndex: number, pane: "left" | "right"): boolean {
-  return notes.some((note) => note.rowIndex === rowIndex && note.pane === pane);
+  return notes.some((note) => coversRow(note, rowIndex, pane));
 }
 
 function paintMarkerColumn(hasColumn: boolean, annotated: boolean, truecolor: boolean): string {
@@ -257,11 +277,11 @@ function paintModelRow(
 
   const leftHighlights = [
     ...(leftSelectionSpan === null ? [] : [leftSelectionSpan]),
-    ...noteSpansFor(notes, rowIndex, "left"),
+    ...noteSpansFor(notes, rowIndex, "left", row.left.length),
   ];
   const rightHighlights = [
     ...(rightSelectionSpan === null ? [] : [rightSelectionSpan]),
-    ...noteSpansFor(notes, rowIndex, "right"),
+    ...noteSpansFor(notes, rowIndex, "right", row.right.length),
   ];
 
   const leftText = renderPaneText(
@@ -363,8 +383,8 @@ const KEY_HINTS = [
   "d delete",
   "space fold",
   "u layout",
-  "^s send",
-  "^q quit",
+  "s send",
+  "q quit",
   "? keys",
 ];
 
@@ -401,8 +421,14 @@ function paintPanelTitle(noteCount: number, width: number, truecolor: boolean): 
   return padPanelLine(fg(theme.note, truecolor) + text + DEFAULT_FG, text.length, width);
 }
 
+function lineLabel(line: number | null): string {
+  return line === null ? "?" : String(line);
+}
+
 function noteAnchorLabel(note: Note): string {
-  return note.line === null ? "L?" : `L${note.line}`;
+  return note.endRowIndex === note.rowIndex
+    ? `L${lineLabel(note.line)}`
+    : `L${lineLabel(note.line)}-${lineLabel(note.endLine)}`;
 }
 
 function paintNoteRow(note: Note, focused: boolean, width: number, truecolor: boolean): string {
@@ -471,8 +497,9 @@ function anchoredNoteRowsFor(
   width: number,
   truecolor: boolean,
 ): UnifiedBodyEntry {
+  // The connector hangs under the last row of the range, so it never splits the note's own rows.
   const rowNotes = notes
-    .filter((note) => note.rowIndex === rowIndex)
+    .filter((note) => note.endRowIndex === rowIndex)
     .sort((left, right) => left.id - right.id);
   const chromeRow: ScreenRow = { kind: "chrome", index: null };
 
@@ -801,7 +828,7 @@ function paintUnifiedBodyEntry(
       : null;
     const highlights = [
       ...(selectionSpan === null ? [] : [selectionSpan]),
-      ...noteSpansFor(notes, entry.index, "right"),
+      ...noteSpansFor(notes, entry.index, "right", row.right.length),
     ];
     const line = paintUnifiedHalf(
       "context",
@@ -829,7 +856,7 @@ function paintUnifiedBodyEntry(
       : null;
     const highlights = [
       ...(selectionSpan === null ? [] : [selectionSpan]),
-      ...noteSpansFor(notes, entry.index, "right"),
+      ...noteSpansFor(notes, entry.index, "right", row.right.length),
     ];
     const line = paintUnifiedHalf(
       "add",
@@ -857,7 +884,7 @@ function paintUnifiedBodyEntry(
       : null;
     const highlights = [
       ...(selectionSpan === null ? [] : [selectionSpan]),
-      ...noteSpansFor(notes, entry.index, "left"),
+      ...noteSpansFor(notes, entry.index, "left", row.left.length),
     ];
     const line = paintUnifiedHalf(
       "del",
@@ -887,11 +914,11 @@ function paintUnifiedBodyEntry(
     : null;
   const delHighlights = [
     ...(delSelectionSpan === null ? [] : [delSelectionSpan]),
-    ...noteSpansFor(notes, entry.index, "left"),
+    ...noteSpansFor(notes, entry.index, "left", row.left.length),
   ];
   const addHighlights = [
     ...(addSelectionSpan === null ? [] : [addSelectionSpan]),
-    ...noteSpansFor(notes, entry.index, "right"),
+    ...noteSpansFor(notes, entry.index, "right", row.right.length),
   ];
 
   const delLine = paintUnifiedHalf(

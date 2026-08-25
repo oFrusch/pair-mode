@@ -83,13 +83,18 @@ describe("noteFromSelection", () => {
 });
 
 function makeNote(overrides: Partial<Note> = {}): Note {
+  const rowIndex = overrides.rowIndex ?? 0;
+  const line = overrides.line ?? 1;
+
   return {
     id: 1,
-    rowIndex: 0,
+    rowIndex,
+    endRowIndex: rowIndex,
     pane: "right",
     startColumn: 0,
     endColumn: 4,
-    line: 1,
+    line,
+    endLine: line,
     code: "aaaa",
     text: "a question",
     ...overrides,
