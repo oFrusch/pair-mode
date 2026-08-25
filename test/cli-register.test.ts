@@ -1,5 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test, expect, beforeEach } from "vitest";
 import {
@@ -7,17 +6,21 @@ import {
   codexHooksPath,
   correctMultiEditMatchers,
   registerClaudeCode,
+  registerCodex,
   piExtensionPath,
   piExtensionSource,
   registerPi,
 } from "../src/cli/register";
+import { useIsolatedHome } from "./helpers/env";
+
+const isolated = useIsolatedHome();
 
 let homeDir: string;
 let installDir: string;
 
 beforeEach(() => {
-  homeDir = mkdtempSync(join(tmpdir(), "pair-mode-home-"));
-  installDir = mkdtempSync(join(tmpdir(), "pair-mode-install-"));
+  homeDir = isolated.tempDir("pair-mode-home-");
+  installDir = isolated.tempDir("pair-mode-install-");
 });
 
 test("registration refuses a settings file whose hooks value is an array, and does not touch the file", () => {
@@ -108,4 +111,96 @@ test("re-registering pi over a default-less extension file rewrites it", () => {
 
   expect(result.changed).toBe(true);
   expect(readFileSync(path, "utf-8")).toBe(piExtensionSource(target));
+});
+
+test("re-registering from a new install root rewrites the hook in place instead of adding a second one", () => {
+  const otherInstallDir = isolated.tempDir("pair-mode-install-old-");
+  registerClaudeCode(homeDir, otherInstallDir);
+
+  const result = registerClaudeCode(homeDir, installDir);
+
+  expect(result.changed).toBe(true);
+
+  const written: unknown = JSON.parse(readFileSync(claudeCodeSettingsPath(homeDir), "utf-8"));
+  const groups = (written as { hooks: { PreToolUse: { hooks: { command: string }[] }[] } }).hooks
+    .PreToolUse;
+  const commands = groups.flatMap((group) => group.hooks.map((entry) => entry.command));
+
+  expect(commands).toEqual([join(installDir, "dist", "claude-code.js")]);
+});
+
+test("re-registering codex from a new install root leaves exactly one pair-mode hook", () => {
+  const otherInstallDir = isolated.tempDir("pair-mode-install-old-");
+  registerCodex(homeDir, otherInstallDir);
+  registerCodex(homeDir, installDir);
+
+  const written: unknown = JSON.parse(readFileSync(codexHooksPath(homeDir), "utf-8"));
+  const groups = (written as { hooks: { PreToolUse: { hooks: { command: string }[] }[] } }).hooks
+    .PreToolUse;
+  const commands = groups.flatMap((group) => group.hooks.map((entry) => entry.command));
+
+  expect(commands).toEqual([join(installDir, "dist", "codex.js")]);
+});
+
+test("a rewritten hook keeps unrelated hooks that share the same group", () => {
+  const path = claudeCodeSettingsPath(homeDir);
+  const otherInstallDir = isolated.tempDir("pair-mode-install-old-");
+  mkdirSync(join(homeDir, ".claude"), { recursive: true });
+  writeFileSync(
+    path,
+    JSON.stringify({
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: "Write|Edit|MultiEdit",
+            hooks: [
+              { type: "command", command: "some-other-hook" },
+              { type: "command", command: join(otherInstallDir, "dist", "claude-code.js") },
+            ],
+          },
+        ],
+      },
+    }),
+    "utf-8",
+  );
+
+  registerClaudeCode(homeDir, installDir);
+
+  const written: unknown = JSON.parse(readFileSync(path, "utf-8"));
+  const groups = (written as { hooks: { PreToolUse: { hooks: { command: string }[] }[] } }).hooks
+    .PreToolUse;
+  const commands = groups.flatMap((group) => group.hooks.map((entry) => entry.command));
+
+  expect(commands).toEqual(["some-other-hook", join(installDir, "dist", "claude-code.js")]);
+});
+
+test("registration reports malformed JSON through the error channel and leaves the file alone", () => {
+  const path = claudeCodeSettingsPath(homeDir);
+  mkdirSync(join(homeDir, ".claude"), { recursive: true });
+  const original = "{ this is not json";
+  writeFileSync(path, original, "utf-8");
+
+  const result = registerClaudeCode(homeDir, installDir);
+
+  expect(result.changed).toBe(false);
+  expect(result.error).toContain(path);
+  expect(result.error).toContain("not valid JSON");
+  expect(readFileSync(path, "utf-8")).toBe(original);
+  expect(existsSync(`${path}.pair-backup`)).toBe(false);
+});
+
+test("two writes to one file in a single run keep the original in the backup", () => {
+  const path = codexHooksPath(homeDir);
+  mkdirSync(join(homeDir, ".codex"), { recursive: true });
+  const original = JSON.stringify({
+    hooks: {
+      PreToolUse: [{ matcher: "MultiEdit", hooks: [{ type: "command", command: "user-hook" }] }],
+    },
+  });
+  writeFileSync(path, original, "utf-8");
+
+  correctMultiEditMatchers(homeDir);
+  registerCodex(homeDir, installDir);
+
+  expect(readFileSync(`${path}.pair-backup`, "utf-8")).toBe(original);
 });

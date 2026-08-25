@@ -44,6 +44,28 @@ function readVersion(): string {
   return "unknown";
 }
 
+function isFlag(entry: string): boolean {
+  return entry.startsWith("-") && entry !== "-";
+}
+
+// A flag read as a directory is worse than an error: "off --web" would resolve <cwd>/--web and leave pair mode on.
+function parseDirectoryArgs(args: string[], allowedFlags: string[]) {
+  const flags = args.filter(isFlag);
+  const target = args.find((entry) => !isFlag(entry));
+
+  return {
+    directory: resolve(target ?? process.cwd()),
+    web: flags.includes("--web"),
+    unknownFlag: flags.find((flag) => !allowedFlags.includes(flag)) ?? null,
+  };
+}
+
+function reportUnknownFlag(command: string, flag: string): number {
+  console.error(`unknown option for ${command}: ${flag}`);
+  console.error(USAGE);
+  return 1;
+}
+
 async function main(): Promise<number> {
   const command = process.argv[2] ?? "";
 
@@ -75,34 +97,52 @@ async function main(): Promise<number> {
   }
 
   if (command === "on") {
-    const rest = process.argv.slice(3);
-    const target = rest.find((entry) => !entry.startsWith("--"));
-    const directory = resolve(target ?? process.cwd());
+    const parsed = parseDirectoryArgs(process.argv.slice(3), ["--web"]);
 
-    if (rest.includes("--web")) {
-      console.log(await pairOnWeb(directory, process.argv[1] ?? ""));
+    if (parsed.unknownFlag !== null) {
+      return reportUnknownFlag(command, parsed.unknownFlag);
+    }
+
+    if (parsed.web) {
+      console.log(await pairOnWeb(parsed.directory, process.argv[1] ?? ""));
       return 0;
     }
 
-    console.log(pairOn(directory));
+    console.log(pairOn(parsed.directory));
     return 0;
   }
 
   if (command === "off") {
-    console.log(pairOff(resolve(process.argv[3] ?? process.cwd())));
+    const parsed = parseDirectoryArgs(process.argv.slice(3), []);
+
+    if (parsed.unknownFlag !== null) {
+      return reportUnknownFlag(command, parsed.unknownFlag);
+    }
+
+    console.log(pairOff(parsed.directory));
     return 0;
   }
 
   if (command === "status") {
-    console.log(pairStatus(resolve(process.argv[3] ?? process.cwd())));
+    const parsed = parseDirectoryArgs(process.argv.slice(3), []);
+
+    if (parsed.unknownFlag !== null) {
+      return reportUnknownFlag(command, parsed.unknownFlag);
+    }
+
+    console.log(pairStatus(parsed.directory));
     return 0;
   }
 
   if (command === "watch") {
-    const rest = process.argv.slice(3);
-    const wantsWeb = rest.includes("--web");
-    const target = rest.find((entry) => !entry.startsWith("--"));
-    const directory = resolve(target ?? process.cwd());
+    const parsed = parseDirectoryArgs(process.argv.slice(3), ["--web"]);
+
+    if (parsed.unknownFlag !== null) {
+      return reportUnknownFlag(command, parsed.unknownFlag);
+    }
+
+    const wantsWeb = parsed.web;
+    const directory = parsed.directory;
     const { config, errors } = loadConfig();
 
     errors.forEach((error) => console.error(`config ${error.path}: ${error.message}`));

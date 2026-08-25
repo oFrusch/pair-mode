@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import type { HookEntry, HookGroup, RegisterResult } from "./types";
+import { basename, dirname, join, sep } from "node:path";
+import type { HookEntry, HookGroup, JsonReadResult, RegisterResult } from "./types";
 import { isRecord } from "../../helpers";
 
 const HOOK_TIMEOUT_SECONDS = 1800;
@@ -42,29 +42,48 @@ function isHookGroup(value: unknown): value is HookGroup {
 }
 
 // Every file this module touches is a plain JSON object at the root. A file that is not gets a clear error rather than a silent overwrite.
-function readJsonObject(path: string): Record<string, unknown> {
+function readJsonObject(path: string): JsonReadResult {
   if (!existsSync(path)) {
-    return {};
+    return { ok: true, root: {} };
   }
 
   const text = readFileSync(path, "utf-8");
-  const parsed: unknown = JSON.parse(text);
 
-  if (!isRecord(parsed)) {
-    throw new Error(`${path} does not contain a JSON object`);
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return {
+      ok: false,
+      error: `${path}: not valid JSON. Fix it by hand, then re-run this command.`,
+    };
   }
 
-  return parsed;
+  if (!isRecord(parsed)) {
+    return { ok: false, error: `${path} does not contain a JSON object` };
+  }
+
+  return { ok: true, root: parsed };
 }
 
-// Never overwrite a user file without a backup of what was there first.
+const backedUpThisRun = new Set<string>();
+
+// One backup per file per run, so a second write cannot capture pair-mode's own output over the user's original.
 export function backupIfPresent(path: string): string | null {
   if (!existsSync(path)) {
     return null;
   }
 
   const backupPath = `${path}.pair-backup`;
+
+  if (backedUpThisRun.has(path)) {
+    return backupPath;
+  }
+
   copyFileSync(path, backupPath);
+  backedUpThisRun.add(path);
+
   return backupPath;
 }
 
@@ -107,6 +126,58 @@ function hasCommand(groups: unknown[], command: string): boolean {
   });
 }
 
+// A reinstall moves the install root, so a hook is ours by where it sits inside dist, not by its absolute path.
+function matchesOurCommand(command: string): (entry: HookEntry) => boolean {
+  const suffix = sep + join("dist", basename(command));
+
+  return (entry) => entry.command === command || entry.command.endsWith(suffix);
+}
+
+function upsertHookGroup(
+  groups: unknown[],
+  matcher: string,
+  command: string,
+  timeout: number,
+): unknown[] {
+  const matches = matchesOurCommand(command);
+  const ours: HookEntry = { type: "command", command, timeout };
+
+  let placed = false;
+  const next: unknown[] = [];
+
+  for (const group of groups) {
+    if (!isHookGroup(group) || !group.hooks.some(matches)) {
+      next.push(group);
+      continue;
+    }
+
+    // Rewrite the first hook of ours in place; every later one would fire a second watcher at the same edit.
+    if (!placed) {
+      placed = true;
+
+      const index = group.hooks.findIndex(matches);
+      const hooks = group.hooks
+        .map((entry, position) => (position === index ? { ...entry, ...ours } : entry))
+        .filter((entry, position) => position === index || !matches(entry));
+
+      next.push({ ...group, matcher, hooks });
+      continue;
+    }
+
+    const hooks = group.hooks.filter((entry) => !matches(entry));
+
+    if (hooks.length > 0) {
+      next.push({ ...group, hooks });
+    }
+  }
+
+  if (!placed) {
+    next.push({ matcher, hooks: [ours] });
+  }
+
+  return next;
+}
+
 function writeJsonObject(path: string, root: Record<string, unknown>): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, JSON.stringify(root, null, 2) + "\n", "utf-8");
@@ -118,7 +189,13 @@ function registerPreToolUseHook(
   command: string,
   timeout: number,
 ): RegisterResult {
-  const root = readJsonObject(path);
+  const read = readJsonObject(path);
+
+  if (!read.ok) {
+    return { path, changed: false, backupPath: null, error: read.error };
+  }
+
+  const root = read.root;
   const shapeError = describeShapeError(root, path);
 
   if (shapeError !== null) {
@@ -126,13 +203,16 @@ function registerPreToolUseHook(
   }
 
   const groups = preToolUseGroups(root);
+  const next = upsertHookGroup(groups, matcher, command, timeout);
 
-  if (hasCommand(groups, command)) {
+  // Re-running setup with nothing to change must leave the file alone, backup included.
+  if (JSON.stringify(groups) === JSON.stringify(next)) {
     return { path, changed: false, backupPath: null };
   }
 
   const backupPath = backupIfPresent(path);
-  groups.push({ matcher, hooks: [{ type: "command", command, timeout }] });
+  groups.length = 0;
+  groups.push(...next);
   writeJsonObject(path, root);
 
   return { path, changed: true, backupPath };
@@ -143,15 +223,13 @@ export function isPreToolUseRegistered(path: string, command: string): boolean {
     return false;
   }
 
-  let root: Record<string, unknown>;
+  const read = readJsonObject(path);
 
-  try {
-    root = readJsonObject(path);
-  } catch {
+  if (!read.ok) {
     return false;
   }
 
-  return hasCommand(preToolUseGroups(root), command);
+  return hasCommand(preToolUseGroups(read.root), command);
 }
 
 export function claudeCodeSettingsPath(homeDir: string): string {
@@ -182,8 +260,14 @@ export function findMultiEditMatchers(homeDir: string): string[] {
     return [];
   }
 
-  const root = readJsonObject(path);
-  const groups = preToolUseGroups(root);
+  const read = readJsonObject(path);
+
+  // An unparsable file reports no matchers here; registerCodex reports the parse error to the user.
+  if (!read.ok) {
+    return [];
+  }
+
+  const groups = preToolUseGroups(read.root);
 
   return groups.flatMap((group) => {
     if (!isHookGroup(group) || group.matcher === undefined) {
@@ -196,7 +280,13 @@ export function findMultiEditMatchers(homeDir: string): string[] {
 
 export function correctMultiEditMatchers(homeDir: string): RegisterResult {
   const path = codexHooksPath(homeDir);
-  const root = readJsonObject(path);
+  const read = readJsonObject(path);
+
+  if (!read.ok) {
+    return { path, changed: false, backupPath: null, error: read.error };
+  }
+
+  const root = read.root;
   const shapeError = describeShapeError(root, path);
 
   if (shapeError !== null) {

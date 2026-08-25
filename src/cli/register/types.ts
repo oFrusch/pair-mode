@@ -9,6 +9,10 @@ export interface HookGroup {
   hooks: HookEntry[];
 }
 
+export type JsonReadResult =
+  | { ok: true; root: Record<string, unknown> }
+  | { ok: false; error: string };
+
 export interface RegisterResult {
   path: string;
   changed: boolean;
