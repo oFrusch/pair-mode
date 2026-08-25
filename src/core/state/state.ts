@@ -22,10 +22,24 @@ function realpathLenient(path: string): string {
   }
 }
 
-export function flagPath(directory: string): string {
+const DIGEST_LENGTH = 16;
+
+function digestFor(directory: string): string {
   const real = realpathLenient(directory);
-  const digest = createHash("sha1").update(real).digest("hex").slice(0, 16);
-  return join(stateDir(), `${digest}.on`);
+  return createHash("sha1").update(real).digest("hex").slice(0, DIGEST_LENGTH);
+}
+
+export function flagPath(directory: string): string {
+  return join(stateDir(), `${digestFor(directory)}.on`);
+}
+
+export function sessionsDir(): string {
+  return join(stateDir(), "sessions");
+}
+
+// The watcher and the hook both derive this from the directory, so neither side ever names a session id.
+export function sessionSocketPath(directory: string): string {
+  return join(sessionsDir(), `${digestFor(directory)}.sock`);
 }
 
 export function isEnabled(filePath: string): boolean {
