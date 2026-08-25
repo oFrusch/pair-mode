@@ -1,6 +1,7 @@
 import { align, fold } from "../diff";
 import type { Row } from "../diff/types";
 import type { RenderInput, RenderResult } from "./types";
+import { splitLines } from "../../helpers/splitLines";
 
 const HEADER_LEAD: string[] = [
   "# PAIR MODE. Left pane is the current file. Right pane is the proposal.",
@@ -9,17 +10,6 @@ const HEADER_LEAD: string[] = [
 ];
 
 const HEADER_TAIL: string[] = ["#", "# tool: {tool}", "# file: {path}"];
-
-function splitLines(text: string): string[] {
-  const lines = text.split("\n");
-  const last = lines.at(-1);
-
-  if (last === "") {
-    lines.pop();
-  }
-
-  return lines;
-}
 
 function buildHeader(tool: string, path: string, headerHint: string[]): string[] {
   const lines = [...HEADER_LEAD, ...headerHint, ...HEADER_TAIL];

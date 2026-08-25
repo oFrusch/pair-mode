@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { readFileSync, writeFileSync, unlinkSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PairConfig } from "../../core/config";
@@ -9,7 +9,7 @@ import { stateDir } from "../../core/state";
 import { collect, parseNoteResult } from "../../core/collect";
 import { resolve } from "../../editors";
 import { detect } from "../../multiplexers";
-import { readFileOrEmpty, resultFilePath, splitLines } from "../../helpers";
+import { readFileOrEmpty, removeQuietly, resultFilePath, splitLines } from "../../helpers";
 import type { EditRequest, ReviewOutcome, ReviewTransport } from "../transport.types";
 import type { PaneDeps } from "./pane.types";
 
@@ -27,14 +27,6 @@ function tempFile(prefix: string, suffix: string, content: string): string {
   const path = join(tmpdir(), name);
   writeFileSync(path, content, "utf-8");
   return path;
-}
-
-function removeQuietly(path: string): void {
-  try {
-    unlinkSync(path);
-  } catch {
-    // Best-effort cleanup only.
-  }
 }
 
 function removeTreeQuietly(path: string): void {

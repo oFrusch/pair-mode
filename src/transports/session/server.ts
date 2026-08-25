@@ -1,7 +1,7 @@
 import { createServer, createConnection } from "node:net";
 import type { Server, Socket } from "node:net";
 import { randomBytes } from "node:crypto";
-import { chmodSync, mkdirSync, unlinkSync } from "node:fs";
+import { chmodSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { EditRequest } from "../transport.types";
 import type { QueueState } from "./queue.types";
@@ -17,6 +17,7 @@ import {
 import { createLineReader, decodeLine, encode } from "./wire";
 import type { ServerMessage, VerdictMessage } from "./wire.types";
 import type { SessionServer, SessionServerOptions } from "./server.types";
+import { removeQuietly } from "../../helpers";
 
 const ID_BYTES = 8;
 const OWNER_ONLY_DIR = 0o700;
@@ -30,14 +31,6 @@ function defaultGenerateId(): string {
 // An accept error must never kill the watcher, so it goes to stderr unless the caller wants it.
 function defaultReportError(error: Error): void {
   process.stderr.write(`pair-mode session server error: ${error.message}\n`);
-}
-
-function removeQuietly(path: string): void {
-  try {
-    unlinkSync(path);
-  } catch {
-    // Best-effort cleanup only.
-  }
 }
 
 // A socket file outlives a crashed watcher, so a refused connection means the file is stale and safe to unlink.

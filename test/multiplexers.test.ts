@@ -3,6 +3,7 @@ import { createZellijMultiplexer } from "../src/multiplexers/zellij";
 import { createTmuxMultiplexer } from "../src/multiplexers/tmux";
 import { createTtyMultiplexer } from "../src/multiplexers/tty";
 import { detect, describe as describeAdapters } from "../src/multiplexers/index";
+import { defaultSpawn } from "../src/helpers/spawn";
 import type { Spawn, SpawnResult, TtyOpen, TtyRunner } from "../src/multiplexers/multiplexer.types";
 
 let originalZellij: string | undefined;
@@ -249,4 +250,12 @@ test("describe returns one line per adapter", () => {
   expect(lines.some((line) => line.startsWith("zellij:"))).toBe(true);
   expect(lines.some((line) => line.startsWith("tmux:"))).toBe(true);
   expect(lines.some((line) => line.startsWith("none:"))).toBe(true);
+});
+
+test("defaultSpawn reports a real reason when the binary is missing", () => {
+  const result = defaultSpawn("pair-mode-no-such-binary", ["--version"]);
+
+  expect(result.status).toBe(null);
+  expect(result.stderr).not.toBe("");
+  expect(result.stderr).toContain("pair-mode-no-such-binary");
 });

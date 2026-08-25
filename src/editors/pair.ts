@@ -1,13 +1,9 @@
 import { existsSync } from "node:fs";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { paintLayout } from "../core/config";
 import type { Editor, EditorContext, EditorLaunch } from "./editor.types";
 import type { BundleExistsChecker, TuiEntryResolver } from "./pair.types";
-
-// runTui speaks "split" | "unified". PairConfig.layout speaks "split" | "inline", because "inline" already names the one-column layout there. This is the only place the two vocabularies meet.
-function paintLayout(layout: EditorContext["config"]["layout"]): "split" | "unified" {
-  return layout === "inline" ? "unified" : "split";
-}
 
 // The TUI bundles into the same dist/ directory as every editor's caller, so a sibling lookup survives an arbitrary install prefix.
 const defaultResolveTuiEntry: TuiEntryResolver = () => {
