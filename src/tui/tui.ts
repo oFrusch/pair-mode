@@ -1,5 +1,5 @@
 import type { Question } from "../core/collect";
-import type { KeyEvent } from "./input/input.types";
+import type { KeyEvent, MouseEvent } from "./input/input.types";
 import { parseKeys } from "./input/keys";
 import { MOUSE_OFF, MOUSE_ON, splitInput } from "./input/mouse";
 import { buildModel, moveCursor, toggleFold, visibleRows } from "./model";
@@ -95,6 +95,19 @@ function toggleFoldAtCursor(model: DiffModel): DiffModel {
   }
 
   return toggleFold(model, entry.foldIndex);
+}
+
+const WHEEL_UP_BUTTON = 0;
+const WHEEL_ROWS = 3;
+
+// The wheel moves the viewport alone. followScroll pulls it back to the cursor on the next key.
+function applyScroll(state: TuiState, event: MouseEvent, height: number): TuiState {
+  const bodyRows = bodyHeight(height, state.notes.length, state.mode, state.notePosition);
+  const step = event.button === WHEEL_UP_BUTTON ? -WHEEL_ROWS : WHEEL_ROWS;
+  const maxScroll = Math.max(0, visibleRows(state.model).length - bodyRows);
+  const scrollTop = Math.min(maxScroll, Math.max(0, state.scrollTop + step));
+
+  return scrollTop === state.scrollTop ? state : { ...state, scrollTop };
 }
 
 function withScroll(state: TuiState, model: DiffModel, height: number): TuiState {
@@ -472,7 +485,13 @@ export function runTui(options: TuiOptions, io: TuiIo): Promise<TuiResult> {
       try {
         const { keys, mouse } = splitInput(chunk);
 
-        state = mouse.reduce((current, event) => applyMouse(current, event), state);
+        state = mouse.reduce(
+          (current, event) =>
+            event.kind === "scroll" && !event.shift
+              ? applyScroll(current, event, io.size().height)
+              : applyMouse(current, event),
+          state,
+        );
 
         const events = parseKeys(keys);
 

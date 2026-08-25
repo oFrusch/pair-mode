@@ -455,6 +455,67 @@ function makeOptions(overrides: Partial<TuiOptions> = {}): TuiOptions {
   };
 }
 
+describe("runTui — wheel scroll", () => {
+  const WHEEL_DOWN = "\x1b[<65;40;10M";
+  const WHEEL_UP = "\x1b[<64;40;10M";
+  const SHIFT_WHEEL_DOWN = "\x1b[<69;40;10M";
+
+  // A body far taller than the 24-row fake terminal, so scrollTop has room to move.
+  function longOptions(): TuiOptions {
+    const before = Array.from({ length: 120 }, (_, index) => `line ${index}`);
+    const after = before.map((line, index) => (index === 60 ? `${line} changed` : line));
+
+    return makeOptions({ before, after, context: 200, minFold: 999 });
+  }
+
+  function scrollTopAfter(chunks: string[]): number {
+    const fake = makeFakeIo();
+    void runTui(longOptions(), fake.io);
+
+    const before = fake.writes.length;
+    chunks.forEach((chunk) => fake.feed(chunk));
+
+    return fake.writes.length - before;
+  }
+
+  test("a wheel-down event repaints, a shift wheel does not", () => {
+    expect(scrollTopAfter([WHEEL_DOWN])).toBeGreaterThan(0);
+    expect(scrollTopAfter([SHIFT_WHEEL_DOWN])).toBe(1);
+  });
+
+  test("a wheel-up at the top produces no frame change", () => {
+    const fake = makeFakeIo();
+    void runTui(longOptions(), fake.io);
+
+    fake.feed(WHEEL_UP);
+
+    expect(fake.writes[fake.writes.length - 1]).toBe("");
+  });
+
+  test("a wheel-down then an equal wheel-up returns to the top", () => {
+    const fake = makeFakeIo();
+    void runTui(longOptions(), fake.io);
+
+    fake.feed(WHEEL_DOWN);
+    fake.feed(WHEEL_UP);
+
+    expect(fake.writes[fake.writes.length - 1]).not.toBe("");
+
+    fake.feed(WHEEL_UP);
+
+    expect(fake.writes[fake.writes.length - 1]).toBe("");
+  });
+
+  test("repeated wheel-down stops at the bottom", () => {
+    const fake = makeFakeIo();
+    void runTui(longOptions(), fake.io);
+
+    Array.from({ length: 200 }, () => fake.feed(WHEEL_DOWN));
+
+    expect(fake.writes[fake.writes.length - 1]).toBe("");
+  });
+});
+
 describe("runTui — mouse reporting", () => {
   test("writes MOUSE_ON after the alternate-screen enter sequence", async () => {
     const fake = makeFakeIo();
