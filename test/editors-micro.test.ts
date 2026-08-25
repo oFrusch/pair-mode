@@ -1,18 +1,20 @@
-import { mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "yaml";
 import { test, expect, beforeEach } from "vitest";
 import { createMicroEditor } from "../src/editors/micro";
 import { DEFAULT_CONFIG } from "../src/core/config";
 import type { EditorContext } from "../src/editors/editor.types";
+import { useIsolatedHome } from "./helpers/env";
+
+const isolated = useIsolatedHome();
 
 let configDir: string;
 
 const theme = { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a", rowBand: false };
 
 beforeEach(() => {
-  configDir = mkdtempSync(join(tmpdir(), "pair-mode-micro-"));
+  configDir = isolated.tempDir("pair-mode-micro-");
 });
 
 function context(overrides: Partial<EditorContext> = {}): EditorContext {

@@ -1,74 +1,21 @@
-import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { test, expect, beforeEach, afterEach } from "vitest";
+import { test, expect, beforeEach } from "vitest";
 import { runPair } from "../src/core/run";
 import { DEFAULT_CONFIG } from "../src/core/config";
 import type { PairConfig } from "../src/core/config";
 import { enable } from "../src/core/state";
 import type { Multiplexer, RunResult, PaneSize } from "../src/multiplexers/multiplexer.types";
 import type { Editor, EditorContext, EditorLaunch } from "../src/editors/editor.types";
+import { useIsolatedHome } from "./helpers/env";
 
-let xdgStateHome: string;
-let originalXdgStateHome: string | undefined;
-let originalHome: string | undefined;
-let originalEditorOverride: string | undefined;
-let originalVisual: string | undefined;
-let originalEditor: string | undefined;
+const isolated = useIsolatedHome({ clear: ["CC_PAIR_EDITOR", "VISUAL", "EDITOR"] });
+
 let repoRoot: string;
 
 beforeEach(() => {
-  xdgStateHome = mkdtempSync(join(tmpdir(), "pair-mode-state-"));
-  originalXdgStateHome = process.env["XDG_STATE_HOME"];
-  process.env["XDG_STATE_HOME"] = xdgStateHome;
-
-  originalHome = process.env["HOME"];
-  process.env["HOME"] = mkdtempSync(join(tmpdir(), "pair-mode-home-"));
-
-  originalEditorOverride = process.env["CC_PAIR_EDITOR"];
-  delete process.env["CC_PAIR_EDITOR"];
-
-  originalVisual = process.env["VISUAL"];
-  delete process.env["VISUAL"];
-
-  originalEditor = process.env["EDITOR"];
-  delete process.env["EDITOR"];
-
-  const scratch = mkdtempSync(join(tmpdir(), "pair-mode-repo-"));
-  repoRoot = realpathSync(scratch);
+  repoRoot = realpathSync(isolated.tempDir("pair-mode-repo-"));
   enable(repoRoot);
-});
-
-afterEach(() => {
-  if (originalXdgStateHome === undefined) {
-    delete process.env["XDG_STATE_HOME"];
-  } else {
-    process.env["XDG_STATE_HOME"] = originalXdgStateHome;
-  }
-
-  if (originalHome === undefined) {
-    delete process.env["HOME"];
-  } else {
-    process.env["HOME"] = originalHome;
-  }
-
-  if (originalEditorOverride === undefined) {
-    delete process.env["CC_PAIR_EDITOR"];
-  } else {
-    process.env["CC_PAIR_EDITOR"] = originalEditorOverride;
-  }
-
-  if (originalVisual === undefined) {
-    delete process.env["VISUAL"];
-  } else {
-    process.env["VISUAL"] = originalVisual;
-  }
-
-  if (originalEditor === undefined) {
-    delete process.env["EDITOR"];
-  } else {
-    process.env["EDITOR"] = originalEditor;
-  }
 });
 
 function recordingMultiplexer(): { multiplexer: Multiplexer; calls: string[][] } {
