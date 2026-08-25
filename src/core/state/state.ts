@@ -42,6 +42,11 @@ export function sessionSocketPath(directory: string): string {
   return join(sessionsDir(), `${digestFor(directory)}.sock`);
 }
 
+// A detached web watcher records its link here, so pair-mode on and off can find and stop it.
+export function sessionUrlPath(directory: string): string {
+  return join(sessionsDir(), `${digestFor(directory)}.url`);
+}
+
 // The watcher runs at the repo root, so the hook walks up from the edited file exactly as isEnabled does.
 export function findSessionSocket(filePath: string): string | null {
   let current = dirname(realpathLenient(filePath));

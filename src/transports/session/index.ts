@@ -1,5 +1,5 @@
 export { createSessionTransport } from "./client";
-export { startSessionServer } from "./server";
+export { startSessionServer, probeSocket } from "./server";
 export { encode, decodeLine, createLineReader } from "./wire";
 export {
   emptyQueue,

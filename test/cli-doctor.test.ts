@@ -52,8 +52,8 @@ afterEach(() => {
   }
 });
 
-test("doctor on an unconfigured machine exits 1 and names each failing check", () => {
-  const report = runDoctor({
+test("doctor on an unconfigured machine exits 1 and names each failing check", async () => {
+  const report = await runDoctor({
     homeDir: homeDir,
     installRoot: installDir,
     resolvesOnPath: () => false,
@@ -74,7 +74,7 @@ test("doctor on an unconfigured machine exits 1 and names each failing check", (
   expect(failing).toContain("dist/ entry points");
 });
 
-test("doctor on a fully configured temporary home exits 0", () => {
+test("doctor on a fully configured temporary home exits 0", async () => {
   const config: PairConfig = {
     editor: "micro",
     multiplexer: "tmux",
@@ -122,7 +122,7 @@ test("doctor on a fully configured temporary home exits 0", () => {
   const fakeTtyPath = join(homeDir, "fake-tty");
   writeFileSync(fakeTtyPath, "", "utf-8");
 
-  const report = runDoctor({
+  const report = await runDoctor({
     homeDir: homeDir,
     installRoot: installDir,
     resolvesOnPath: () => true,
@@ -136,7 +136,7 @@ test("doctor on a fully configured temporary home exits 0", () => {
   expect(report.exitCode).toBe(0);
 });
 
-test("doctor fails the entry points check when a built file is not executable", () => {
+test("doctor fails the entry points check when a built file is not executable", async () => {
   const config: PairConfig = {
     editor: "micro",
     multiplexer: "tmux",
@@ -185,7 +185,7 @@ test("doctor fails the entry points check when a built file is not executable", 
   const fakeTtyPath = join(homeDir, "fake-tty");
   writeFileSync(fakeTtyPath, "", "utf-8");
 
-  const report = runDoctor({
+  const report = await runDoctor({
     homeDir: homeDir,
     installRoot: installDir,
     resolvesOnPath: () => true,
@@ -256,10 +256,10 @@ function setUpFullInstall(
   return { distDir, fakeTtyPath, tmuxMultiplexer };
 }
 
-test("doctor fails when dist/pair-tui.js is absent", () => {
+test("doctor fails when dist/pair-tui.js is absent", async () => {
   const { fakeTtyPath, tmuxMultiplexer } = setUpFullInstall(homeDir, installDir);
 
-  const report = runDoctor({
+  const report = await runDoctor({
     homeDir: homeDir,
     installRoot: installDir,
     resolvesOnPath: () => true,
@@ -275,14 +275,14 @@ test("doctor fails when dist/pair-tui.js is absent", () => {
   expect(entryCheck?.detail).toContain("missing: pair-tui.js");
 });
 
-test("doctor fails when dist/pair-tui.js exists with mode 644", () => {
+test("doctor fails when dist/pair-tui.js exists with mode 644", async () => {
   const { distDir, fakeTtyPath, tmuxMultiplexer } = setUpFullInstall(homeDir, installDir);
 
   const tuiPath = join(distDir, "pair-tui.js");
   writeFileSync(tuiPath, "#!/usr/bin/env node\n// stub\n", "utf-8");
   chmodSync(tuiPath, 0o644);
 
-  const report = runDoctor({
+  const report = await runDoctor({
     homeDir: homeDir,
     installRoot: installDir,
     resolvesOnPath: () => true,
@@ -298,14 +298,14 @@ test("doctor fails when dist/pair-tui.js exists with mode 644", () => {
   expect(entryCheck?.detail).toContain("not executable: pair-tui.js");
 });
 
-test("doctor passes when dist/pair-tui.js exists with mode 755 and the shebang", () => {
+test("doctor passes when dist/pair-tui.js exists with mode 755 and the shebang", async () => {
   const { distDir, fakeTtyPath, tmuxMultiplexer } = setUpFullInstall(homeDir, installDir);
 
   const tuiPath = join(distDir, "pair-tui.js");
   writeFileSync(tuiPath, "#!/usr/bin/env node\n// stub\n", "utf-8");
   chmodSync(tuiPath, 0o755);
 
-  const report = runDoctor({
+  const report = await runDoctor({
     homeDir: homeDir,
     installRoot: installDir,
     resolvesOnPath: () => true,
@@ -319,14 +319,14 @@ test("doctor passes when dist/pair-tui.js exists with mode 755 and the shebang",
   expect(report.exitCode).toBe(0);
 });
 
-test("doctor reports WARN, not FAIL, when shiki does not resolve", () => {
+test("doctor reports WARN, not FAIL, when shiki does not resolve", async () => {
   const { distDir, fakeTtyPath, tmuxMultiplexer } = setUpFullInstall(homeDir, installDir);
 
   const tuiPath = join(distDir, "pair-tui.js");
   writeFileSync(tuiPath, "#!/usr/bin/env node\n// stub\n", "utf-8");
   chmodSync(tuiPath, 0o755);
 
-  const report = runDoctor({
+  const report = await runDoctor({
     homeDir: homeDir,
     installRoot: installDir,
     resolvesOnPath: () => true,

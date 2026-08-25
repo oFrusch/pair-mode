@@ -2,7 +2,8 @@ import { existsSync, openSync, closeSync, readFileSync, statSync } from "node:fs
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { loadConfig, configPath } from "../../core/config";
-import { stateDir } from "../../core/state";
+import { stateDir, sessionSocketPath } from "../../core/state";
+import { probeSocket } from "../../transports/session";
 import { resolve as resolveEditor } from "../../editors/index";
 import { detect as detectMultiplexer } from "../../multiplexers/index";
 import { installRoot } from "../install-root";
@@ -228,7 +229,37 @@ function checkTrace(): DoctorCheck | null {
 
 const defaultOpenTty = (): number => openSync("/dev/tty", "r+");
 
-export function runDoctor(options: DoctorOptions = {}): DoctorReport {
+// A watcher that crashed leaves its socket file behind, so the probe distinguishes a live one from a stale one.
+async function checkSession(
+  directory: string,
+  probe: DoctorOptions["probeSocket"],
+): Promise<DoctorCheck> {
+  const config = loadConfig().config;
+  const path = sessionSocketPath(directory);
+  const name = `session: ${path}`;
+  const wanted = config.transport === "session";
+
+  if (!existsSync(path)) {
+    return {
+      name,
+      passed: !wanted,
+      detail: wanted
+        ? "transport is session but no watcher is attached; run pair-mode watch"
+        : "no watcher attached, and transport is pane",
+      warnOnly: !wanted,
+    };
+  }
+
+  const alive = await (probe ?? probeSocket)(path);
+
+  if (alive) {
+    return { name, passed: true, detail: "a watcher is attached" };
+  }
+
+  return { name, passed: false, detail: `stale socket, remove it with: rm ${path}` };
+}
+
+export async function runDoctor(options: DoctorOptions = {}): Promise<DoctorReport> {
   const home = options.homeDir ?? homedir();
   const root = options.installRoot ?? installRoot();
   const openTty = options.openTty ?? defaultOpenTty;
@@ -241,6 +272,7 @@ export function runDoctor(options: DoctorOptions = {}): DoctorReport {
     ...checkClis(home, root),
     checkEntryPoints(root),
     checkShiki(options.resolvesShiki),
+    await checkSession(options.directory ?? process.cwd(), options.probeSocket),
   ];
 
   const traceCheck = checkTrace();

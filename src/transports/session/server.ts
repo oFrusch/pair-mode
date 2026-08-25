@@ -34,7 +34,7 @@ function removeQuietly(path: string): void {
 }
 
 // A socket file outlives a crashed watcher, so a refused connection means the file is stale and safe to unlink.
-function probeSocket(path: string): Promise<boolean> {
+export function probeSocket(path: string): Promise<boolean> {
   return new Promise((resolve) => {
     const probe = createConnection(path);
 
