@@ -267,6 +267,24 @@ describe("status bar layout override reason", () => {
     expect(plain).toContain("^q quit");
   });
 
+  test("the status bar paints a dark foreground over the chrome background", () => {
+    const { lines } = paint(baseOptions({ width: 200, layout: "split" }));
+    const statusLine = lines[lines.length - 1] ?? "";
+
+    expect(statusLine).toContain("\x1b[48;2;232;163;61m");
+    expect(statusLine).toContain("\x1b[38;2;31;26;18m");
+  });
+
+  test("a narrow status bar drops whole hints instead of cutting one mid-word", () => {
+    const { lines } = paint(baseOptions({ width: 90, layout: "split" }));
+    const plain = stripAnsi(lines[lines.length - 1] ?? "").trimEnd();
+
+    expect(plain.length).toBeLessThanOrEqual(90);
+    expect(plain).toContain("j/k move");
+    expect(plain).not.toMatch(/·\s*$/);
+    plain.split(" · ").forEach((hint) => expect(hint).not.toBe(""));
+  });
+
   test("an override reason replaces the key hint rather than joining it", () => {
     const { lines } = paint(
       baseOptions({ width: 200, layout: "split", model: buildNewFileModel() }),

@@ -12,6 +12,7 @@ export interface TuiTheme {
   note: string;
   fold: string;
   chrome: string;
+  statusText: string;
 }
 
 export interface Span {

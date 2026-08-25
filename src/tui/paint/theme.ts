@@ -16,6 +16,7 @@ export const theme: TuiTheme = Object.freeze({
   note: "#D2A8FF",
   fold: "#6E7681",
   chrome: "#E8A33D",
+  statusText: "#1F1A12",
 });
 
 export const RESET = "\x1b[0m";
@@ -32,6 +33,7 @@ const ANSI_16: Record<string, AnsiPair> = {
   [theme.note]: { fg: "\x1b[35m", bg: "\x1b[45m" },
   [theme.fold]: { fg: "\x1b[90m", bg: "\x1b[100m" },
   [theme.chrome]: { fg: "\x1b[33m", bg: "\x1b[43m" },
+  [theme.statusText]: { fg: "\x1b[30m", bg: "\x1b[40m" },
 };
 
 export function supportsTruecolor(env: Record<string, string | undefined>): boolean {

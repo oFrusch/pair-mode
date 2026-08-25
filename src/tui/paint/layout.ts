@@ -349,15 +349,39 @@ function paintRule(width: number, truecolor: boolean): string {
   return fg(theme.fold, truecolor) + "─".repeat(width) + RESET;
 }
 
-// Without this the status bar is a blank strip, and every key in the TUI is undiscoverable.
-const KEY_HINT =
-  "j/k move · n/N hunk · a note · space fold · u layout · ^s send · ^q quit · ? keys";
+// Without these the status bar is a blank strip, and every key in the TUI is undiscoverable.
+const KEY_HINTS = [
+  "j/k move",
+  "^d/^u page",
+  "n/N hunk",
+  "v select",
+  "a note",
+  "tab cycle",
+  "d delete",
+  "space fold",
+  "u layout",
+  "^s send",
+  "^q quit",
+  "? keys",
+];
 
+const HINT_SEPARATOR = " · ";
+
+// A narrow bar drops whole hints from the tail rather than cutting one mid-word.
+function fitHints(width: number): string {
+  return KEY_HINTS.reduce((kept, hint) => {
+    const candidate = kept === "" ? hint : kept + HINT_SEPARATOR + hint;
+
+    return candidate.length <= width ? candidate : kept;
+  }, "");
+}
+
+// The bar fills with theme.chrome, so it needs a dark foreground. The terminal default is light on a dark theme.
 function paintStatus(width: number, truecolor: boolean, message: string | null): string {
-  const text = (message ?? KEY_HINT).slice(0, width);
+  const text = message === null ? fitHints(width) : message.slice(0, width);
   const padding = " ".repeat(Math.max(0, width - text.length));
 
-  return bg(theme.chrome, truecolor) + text + padding + RESET;
+  return bg(theme.chrome, truecolor) + fg(theme.statusText, truecolor) + text + padding + RESET;
 }
 
 function paintBlankLine(width: number): string {
