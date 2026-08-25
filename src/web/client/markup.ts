@@ -1,3 +1,4 @@
+import { isHexColor } from "../../helpers/hexColor";
 import type { SyntaxToken } from "../../tui/paint";
 import type { WebNote } from "../notes.types";
 import type { WebReview, WebRow } from "../review.types";
@@ -48,8 +49,11 @@ export function marksFor(
     .filter((range) => range.end > range.start);
 }
 
+// Escaping cannot stop a colour that is valid CSS, so only the hex shape a theme emits reaches a style attribute.
 function colorAt(colors: readonly (string | null)[], index: number): string | null {
-  return colors[index] ?? null;
+  const color = colors[index] ?? null;
+
+  return color !== null && isHexColor(color) ? color : null;
 }
 
 // One pass per character keeps token colour and note highlight from fighting over the same span.
@@ -94,8 +98,7 @@ export function paintCell(
 
     const body = escapeHtml(text.slice(cursor, end));
     const color = colorAt(colors, cursor);
-    const styled =
-      color === null ? body : '<span style="color:' + escapeHtml(color) + '">' + body + "</span>";
+    const styled = color === null ? body : '<span style="color:' + color + '">' + body + "</span>";
 
     parts.push(marked[cursor] === true ? '<mark class="noted">' + styled + "</mark>" : styled);
     cursor = end;

@@ -550,11 +550,25 @@ test("paintCell escapes hostile file content rather than emitting markup", () =>
   expect(painted).toContain("&lt;img");
 });
 
-test("paintCell escapes a token colour before it reaches the style attribute", () => {
+test("paintCell drops a token colour that is not a hex colour", () => {
   const painted = paintCell("ab", [{ start: 0, end: 2, color: '"><img onerror=x>' }], []);
 
-  expect(painted).toContain("&quot;&gt;&lt;img");
+  expect(painted).toBe("ab");
   expect(painted).not.toContain("<img");
+});
+
+test("paintCell drops a token colour that is valid CSS but not a colour", () => {
+  const colour = "red;background:url(https://attacker.example/pixel.png)";
+  const painted = paintCell("abc", [{ start: 0, end: 3, color: colour }], []);
+
+  expect(painted).toBe("abc");
+  expect(painted).not.toContain("url(");
+});
+
+test("paintCell keeps a hex colour a theme actually emits", () => {
+  const painted = paintCell("ab", [{ start: 0, end: 2, color: "#1e3a1e" }], []);
+
+  expect(painted).toBe('<span style="color:#1e3a1e">ab</span>');
 });
 
 test("paintCell wraps a marked span and leaves the rest alone", () => {

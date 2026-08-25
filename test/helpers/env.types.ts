@@ -7,5 +7,6 @@ export interface IsolatedHome {
   readonly home: string;
   readonly stateHome: string;
   readonly configHome: string;
+  readonly temp: string;
   tempDir(prefix: string): string;
 }

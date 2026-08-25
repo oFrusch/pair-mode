@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { beforeEach, afterEach } from "vitest";
 import type { IsolatedHome, IsolatedHomeOptions } from "./env.types";
 
-const HOME_VARS = ["HOME", "XDG_STATE_HOME", "XDG_CONFIG_HOME"];
+const HOME_VARS = ["HOME", "XDG_STATE_HOME", "XDG_CONFIG_HOME", "TMPDIR"];
 
 // Every test gets a private home, so nothing reads the developer's real config or state.
 export function useIsolatedHome(options: IsolatedHomeOptions = {}): IsolatedHome {
@@ -16,6 +16,7 @@ export function useIsolatedHome(options: IsolatedHomeOptions = {}): IsolatedHome
   let home = "";
   let stateHome = "";
   let configHome = "";
+  let temp = "";
 
   function tempDir(prefix: string): string {
     const dir = mkdtempSync(join(tmpdir(), prefix));
@@ -30,10 +31,14 @@ export function useIsolatedHome(options: IsolatedHomeOptions = {}): IsolatedHome
     home = tempDir("pair-mode-home-");
     stateHome = tempDir("pair-mode-state-");
     configHome = tempDir("pair-mode-config-");
+    temp = tempDir("pair-mode-tmp-");
 
     process.env["HOME"] = home;
     process.env["XDG_STATE_HOME"] = stateHome;
     process.env["XDG_CONFIG_HOME"] = configHome;
+
+    // os.tmpdir() reads TMPDIR, so a private one keeps a test off the shared directory every other process writes to.
+    process.env["TMPDIR"] = temp;
 
     cleared.forEach((name) => delete process.env[name]);
   });
@@ -61,6 +66,9 @@ export function useIsolatedHome(options: IsolatedHomeOptions = {}): IsolatedHome
     },
     get configHome() {
       return configHome;
+    },
+    get temp() {
+      return temp;
     },
     tempDir,
   };
