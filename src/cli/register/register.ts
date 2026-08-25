@@ -252,9 +252,7 @@ export function correctMultiEditMatchers(homeDir: string): RegisterResult {
   return { path, changed: true, backupPath, note };
 }
 
-function writeReExport(path: string, target: string): RegisterResult {
-  const content = `export * from "${target}";\n`;
-
+function writeFileIfChanged(path: string, content: string): RegisterResult {
   if (existsSync(path) && readFileSync(path, "utf-8") === content) {
     return { path, changed: false, backupPath: null };
   }
@@ -264,6 +262,15 @@ function writeReExport(path: string, target: string): RegisterResult {
   writeFileSync(path, content, "utf-8");
 
   return { path, changed: true, backupPath };
+}
+
+function writeReExport(path: string, target: string): RegisterResult {
+  return writeFileIfChanged(path, `export * from "${target}";\n`);
+}
+
+// pi imports the module's default export and rejects the extension when that export is not a function.
+export function piExtensionSource(target: string): string {
+  return `export * from "${target}";\nexport { default } from "${target}";\n`;
 }
 
 export function isReExportRegistered(path: string, target: string): boolean {
@@ -289,5 +296,5 @@ export function piExtensionPath(homeDir: string): string {
 
 export function registerPi(homeDir: string, installRoot: string): RegisterResult {
   const target = join(installRoot, "dist", "pi.js");
-  return writeReExport(piExtensionPath(homeDir), target);
+  return writeFileIfChanged(piExtensionPath(homeDir), piExtensionSource(target));
 }

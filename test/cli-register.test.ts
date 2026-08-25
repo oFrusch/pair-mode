@@ -1,12 +1,15 @@
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { test, expect, beforeEach } from "vitest";
 import {
   claudeCodeSettingsPath,
   codexHooksPath,
   correctMultiEditMatchers,
   registerClaudeCode,
+  piExtensionPath,
+  piExtensionSource,
+  registerPi,
 } from "../src/cli/register";
 
 let homeDir: string;
@@ -77,4 +80,32 @@ test("correcting a MultiEdit-only matcher drops the whole hook group instead of 
   expect(hooks).toHaveLength(1);
   expect(hooks[0]?.matcher).toBe("Write|Edit");
   expect(hooks.some((group) => group.matcher === "")).toBe(false);
+});
+
+test("the pi extension file re-exports the default factory, because pi loads only the default export", () => {
+  const result = registerPi(homeDir, installDir);
+  const written = readFileSync(piExtensionPath(homeDir), "utf-8");
+  const target = join(installDir, "dist", "pi.js");
+
+  expect(result.changed).toBe(true);
+  expect(written).toContain(`export { default } from "${target}";`);
+  expect(written).toContain(`export * from "${target}";`);
+});
+
+test("re-registering pi over an identical extension file reports no change", () => {
+  registerPi(homeDir, installDir);
+
+  expect(registerPi(homeDir, installDir).changed).toBe(false);
+});
+
+test("re-registering pi over a default-less extension file rewrites it", () => {
+  const path = piExtensionPath(homeDir);
+  const target = join(installDir, "dist", "pi.js");
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `export * from "${target}";\n`, "utf-8");
+
+  const result = registerPi(homeDir, installDir);
+
+  expect(result.changed).toBe(true);
+  expect(readFileSync(path, "utf-8")).toBe(piExtensionSource(target));
 });

@@ -123,3 +123,18 @@ test("a call for a directory pair mode has not enabled resolves block: false", a
 
   expect(result).toEqual({ block: false });
 });
+
+test("the module default export is the factory pi calls, and it subscribes to tool_call", async () => {
+  const module = await import("../src/adapters/pi");
+  const events: string[] = [];
+
+  expect(typeof module.default).toBe("function");
+
+  module.default({
+    on: (event) => {
+      events.push(event);
+    },
+  });
+
+  expect(events).toEqual(["tool_call"]);
+});

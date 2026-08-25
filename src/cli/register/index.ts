@@ -11,5 +11,6 @@ export {
   opencodePluginPath,
   registerOpencode,
   piExtensionPath,
+  piExtensionSource,
   registerPi,
 } from "./register";
