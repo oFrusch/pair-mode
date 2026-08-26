@@ -7,6 +7,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- The web review renders an inline layout and a split layout, and `u` swaps them.
+- The inline layout puts every note in the right margin and draws a leader to the line it covers.
+- The split layout threads every note under the last line it covers.
+- The web page opens in the layout the `layout` setting names.
+
+### Changed
+
+- The web page replaces the docked notes panel and the full-width amber bar with a path line and a status line.
+- A split row with no line on one side renders as hatched padding instead of blank space.
+
 ## [0.1.1] - 2026-08-26
 
 ### Added

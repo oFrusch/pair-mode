@@ -198,7 +198,7 @@ export function startWebServer(options: WebServerOptions): Promise<WebServer> {
 
     if (url === base && request.method === "GET") {
       response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
-      response.end(renderPage());
+      response.end(renderPage(options.layout));
       return;
     }
 

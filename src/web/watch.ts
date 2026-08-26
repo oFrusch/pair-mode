@@ -40,6 +40,7 @@ export async function startWebWatch(
   const web: WebServer = await startWebServer({
     port: options.port,
     token: options.token,
+    layout: config.layout,
     onVerdict(id, questions) {
       client.write(encode({ type: "verdict", id, questions }));
     },

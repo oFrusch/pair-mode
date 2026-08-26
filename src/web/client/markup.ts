@@ -25,6 +25,10 @@ function tokensOf(row: WebRow, pane: Pane): SyntaxToken[] {
   return pane === "right" ? row.rightTokens : row.leftTokens;
 }
 
+function other(pane: Pane): Pane {
+  return pane === "right" ? "left" : "right";
+}
+
 export function numberOf(row: WebRow, pane: Pane): number | null {
   return pane === "right" ? row.rightNumber : row.leftNumber;
 }
@@ -123,21 +127,37 @@ export function hiddenRows(review: WebReview, expanded: ReadonlySet<number>): Se
   return hidden;
 }
 
+// A row that changed on one side only pads the other, and that padding reads as void rather than as code.
+function signOf(kind: string, pane: Pane): string {
+  if (pane === "left") {
+    return kind === "del" || kind === "replace" ? "-" : " ";
+  }
+
+  return kind === "add" || kind === "replace" ? "+" : " ";
+}
+
 function cellHtml(notes: readonly WebNote[], row: WebRow, rowIndex: number, pane: Pane): string {
   const text = textOf(row, pane);
   const body = paintCell(text, tokensOf(row, pane), marksFor(notes, rowIndex, pane, text.length));
+  const number = numberOf(row, pane);
+  const void_ = number === null ? " void" : "";
 
   return (
     '<td class="num ' +
     pane +
+    void_ +
     '">' +
-    (numberOf(row, pane) ?? "") +
+    (number ?? "") +
     "</td>" +
-    '<td class="bar ' +
+    '<td class="sign ' +
     pane +
-    '"></td>' +
+    void_ +
+    '">' +
+    signOf(row.kind, pane) +
+    "</td>" +
     '<td class="code ' +
     pane +
+    void_ +
     '" data-row="' +
     rowIndex +
     '" data-pane="' +
@@ -153,6 +173,21 @@ function foldsByStart(review: WebReview): Map<number, number> {
   return new Map(review.folds.map((fold, foldIndex) => [fold.start, foldIndex]));
 }
 
+const SPLIT_COLUMNS = 6;
+const INLINE_COLUMNS = 4;
+
+function foldHtml(foldIndex: number, count: number, columns: number): string {
+  return (
+    '<tr class="fold" data-fold="' +
+    foldIndex +
+    '"><td colspan="' +
+    columns +
+    '">' +
+    count +
+    " unchanged lines</td></tr>"
+  );
+}
+
 export function tableHtml(
   review: WebReview,
   notes: readonly WebNote[],
@@ -160,20 +195,14 @@ export function tableHtml(
 ): string {
   const hidden = hiddenRows(review, expanded);
   const byStart = foldsByStart(review);
-  const parts: string[] = ["<table>"];
+  const parts: string[] = ['<table class="split">'];
 
   review.rows.forEach((row, index) => {
     const foldIndex = byStart.get(index);
     const fold = foldIndex === undefined ? undefined : review.folds[foldIndex];
 
     if (foldIndex !== undefined && fold !== undefined && !expanded.has(foldIndex)) {
-      parts.push(
-        '<tr class="fold" data-fold="' +
-          foldIndex +
-          '"><td colspan="6">' +
-          fold.count +
-          " unchanged lines</td></tr>",
-      );
+      parts.push(foldHtml(foldIndex, fold.count, SPLIT_COLUMNS));
     }
 
     if (hidden.has(index)) {
@@ -188,6 +217,144 @@ export function tableHtml(
         cellHtml(notes, row, index, "right") +
         "</tr>",
     );
+
+    parts.push(threadsAt(review, notes, index, SPLIT_COLUMNS));
+  });
+
+  parts.push("</table>");
+
+  return parts.join("");
+}
+
+interface InlineLine {
+  pane: Pane;
+  sign: string;
+  kind: string;
+}
+
+// A replace row changed on both sides, so one column has to show the old line above the new one.
+function inlineLines(kind: string): InlineLine[] {
+  if (kind === "del") {
+    return [{ pane: "left", sign: "-", kind: "del" }];
+  }
+
+  if (kind === "add") {
+    return [{ pane: "right", sign: "+", kind: "add" }];
+  }
+
+  if (kind === "replace") {
+    return [
+      { pane: "left", sign: "-", kind: "del" },
+      { pane: "right", sign: "+", kind: "add" },
+    ];
+  }
+
+  return [{ pane: "right", sign: " ", kind: "context" }];
+}
+
+// A context row holds the same text on both sides, so a note taken in either pane still marks it.
+function inlineMarks(
+  notes: readonly WebNote[],
+  rowIndex: number,
+  kind: string,
+  pane: Pane,
+  length: number,
+): MarkRange[] {
+  if (kind !== "context") {
+    return marksFor(notes, rowIndex, pane, length);
+  }
+
+  return [
+    ...marksFor(notes, rowIndex, "left", length),
+    ...marksFor(notes, rowIndex, "right", length),
+  ];
+}
+
+// One line can carry several notes, so the anchor holds every index that starts here.
+function anchorsAt(
+  notes: readonly WebNote[],
+  rowIndex: number,
+  kind: string,
+  pane: Pane,
+): number[] {
+  return notes
+    .map((note, index) => ({ note, index }))
+    .filter(
+      (entry) =>
+        entry.note.startRow === rowIndex && (kind === "context" || entry.note.pane === pane),
+    )
+    .map((entry) => entry.index);
+}
+
+function inlineRowHtml(
+  review: WebReview,
+  notes: readonly WebNote[],
+  rowIndex: number,
+  line: InlineLine,
+): string {
+  const row = review.rows[rowIndex];
+
+  if (row === undefined) {
+    return "";
+  }
+
+  const text = textOf(row, line.pane);
+  const body = paintCell(
+    text,
+    tokensOf(row, line.pane),
+    inlineMarks(notes, rowIndex, row.kind, line.pane, text.length),
+  );
+  const anchors = anchorsAt(notes, rowIndex, row.kind, line.pane);
+  const leftNumber = line.pane === "left" ? (row.leftNumber ?? "") : "";
+  const rightNumber = line.pane === "right" ? (row.rightNumber ?? "") : "";
+
+  return (
+    '<tr class="' +
+    line.kind +
+    '"' +
+    (anchors.length === 0 ? "" : ' data-anchor="' + anchors.join(" ") + '"') +
+    '><td class="num old">' +
+    leftNumber +
+    '</td><td class="num new">' +
+    rightNumber +
+    '</td><td class="sign">' +
+    line.sign +
+    '</td><td class="code ' +
+    line.pane +
+    '" data-row="' +
+    rowIndex +
+    '" data-pane="' +
+    line.pane +
+    '">' +
+    body +
+    "</td></tr>"
+  );
+}
+
+export function inlineHtml(
+  review: WebReview,
+  notes: readonly WebNote[],
+  expanded: ReadonlySet<number>,
+): string {
+  const hidden = hiddenRows(review, expanded);
+  const byStart = foldsByStart(review);
+  const parts: string[] = ['<table class="inline">'];
+
+  review.rows.forEach((row, index) => {
+    const foldIndex = byStart.get(index);
+    const fold = foldIndex === undefined ? undefined : review.folds[foldIndex];
+
+    if (foldIndex !== undefined && fold !== undefined && !expanded.has(foldIndex)) {
+      parts.push(foldHtml(foldIndex, fold.count, INLINE_COLUMNS));
+    }
+
+    if (hidden.has(index)) {
+      return;
+    }
+
+    inlineLines(row.kind).forEach((line) => {
+      parts.push(inlineRowHtml(review, notes, index, line));
+    });
   });
 
   parts.push("</table>");
@@ -216,33 +383,61 @@ export function labelOf(review: WebReview, note: SpanRange): string {
     return "";
   }
 
-  const start = numberOf(startRow, note.pane);
+  // A selection can start on the padding side of a row, and that side carries no line number.
+  const start = numberOf(startRow, note.pane) ?? numberOf(startRow, other(note.pane));
   const end = numberOf(endRow, note.pane);
+
+  if (start === null) {
+    return "";
+  }
 
   return start === end || end === null ? "L" + start : "L" + start + "-" + end;
 }
 
-export function notesHtml(review: WebReview, notes: readonly WebNote[]): string {
+// A thread renders under the last line its note covers, so the note reads as a reply to that line.
+function threadsAt(
+  review: WebReview,
+  notes: readonly WebNote[],
+  rowIndex: number,
+  columns: number,
+): string {
   return notes
+    .map((note, index) => ({ note, index }))
+    .filter((entry) => entry.note.endRow === rowIndex)
     .map(
-      (note, index) =>
-        '<div class="note"><button class="drop" data-drop="' +
-        index +
-        '">&times;</button>' +
-        '<div class="where">' +
-        escapeHtml(labelOf(review, note)) +
-        "</div>" +
-        '<div class="quote">' +
-        escapeHtml(quoteOf(review, note)) +
-        "</div>" +
-        '<div class="body">' +
-        escapeHtml(note.text) +
-        "</div></div>",
+      (entry) =>
+        '<tr class="thread"><td colspan="' +
+        columns +
+        '"><div class="at">' +
+        escapeHtml(labelOf(review, entry.note)) +
+        "</div><p>" +
+        escapeHtml(entry.note.text) +
+        '</p><button class="drop" data-drop="' +
+        entry.index +
+        '" aria-label="Remove note">&times;</button></td></tr>',
     )
     .join("");
 }
 
-// The panel matches the order the agent receives, so a note sits where its line sits.
+// The inline layout keeps notes out of the code column, so each one gets a card the margin can place.
+export function marginNotesHtml(review: WebReview, notes: readonly WebNote[]): string {
+  return notes
+    .map(
+      (note, index) =>
+        '<div class="note" data-card="' +
+        index +
+        '"><button class="drop" data-drop="' +
+        index +
+        '" aria-label="Remove note">&times;</button><div class="at">' +
+        escapeHtml(labelOf(review, note)) +
+        "</div><p>" +
+        escapeHtml(note.text) +
+        "</p></div>",
+    )
+    .join("");
+}
+
+// The notes reach the agent in this order, so a note sits where its line sits.
 export function sortedNotes(notes: readonly WebNote[]): WebNote[] {
   return [...notes].sort((first, second) =>
     first.startRow === second.startRow
