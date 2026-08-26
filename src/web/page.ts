@@ -18,7 +18,6 @@ const STYLE = `
   --note-tint: rgba(210, 168, 255, 0.16);
   --amber: ${theme.chrome};
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --serif: "Iowan Old Style", Georgia, "Times New Roman", serif;
 }
 
 * { box-sizing: border-box; }
@@ -173,12 +172,10 @@ tr.thread .at {
 }
 
 tr.thread p, .note p {
-  margin: 2px 0 0;
+  margin: 3px 0 0;
   max-width: 62ch;
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 16px;
-  line-height: 1.42;
+  font-size: 13px;
+  line-height: 1.5;
   color: #e7e2ea;
 }
 
@@ -268,7 +265,7 @@ textarea {
   border-radius: 4px;
   background: var(--bg);
   color: var(--text);
-  font: italic 15px/1.4 var(--serif);
+  font: 13px/1.5 var(--mono);
   resize: vertical;
 }
 
