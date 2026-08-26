@@ -7,6 +7,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- `pnpm release patch|minor|major` runs the gates, bumps the version, rolls the changelog, tags, publishes, and pushes.
+- The README shows a screenshot of each review mode.
+
+### Fixed
+
+- The README names the correct micro save key, which is Ctrl+W.
+
 ## [0.1.0] - 2026-08-26
 
 First public release.
@@ -41,9 +50,18 @@ First public release.
 
 ## Releasing
 
-1. Bump the version in `package.json`.
-2. Move the `[Unreleased]` entries into a new version section in this file.
-3. Commit the version bump and the changelog.
-4. Tag the commit as `v<version>`.
-5. Push the commit and the tag.
-6. Run `npm publish`. The `prepublishOnly` script builds `dist` for you.
+Run one command from a clean `main`:
+
+```
+pnpm release patch     # or minor, or major
+```
+
+The script refuses to run unless the branch is `main`, the tree is clean, and `HEAD`
+matches `origin/main`. It then runs the typecheck, the lint, the format check, the tests,
+and the build. It bumps the version, moves the `[Unreleased]` entries into a dated
+section, commits, tags `v<version>`, publishes to npm, and pushes the commit and the tag.
+
+The script publishes before it pushes. A failed publish therefore leaves the remote
+untouched, and `git tag -d v<version> && git reset --hard HEAD~1` undoes the local state.
+
+Add `--dry-run` to stop after the tag and before the publish.

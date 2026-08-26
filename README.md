@@ -1,4 +1,5 @@
 # pair mode
+
 #### For when your agent needs a rubber ducky.
 
 `pair-mode` is a tool that allows you to sit somewhere between being an approval monkey for your agent running in manual mode and just totally vibe coding in auto mode.
@@ -25,12 +26,12 @@ required hooks, and writes a config file.
 
 ## Supported CLIs
 
-| CLI         | Hook                                             | Status                                                                                        |
-| ----------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| Claude Code | `PreToolUse`, matcher `Write\|Edit\|MultiEdit`   | Should work.                                                                                      |
-| Codex       | `PreToolUse`, matcher `apply_patch\|Edit\|Write` | Should work.                                                                                      |
+| CLI         | Hook                                             | Status                                      |
+| ----------- | ------------------------------------------------ | ------------------------------------------- |
+| Claude Code | `PreToolUse`, matcher `Write\|Edit\|MultiEdit`   | Should work.                                |
+| Codex       | `PreToolUse`, matcher `apply_patch\|Edit\|Write` | Should work.                                |
 | pi          | `tool_call` extension hook                       | Will maybe work. Probably not. Coming soon. |
-| opencode    | `tool.execute.before` plugin hook                | Will maybe work. Probably not. Coming soon.    |
+| opencode    | `tool.execute.before` plugin hook                | Will maybe work. Probably not. Coming soon. |
 
 ## The /pair command
 
@@ -84,7 +85,6 @@ keyboard only.
 | `Ctrl+s`           | —                | Send the notes. The hook denies the edit.                                                                          |
 | `Ctrl+q` `Ctrl+c`  | —                | Quit. With no notes, the edit applies. With notes pending, asks: `s` sends, `d` discards and quits, `Esc` cancels. |
 | `?`                | —                | Toggle the keymap overlay.                                                                                         |
-
 
 ## Multiplexers
 
