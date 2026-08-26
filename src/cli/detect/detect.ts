@@ -13,6 +13,7 @@ import type {
   PathResolver,
 } from "./types";
 import { defaultResolvesOnPath } from "../../helpers/resolvesOnPath";
+import { isReleased } from "../released";
 
 interface CliSpec {
   name: CliName;
@@ -50,7 +51,7 @@ const CLI_SPECS: CliSpec[] = [
 ];
 
 function detectClis(home: string, resolvesOnPath: PathResolver): CliDetection[] {
-  return CLI_SPECS.map((spec) => ({
+  return CLI_SPECS.filter((spec) => isReleased(spec.name)).map((spec) => ({
     name: spec.name,
     present: resolvesOnPath(spec.binary) || existsSync(spec.configDir(home)),
     configPath: spec.configPath(home),

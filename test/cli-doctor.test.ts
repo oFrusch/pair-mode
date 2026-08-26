@@ -40,9 +40,11 @@ test("doctor on an unconfigured machine exits 1 and names each failing check", a
   expect(failing).toContain("controlling terminal");
   expect(failing).toContain("claude-code hook");
   expect(failing).toContain("codex hook");
-  expect(failing).toContain("opencode hook");
-  expect(failing).toContain("pi hook");
   expect(failing).toContain("dist/ entry points");
+
+  // opencode and pi ship in 1.0.0, so doctor stays quiet about a CLI the user never registered.
+  expect(failing).not.toContain("opencode hook");
+  expect(failing).not.toContain("pi hook");
 });
 
 test("doctor on a fully configured temporary home exits 0", async () => {

@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { configPath, loadConfig, saveConfig } from "../../core/config";
 import type { EditorName, Layout, MultiplexerName, PairConfig } from "../../core/config";
 import { detectInstalls } from "../detect";
-import { installRoot } from "../install-root";
+import { describeEphemeralRoot, installRoot } from "../install-root";
 import { runDoctor } from "../doctor";
 import {
   backupIfPresent,
@@ -16,6 +16,7 @@ import {
   registerPi,
 } from "../register";
 import type { CliName } from "../register";
+import { RELEASED_CLIS } from "../released";
 import type { Prompter, SetupOptions, SetupResult } from "./types";
 
 const EDITOR_NAMES: EditorName[] = ["auto", "pair", "micro", "nvim", "vim", "nano"];
@@ -67,6 +68,21 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
   const changedFiles: string[] = [];
 
   try {
+    // Setup writes root as an absolute path into every CLI config, so a cache run leaves a dead hook behind.
+    const ephemeral = describeEphemeralRoot(root);
+
+    if (ephemeral.ephemeral) {
+      console.log(`pair-mode is running from ${ephemeral.cache}, a package cache that npm prunes.`);
+      console.log(
+        "Setup writes that path into every CLI config, so the hooks would break when the cache clears.",
+      );
+      console.log("Install pair-mode first, then run setup again:");
+      console.log("  npm install -g pair-mode");
+      console.log("  pair-mode setup");
+
+      return { changedFiles, stopped: true, doctorExitCode: 1 };
+    }
+
     const report = detectInstalls({
       resolvesOnPath: options.resolvesOnPath,
       homeDir: home,
@@ -125,7 +141,7 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
     const defaultClis = presentClis.join(",");
     const clisAnswer = withDefault(
       await prompter.question(
-        `Register with which CLIs (comma-separated: claude-code,codex,opencode,pi) [${defaultClis}]: `,
+        `Register with which CLIs (comma-separated: ${RELEASED_CLIS.join(",")}) [${defaultClis}]: `,
       ),
       defaultClis,
     );

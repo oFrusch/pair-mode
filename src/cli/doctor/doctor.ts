@@ -8,6 +8,7 @@ import { probeSocket } from "../../transports/session";
 import { resolve as resolveEditor } from "../../editors/index";
 import { detect as detectMultiplexer } from "../../multiplexers/index";
 import { installRoot } from "../install-root";
+import { isReleased } from "../released";
 import {
   claudeCodeSettingsPath,
   codexHooksPath,
@@ -149,12 +150,15 @@ function checkClis(home: string, root: string): DoctorCheck[] {
     },
   ];
 
+  // An unreleased CLI still reports when the user registered it by hand, so a stale hook stays visible.
+  const shown = specs.filter((spec) => isReleased(spec.cli) || spec.registered);
+
   // A CLI with no hook has no use for the command, so only a registered CLI reports one.
-  const commandChecks = specs
+  const commandChecks = shown
     .filter((spec) => spec.registered)
     .map((spec) => describeCommand(spec.cli, home));
 
-  return [...specs.map(describeRegistration), ...commandChecks];
+  return [...shown.map(describeRegistration), ...commandChecks];
 }
 
 // The build script prepends this exact line, so a mismatch means the entry point was not built by scripts/build.mjs.
