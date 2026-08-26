@@ -30,6 +30,27 @@ script, but a git checkout does not run that script.
 Codex has no `MultiEdit` matcher alias. Its `apply_patch` parser reads single-file Add,
 Update, and Delete patches only. A multi-file or rename patch passes through untouched.
 
+## The /pair command
+
+`pair-mode setup` installs a `/pair` command for every CLI it registers. The command
+toggles pair mode for the current directory and tells the agent how a held edit comes
+back.
+
+| CLI         | Installed at                          |
+| ----------- | ------------------------------------- |
+| Claude Code | `~/.claude/commands/pair.md`          |
+| Codex       | `~/.codex/prompts/pair.md`            |
+| opencode    | `~/.config/opencode/commands/pair.md` |
+| pi          | `~/.pi/agent/skills/pair/SKILL.md`    |
+
+Use `/pair on`, `/pair off`, and `/pair status` inside the agent. pi reads the action
+from your message instead, because pi loads the file as a skill.
+
+`pair-mode doctor` reports the command as a warning when it is missing. A missing
+command never breaks the hook, so the exit code stays 0.
+
+Setup backs up a file you edited before it rewrites one.
+
 ## Editors
 
 | Editor         | Diff colour | Syntax colour on changed rows                                                                                                                                                                                                    |

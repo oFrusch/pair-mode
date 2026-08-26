@@ -12,13 +12,16 @@ import {
   registerClaudeCode,
   registerCodex,
   registerOpencode,
+  registerPairCommand,
   registerPi,
 } from "../register";
+import type { CliName } from "../register";
 import type { Prompter, SetupOptions, SetupResult } from "./types";
 
 const EDITOR_NAMES: EditorName[] = ["auto", "pair", "micro", "nvim", "vim", "nano"];
 const MULTIPLEXER_NAMES: MultiplexerName[] = ["auto", "zellij", "tmux", "none"];
 const LAYOUTS: Layout[] = ["split", "inline"];
+const CLI_NAMES: CliName[] = ["claude-code", "codex", "opencode", "pi"];
 
 function toEditorName(value: string): EditorName {
   return EDITOR_NAMES.find((name) => name === value) ?? "auto";
@@ -245,6 +248,21 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
         if (result.changed) {
           pushChanged(changedFiles, result.path, result.backupPath);
         }
+      }
+    }
+
+    // Every registered CLI also gets the /pair command, so a fresh install ships the toggle.
+    for (const name of selectedClis) {
+      const cli = CLI_NAMES.find((candidate) => candidate === name);
+
+      if (cli === undefined) {
+        continue;
+      }
+
+      const result = registerPairCommand(home, cli);
+
+      if (result.changed) {
+        pushChanged(changedFiles, result.path, result.backupPath);
       }
     }
 

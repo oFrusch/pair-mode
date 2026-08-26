@@ -11,11 +11,14 @@ import { installRoot } from "../install-root";
 import {
   claudeCodeSettingsPath,
   codexHooksPath,
+  isPairCommandRegistered,
   isPreToolUseRegistered,
   isReExportRegistered,
   opencodePluginPath,
+  pairCommandPath,
   piExtensionPath,
 } from "../register";
+import type { CliName } from "../register";
 import type { DoctorCheck, DoctorOptions, DoctorReport } from "./types";
 
 function checkConfig(result: ConfigResult): DoctorCheck {
@@ -69,6 +72,20 @@ function checkControllingTerminal(openTty: () => number): DoctorCheck {
   }
 }
 
+const COMMAND_CLIS: CliName[] = ["claude-code", "codex", "opencode", "pi"];
+
+function describeCommand(cli: CliName, home: string): DoctorCheck {
+  const path = pairCommandPath(home, cli);
+  const present = isPairCommandRegistered(path);
+
+  return {
+    name: `${cli} /pair command`,
+    passed: present,
+    detail: present ? `installed at ${path}` : "not installed; run pair-mode setup",
+    warnOnly: true,
+  };
+}
+
 interface RegistrationSpec {
   cli: string;
   registered: boolean;
@@ -102,6 +119,24 @@ function checkClis(home: string, root: string): DoctorCheck[] {
   const piTarget = join(root, "dist", "pi.js");
   const piRegistered = isReExportRegistered(piExtensionPath(home), piTarget);
 
+  const registeredClis: CliName[] = [];
+
+  if (claudeRegistered) {
+    registeredClis.push("claude-code");
+  }
+
+  if (codexRegistered) {
+    registeredClis.push("codex");
+  }
+
+  if (opencodeRegistered) {
+    registeredClis.push("opencode");
+  }
+
+  if (piRegistered) {
+    registeredClis.push("pi");
+  }
+
   return [
     describeRegistration({
       cli: "claude-code",
@@ -123,6 +158,10 @@ function checkClis(home: string, root: string): DoctorCheck[] {
       registered: piRegistered,
       targetExists: existsSync(piTarget),
     }),
+    // A CLI with no hook has no use for the command, so only a registered CLI reports one.
+    ...COMMAND_CLIS.filter((cli) => registeredClis.includes(cli)).map((cli) =>
+      describeCommand(cli, home),
+    ),
   ];
 }
 

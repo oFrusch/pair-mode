@@ -6,6 +6,7 @@ import {
   registerClaudeCode,
   registerCodex,
   registerOpencode,
+  registerPairCommand,
   registerPi,
 } from "../src/cli/register";
 import { saveConfig } from "../src/core/config";
@@ -67,6 +68,10 @@ test("doctor on a fully configured temporary home exits 0", async () => {
   registerCodex(homeDir, installDir);
   registerOpencode(homeDir, installDir);
   registerPi(homeDir, installDir);
+  registerPairCommand(homeDir, "claude-code");
+  registerPairCommand(homeDir, "codex");
+  registerPairCommand(homeDir, "opencode");
+  registerPairCommand(homeDir, "pi");
 
   const distDir = join(installDir, "dist");
   mkdirSync(distDir, { recursive: true });
