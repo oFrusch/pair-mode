@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-26
+
 ### Added
 
 - The web page serves a duck favicon, and it marks its header with the duck.
