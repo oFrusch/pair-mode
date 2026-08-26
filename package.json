@@ -2,7 +2,29 @@
   "name": "pair-mode",
   "version": "0.1.0",
   "description": "Annotate a coding agent's proposed edits line by line, in your terminal.",
+  "keywords": [
+    "ai",
+    "claude-code",
+    "cli",
+    "code-review",
+    "codex",
+    "coding-agent",
+    "diff",
+    "opencode",
+    "pair-programming",
+    "terminal",
+    "tui"
+  ],
+  "homepage": "https://github.com/oFrusch/pair-mode#readme",
+  "bugs": {
+    "url": "https://github.com/oFrusch/pair-mode/issues"
+  },
   "license": "MIT",
+  "author": "ofrusch",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oFrusch/pair-mode.git"
+  },
   "bin": {
     "pair-mode": "dist/cli.js"
   },

@@ -7,8 +7,14 @@ does not apply until you close the editor.
 ## Install
 
 ```
-npx pair-mode setup
+npm install -g pair-mode
+pair-mode setup
 ```
+
+Install pair-mode globally before you run setup. Setup writes the install path into each
+CLI's config as an absolute path. `npx pair-mode setup` runs from a package cache that
+npm later prunes, which would leave every hook pointing at a deleted file. Setup detects
+that case and stops.
 
 The setup command detects the CLIs and multiplexers on your machine, registers the
 required hooks, and writes a config file. Restart Claude Code after setup, because
@@ -20,12 +26,12 @@ script, but a git checkout does not run that script.
 
 ## Supported CLIs
 
-| CLI         | Hook                                             | Status                                                                                                                            |
-| ----------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| Claude Code | `PreToolUse`, matcher `Write\|Edit\|MultiEdit`   | Tested                                                                                                                            |
-| Codex       | `PreToolUse`, matcher `apply_patch\|Edit\|Write` | Tested                                                                                                                            |
-| pi          | `tool_call` extension hook                       | Tested                                                                                                                            |
-| opencode    | `tool.execute.before` plugin hook                | Untested — opencode is not installed on the author's machine. Ships against the documented plugin contract, with unit tests only. |
+| CLI         | Hook                                             | Status                                                                                        |
+| ----------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Claude Code | `PreToolUse`, matcher `Write\|Edit\|MultiEdit`   | Shipped.                                                                                      |
+| Codex       | `PreToolUse`, matcher `apply_patch\|Edit\|Write` | Shipped.                                                                                      |
+| pi          | `tool_call` extension hook                       | Planned for 1.0.0. The adapter exists and passes its unit tests. Setup does not offer it yet. |
+| opencode    | `tool.execute.before` plugin hook                | Planned for 1.0.0. Nobody has run it against a live opencode. Setup does not offer it yet.    |
 
 Codex has no `MultiEdit` matcher alias. Its `apply_patch` parser reads single-file Add,
 Update, and Delete patches only. A multi-file or rename patch passes through untouched.
@@ -104,10 +110,9 @@ terminal, which then selects text for copy — the same as any other terminal pr
 
 Claude Code and Codex run their hooks with no controlling terminal. `/dev/tty` returns
 `ENXIO` there. Pane mode needs zellij or tmux to open an editor pane under those two
-CLIs. pi and opencode run hooks with a controlling terminal already attached, so pane
-mode needs no multiplexer for them.
+CLIs.
 
-Session mode removes the requirement for every CLI. See the next section.
+Session mode removes the requirement. See the next section.
 
 ## Session modes
 
