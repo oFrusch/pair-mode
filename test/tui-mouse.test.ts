@@ -366,17 +366,17 @@ function buildKeyState(overrides: Partial<TuiState> = {}): TuiState {
 }
 
 describe("applyKey — selection", () => {
-  test("v starts a selection at the cursor", () => {
+  test("v selects the whole row, not one column", () => {
     const state = buildKeyState({ model: { ...buildKeyState().model, cursor: 2 } });
 
-    const next = applyKey(state, key("v"), 24);
+    const next = applyKey(state, key("v"), 24, 120);
 
     expect(next.selection).toEqual({
       pane: "right",
       anchorRow: 2,
       anchorColumn: 0,
       headRow: 2,
-      headColumn: 0,
+      headColumn: "line2".length - 1,
     });
     expect(next.mode).toBe("select");
   });
@@ -387,10 +387,28 @@ describe("applyKey — selection", () => {
       selection: { pane: "right", anchorRow: 1, anchorColumn: 0, headRow: 1, headColumn: 0 },
     });
 
-    const next = applyKey(state, key("escape"), 24);
+    const next = applyKey(state, key("escape"), 24, 120);
 
     expect(next.selection).toBeNull();
     expect(next.mode).toBe("browse");
+  });
+
+  test("j in select mode extends the head to the end of the row it lands on", () => {
+    const state = buildKeyState({
+      mode: "select",
+      selection: {
+        pane: "right",
+        anchorRow: 0,
+        anchorColumn: 0,
+        headRow: 0,
+        headColumn: "line0".length - 1,
+      },
+    });
+
+    const next = applyKey(state, key("j"), 24, 120);
+
+    expect(next.selection?.headRow).toBe(1);
+    expect(next.selection?.headColumn).toBe("line1".length - 1);
   });
 
   test("j in select mode moves the head, not the cursor", () => {
@@ -400,7 +418,7 @@ describe("applyKey — selection", () => {
     });
     const originalCursor = state.model.cursor;
 
-    const next = applyKey(state, key("j"), 24);
+    const next = applyKey(state, key("j"), 24, 120);
 
     expect(next.selection?.headRow).toBe(1);
     expect(next.model.cursor).toBe(originalCursor);

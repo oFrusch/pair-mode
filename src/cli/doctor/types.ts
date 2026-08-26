@@ -1,4 +1,5 @@
 import type { DetectAdapters } from "../../multiplexers/multiplexer.types";
+import type { PairConfig } from "../../core/config";
 
 export interface DoctorCheck {
   name: string;
@@ -17,6 +18,8 @@ export interface DoctorOptions {
   resolvesShiki?: () => boolean;
   directory?: string;
   probeSocket?: (path: string) => Promise<boolean>;
+  // An explicit config replaces the file read, so a test states the transport it is asserting about.
+  config?: PairConfig;
 }
 
 export interface DoctorReport {

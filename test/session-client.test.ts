@@ -1,6 +1,6 @@
 import { createServer, createConnection } from "node:net";
 import type { Server, Socket } from "node:net";
-import { mkdtempSync, existsSync, writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, expect, beforeEach, afterEach } from "vitest";
@@ -15,6 +15,9 @@ import type { SessionServer } from "../src/transports/session";
 import { DEFAULT_CONFIG } from "../src/core/config";
 import type { PairConfig } from "../src/core/config";
 import type { EditRequest } from "../src/transports";
+import { useIsolatedHome } from "./helpers/env";
+
+const isolated = useIsolatedHome();
 
 let socketPath: string;
 let fake: Server | null = null;
@@ -22,7 +25,7 @@ let server: SessionServer | null = null;
 const accepted: Socket[] = [];
 
 beforeEach(() => {
-  const dir = mkdtempSync(join(tmpdir(), "pair-cli-"));
+  const dir = isolated.tempDir("pair-cli-");
   socketPath = join(dir, "s.sock");
 });
 
@@ -145,14 +148,15 @@ test("a missing socket file fails open without waiting for the timeout", async (
   expect(outcome).toEqual({ reviewed: false, detail: "no pair-mode watcher attached" });
 });
 
-test("a stale socket file is unlinked and the review fails open", async () => {
+// A restarted watcher can own the path by the time the error fires, so the client must never unlink it.
+test("a stale socket file fails open and is left in place for bindSocket to clear", async () => {
   writeFileSync(socketPath, "");
 
   const transport = createSessionTransport(socketPath);
   const outcome = await transport.review(request, configWithTimeout(60));
 
-  expect(outcome.reviewed).toBe(false);
-  expect(existsSync(socketPath)).toBe(false);
+  expect(outcome).toEqual({ reviewed: false, detail: "no pair-mode watcher attached" });
+  expect(existsSync(socketPath)).toBe(true);
 });
 
 test("the session transport carries the session name", () => {

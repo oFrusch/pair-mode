@@ -136,3 +136,24 @@ test("an empty headerHint still renders a clean header with no dangling line", (
   expect(result.left).toContain("# tool: Edit");
   expect(result.left.join("\n")).not.toContain("F3 moves between panes");
 });
+
+test("renderInline folds distant unchanged lines instead of rendering the whole file", () => {
+  const lines = Array.from({ length: 200 }, (_, index) => `line ${index + 1}`);
+  const changed = [...lines];
+  changed[100] = "line 101 changed";
+
+  const result = renderInline({
+    before: `${lines.join("\n")}\n`,
+    after: `${changed.join("\n")}\n`,
+    tool: "Edit",
+    path: "/repo/big.txt",
+    context: 5,
+    minFold: 4,
+    headerHint: [],
+  });
+
+  expect(result.left.filter((line) => line.startsWith("⋯ ")).length).toBe(2);
+  expect(result.left.length).toBeLessThan(30);
+  expect(result.left.length).toBe(result.numbers.length);
+  expect(result.left).toContain("▌▌+ line 101 changed");
+});

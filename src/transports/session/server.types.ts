@@ -1,6 +1,7 @@
 export interface SessionServerOptions {
   socketPath: string;
   generateId?: () => string;
+  onError?: (error: Error) => void;
 }
 
 export interface SessionServer {

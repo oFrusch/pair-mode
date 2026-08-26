@@ -1,27 +1,19 @@
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, realpathSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, dirname } from "node:path";
-import { test, expect, beforeEach, afterEach } from "vitest";
+import { mkdirSync, writeFileSync, existsSync, realpathSync } from "node:fs";
+import { dirname } from "node:path";
+import { test, expect, beforeEach } from "vitest";
 import { pairOn, pairOff, pairStatus, pairOnWeb } from "../src/cli/toggle";
 import { sessionUrlPath } from "../src/core/state";
 import { runDoctor } from "../src/cli/doctor";
 import { sessionSocketPath } from "../src/core/state";
+import { DEFAULT_CONFIG } from "../src/core/config";
+import { useIsolatedHome } from "./helpers/env";
 
-let originalXdgStateHome: string | undefined;
+const isolated = useIsolatedHome();
+
 let repoRoot: string;
 
 beforeEach(() => {
-  originalXdgStateHome = process.env["XDG_STATE_HOME"];
-  process.env["XDG_STATE_HOME"] = mkdtempSync(join(tmpdir(), "pair-mode-state-"));
-  repoRoot = realpathSync(mkdtempSync(join(tmpdir(), "pair-mode-repo-")));
-});
-
-afterEach(() => {
-  if (originalXdgStateHome === undefined) {
-    delete process.env["XDG_STATE_HOME"];
-  } else {
-    process.env["XDG_STATE_HOME"] = originalXdgStateHome;
-  }
+  repoRoot = realpathSync(isolated.tempDir("pair-mode-repo-"));
 });
 
 // Signalling this process would kill the test worker, so every link file names a pid that cannot exist.
@@ -72,7 +64,10 @@ test("on --web reuses a link a watcher already published rather than spawning an
 });
 
 test("doctor warns rather than fails when no watcher is attached and the transport is pane", async () => {
-  const report = await runDoctor({ directory: repoRoot });
+  const report = await runDoctor({
+    directory: repoRoot,
+    config: { ...DEFAULT_CONFIG, transport: "pane" },
+  });
   const session = report.checks.find((check) => check.name.startsWith("session:"));
 
   expect(session?.warnOnly).toBe(true);

@@ -1,19 +1,23 @@
 import { build } from "esbuild";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, chmodSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { test, expect, beforeAll } from "vitest";
+import { test, expect, beforeAll, afterAll } from "vitest";
+import { useIsolatedHome } from "./helpers/env";
 import { enable } from "../src/core/state";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
 
+const isolated = useIsolatedHome();
+
+let outDir: string;
 let bundlePath: string;
 
 beforeAll(async () => {
-  const outDir = mkdtempSync(join(tmpdir(), "pair-mode-bundle-"));
+  outDir = mkdtempSync(join(tmpdir(), "pair-mode-bundle-"));
   bundlePath = join(outDir, "claude-code.js");
 
   await build({
@@ -27,6 +31,10 @@ beforeAll(async () => {
       js: 'import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);',
     },
   });
+});
+
+afterAll(() => {
+  rmSync(outDir, { recursive: true, force: true });
 });
 
 // A fake tmux resolved ahead of the real one on PATH, so the harness never needs a real terminal or a real tmux server.
@@ -56,24 +64,18 @@ interface Harness {
 }
 
 function setupHarness(): Harness {
-  const stateHome = mkdtempSync(join(tmpdir(), "pair-mode-state-"));
-  const targetDir = mkdtempSync(join(tmpdir(), "pair-mode-target-"));
+  const stateHome = isolated.tempDir("pair-mode-state-");
+  const targetDir = isolated.tempDir("pair-mode-target-");
   const filePath = join(targetDir, "example.ts");
 
-  const fakeBinDir = mkdtempSync(join(tmpdir(), "pair-mode-bin-"));
+  const fakeBinDir = isolated.tempDir("pair-mode-bin-");
   const tmuxPath = join(fakeBinDir, "tmux");
   writeFileSync(tmuxPath, FAKE_TMUX, "utf-8");
   chmodSync(tmuxPath, 0o755);
 
-  const previousXdgStateHome = process.env["XDG_STATE_HOME"];
   process.env["XDG_STATE_HOME"] = stateHome;
   enable(targetDir);
-
-  if (previousXdgStateHome === undefined) {
-    delete process.env["XDG_STATE_HOME"];
-  } else {
-    process.env["XDG_STATE_HOME"] = previousXdgStateHome;
-  }
+  process.env["XDG_STATE_HOME"] = isolated.stateHome;
 
   return { stateHome, targetDir, filePath, fakeBinDir };
 }
@@ -106,8 +108,8 @@ function runAdapter(
   layout: "split" | "inline" = "split",
   configOverrides: Record<string, unknown> = {},
 ): { status: number | null; stdout: string; stderr: string } {
-  const configHome = mkdtempSync(join(tmpdir(), "pair-mode-config-"));
-  const fakeHome = mkdtempSync(join(tmpdir(), "pair-mode-home-"));
+  const configHome = isolated.tempDir("pair-mode-config-");
+  const fakeHome = isolated.tempDir("pair-mode-home-");
 
   const overrides = layout === "inline" ? { layout, ...configOverrides } : configOverrides;
 
@@ -207,10 +209,10 @@ test("a payload with no file_path exits 0 and writes nothing", () => {
 });
 
 test("a path with no flag file exits 0 and writes nothing", () => {
-  const stateHome = mkdtempSync(join(tmpdir(), "pair-mode-state-"));
-  const targetDir = mkdtempSync(join(tmpdir(), "pair-mode-target-"));
+  const stateHome = isolated.tempDir("pair-mode-state-");
+  const targetDir = isolated.tempDir("pair-mode-target-");
   const filePath = join(targetDir, "example.ts");
-  const fakeBinDir = mkdtempSync(join(tmpdir(), "pair-mode-bin-"));
+  const fakeBinDir = isolated.tempDir("pair-mode-bin-");
 
   const harness: Harness = { stateHome, targetDir, filePath, fakeBinDir };
 
@@ -237,7 +239,7 @@ test("malformed JSON on stdin exits 0 and writes nothing", () => {
 test("a multiplexer failure exits 0 and writes nothing", () => {
   const harness = setupHarness();
 
-  const brokenBinDir = mkdtempSync(join(tmpdir(), "pair-mode-bin-broken-"));
+  const brokenBinDir = isolated.tempDir("pair-mode-bin-broken-");
   const brokenTmux = join(brokenBinDir, "tmux");
   writeFileSync(brokenTmux, "#!/bin/sh\nexit 1\n", "utf-8");
   chmodSync(brokenTmux, 0o755);

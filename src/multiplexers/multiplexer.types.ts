@@ -1,4 +1,5 @@
 import type { Pane } from "../core/config";
+import type { Spawn, SpawnResult } from "../helpers/types";
 
 export type PaneSize = Pane;
 
@@ -13,12 +14,7 @@ export interface Multiplexer {
   run(argv: string[], size: PaneSize): RunResult;
 }
 
-export interface SpawnResult {
-  status: number | null;
-  stderr: string;
-}
-
-export type Spawn = (command: string, args: string[]) => SpawnResult;
+export type { Spawn, SpawnResult };
 
 export type TtyOpen = () => number;
 

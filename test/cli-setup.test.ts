@@ -1,7 +1,6 @@
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { test, expect, beforeEach, afterEach } from "vitest";
+import { test, expect, beforeEach } from "vitest";
 import {
   registerClaudeCode,
   registerCodex,
@@ -15,65 +14,16 @@ import { pairOn, pairOff, pairStatus } from "../src/cli/toggle";
 import type { Prompter } from "../src/cli/setup";
 import { configPath, loadConfig, saveConfig } from "../src/core/config";
 import type { PairConfig } from "../src/core/config";
+import { useIsolatedHome } from "./helpers/env";
+
+const isolated = useIsolatedHome({ clear: ["TMUX", "ZELLIJ"] });
 
 let homeDir: string;
 let installDir: string;
-let originalHome: string | undefined;
-let originalXdgConfigHome: string | undefined;
-let originalXdgStateHome: string | undefined;
-let originalTmux: string | undefined;
-let originalZellij: string | undefined;
 
 beforeEach(() => {
-  homeDir = mkdtempSync(join(tmpdir(), "pair-mode-home-"));
-  installDir = mkdtempSync(join(tmpdir(), "pair-mode-install-"));
-
-  originalHome = process.env["HOME"];
-  process.env["HOME"] = homeDir;
-
-  originalXdgConfigHome = process.env["XDG_CONFIG_HOME"];
-  process.env["XDG_CONFIG_HOME"] = mkdtempSync(join(tmpdir(), "pair-mode-xdg-config-"));
-
-  originalXdgStateHome = process.env["XDG_STATE_HOME"];
-  process.env["XDG_STATE_HOME"] = mkdtempSync(join(tmpdir(), "pair-mode-xdg-state-"));
-
-  originalTmux = process.env["TMUX"];
-  delete process.env["TMUX"];
-
-  originalZellij = process.env["ZELLIJ"];
-  delete process.env["ZELLIJ"];
-});
-
-afterEach(() => {
-  if (originalHome === undefined) {
-    delete process.env["HOME"];
-  } else {
-    process.env["HOME"] = originalHome;
-  }
-
-  if (originalXdgConfigHome === undefined) {
-    delete process.env["XDG_CONFIG_HOME"];
-  } else {
-    process.env["XDG_CONFIG_HOME"] = originalXdgConfigHome;
-  }
-
-  if (originalXdgStateHome === undefined) {
-    delete process.env["XDG_STATE_HOME"];
-  } else {
-    process.env["XDG_STATE_HOME"] = originalXdgStateHome;
-  }
-
-  if (originalTmux === undefined) {
-    delete process.env["TMUX"];
-  } else {
-    process.env["TMUX"] = originalTmux;
-  }
-
-  if (originalZellij === undefined) {
-    delete process.env["ZELLIJ"];
-  } else {
-    process.env["ZELLIJ"] = originalZellij;
-  }
+  homeDir = isolated.home;
+  installDir = isolated.tempDir("pair-mode-install-");
 });
 
 function scriptedPrompter(answers: string[]): Prompter {
@@ -207,7 +157,7 @@ test("registerCodex writes the apply_patch|Edit|Write matcher, not MultiEdit", (
 });
 
 test("toggle on then status reports ON, and toggle off then status reports OFF", () => {
-  const targetDir = mkdtempSync(join(tmpdir(), "pair-mode-target-"));
+  const targetDir = isolated.tempDir("pair-mode-target-");
 
   expect(pairStatus(targetDir)).toBe(`pair mode OFF for ${targetDir}`);
 
@@ -376,4 +326,84 @@ test("the wizard falls back past pair to a PATH editor when the pair bundle is m
 
   const written = loadConfig(configPath(homeDir)).config;
   expect(written.editor).toBe("micro");
+});
+
+test("a run that writes the codex hooks file twice keeps the user's original in the backup", async () => {
+  const path = codexHooksPath(homeDir);
+  mkdirSync(join(homeDir, ".codex"), { recursive: true });
+  const original = JSON.stringify({
+    hooks: {
+      PreToolUse: [{ matcher: "MultiEdit", hooks: [{ type: "command", command: "user-hook" }] }],
+    },
+  });
+  writeFileSync(path, original, "utf-8");
+
+  const prompter = scriptedPrompter([
+    "micro", // editor
+    "tmux", // multiplexer
+    "split", // layout
+    "codex", // CLIs to register
+    "", // correct the MultiEdit matcher? default yes
+  ]);
+
+  await runSetup({
+    prompter,
+    homeDir: homeDir,
+    installRoot: installDir,
+    resolvesOnPath: (command) => command === "tmux",
+  });
+
+  expect(readFileSync(`${path}.pair-backup`, "utf-8")).toBe(original);
+  expect(readFileSync(path, "utf-8")).not.toContain("user-hook");
+});
+
+test("a malformed hooks file does not abort the rest of the run", async () => {
+  const codexPath = codexHooksPath(homeDir);
+  mkdirSync(join(homeDir, ".codex"), { recursive: true });
+  writeFileSync(codexPath, "{ this is not json", "utf-8");
+
+  const prompter = scriptedPrompter([
+    "micro", // editor
+    "tmux", // multiplexer
+    "split", // layout
+    "codex,claude-code", // CLIs to register
+  ]);
+
+  const result = await runSetup({
+    prompter,
+    homeDir: homeDir,
+    installRoot: installDir,
+    resolvesOnPath: (command) => command === "tmux",
+  });
+
+  expect(result.stopped).toBe(false);
+  expect(readFileSync(codexPath, "utf-8")).toBe("{ this is not json");
+  expect(existsSync(claudeCodeSettingsPath(homeDir))).toBe(true);
+});
+
+test("re-running setup leaves exactly one pair-mode hook in each file", async () => {
+  const answers = ["micro", "tmux", "split", "claude-code,codex"];
+
+  await runSetup({
+    prompter: scriptedPrompter(answers),
+    homeDir: homeDir,
+    installRoot: installDir,
+    resolvesOnPath: (command) => command === "tmux",
+  });
+
+  const result = await runSetup({
+    prompter: scriptedPrompter(answers),
+    homeDir: homeDir,
+    installRoot: installDir,
+    resolvesOnPath: (command) => command === "tmux",
+  });
+
+  expect(result.changedFiles).not.toContain(claudeCodeSettingsPath(homeDir));
+  expect(result.changedFiles).not.toContain(codexHooksPath(homeDir));
+
+  const claudeText = readFileSync(claudeCodeSettingsPath(homeDir), "utf-8");
+  const codexText = readFileSync(codexHooksPath(homeDir), "utf-8");
+
+  expect(claudeText.split(join(installDir, "dist", "claude-code.js")).length - 1).toBe(1);
+  expect(codexText.split(join(installDir, "dist", "codex.js")).length - 1).toBe(1);
 });

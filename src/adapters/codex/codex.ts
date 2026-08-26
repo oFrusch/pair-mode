@@ -10,6 +10,18 @@ import { isEntryPoint } from "../entry-point";
 import { isRecord, readFileOrEmpty, readPayload } from "../../helpers";
 
 const BEGIN_PATCH = "*** Begin Patch";
+const END_OF_FILE = "*** End of File";
+
+// The EOF sentinel closes the last section, so drop it before it reads as a second file header.
+function stripEndOfFile(inner: string[]): string[] {
+  const lastIndex = inner.findLastIndex((line) => line.trim() !== "");
+
+  if (lastIndex === -1 || inner[lastIndex]?.trim() !== END_OF_FILE) {
+    return inner;
+  }
+
+  return [...inner.slice(0, lastIndex), ...inner.slice(lastIndex + 1)];
+}
 
 const hasPatchMarker = (value: unknown): value is string =>
   typeof value === "string" && value.includes(BEGIN_PATCH);
@@ -35,7 +47,7 @@ function extractSection(patchText: string): { header: string; body: string[] } |
     return null;
   }
 
-  const inner = lines.slice(beginIndex + 1, endIndex);
+  const inner = stripEndOfFile(lines.slice(beginIndex + 1, endIndex));
   const headerIndex = inner.findIndex((line) => line.startsWith("*** "));
 
   if (headerIndex === -1) {

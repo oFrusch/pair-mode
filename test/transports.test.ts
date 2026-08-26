@@ -1,76 +1,26 @@
-import { mkdtempSync, realpathSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test, expect, beforeEach, afterEach } from "vitest";
+import { test, expect, beforeEach } from "vitest";
 import { splitLines } from "../src/helpers/splitLines";
 import { resultFilePath } from "../src/helpers/resultFilePath";
-import { resolveTransport } from "../src/transports";
+import { resolveTransport, createPaneTransport } from "../src/transports";
 import type { EditRequest, ReviewTransport, ReviewOutcome } from "../src/transports";
+import type { Editor, EditorContext, EditorLaunch } from "../src/editors/editor.types";
+import type { Multiplexer, RunResult } from "../src/multiplexers/multiplexer.types";
 import { runPair } from "../src/core/run";
 import { DEFAULT_CONFIG } from "../src/core/config";
 import type { PairConfig } from "../src/core/config";
-import { enable } from "../src/core/state";
+import { enable, stateDir } from "../src/core/state";
+import { useIsolatedHome } from "./helpers/env";
 
-let xdgStateHome: string;
-let originalXdgStateHome: string | undefined;
-let originalHome: string | undefined;
-let originalEditorOverride: string | undefined;
-let originalVisual: string | undefined;
-let originalEditor: string | undefined;
+const isolated = useIsolatedHome({ clear: ["CC_PAIR_EDITOR", "VISUAL", "EDITOR"] });
+
 let repoRoot: string;
 
 beforeEach(() => {
-  xdgStateHome = mkdtempSync(join(tmpdir(), "pair-mode-state-"));
-  originalXdgStateHome = process.env["XDG_STATE_HOME"];
-  process.env["XDG_STATE_HOME"] = xdgStateHome;
-
-  originalHome = process.env["HOME"];
-  process.env["HOME"] = mkdtempSync(join(tmpdir(), "pair-mode-home-"));
-
-  originalEditorOverride = process.env["CC_PAIR_EDITOR"];
-  delete process.env["CC_PAIR_EDITOR"];
-
-  originalVisual = process.env["VISUAL"];
-  delete process.env["VISUAL"];
-
-  originalEditor = process.env["EDITOR"];
-  delete process.env["EDITOR"];
-
-  const scratch = mkdtempSync(join(tmpdir(), "pair-mode-repo-"));
-  repoRoot = realpathSync(scratch);
+  repoRoot = realpathSync(isolated.tempDir("pair-mode-repo-"));
   enable(repoRoot);
-});
-
-afterEach(() => {
-  if (originalXdgStateHome === undefined) {
-    delete process.env["XDG_STATE_HOME"];
-  } else {
-    process.env["XDG_STATE_HOME"] = originalXdgStateHome;
-  }
-
-  if (originalHome === undefined) {
-    delete process.env["HOME"];
-  } else {
-    process.env["HOME"] = originalHome;
-  }
-
-  if (originalEditorOverride === undefined) {
-    delete process.env["CC_PAIR_EDITOR"];
-  } else {
-    process.env["CC_PAIR_EDITOR"] = originalEditorOverride;
-  }
-
-  if (originalVisual === undefined) {
-    delete process.env["VISUAL"];
-  } else {
-    process.env["VISUAL"] = originalVisual;
-  }
-
-  if (originalEditor === undefined) {
-    delete process.env["EDITOR"];
-  } else {
-    process.env["EDITOR"] = originalEditor;
-  }
 });
 
 function requestFor(filePath: string): EditRequest {
@@ -183,10 +133,95 @@ test("runPair never consults the transport when before equals after", async () =
 test("runPair never consults the transport when the directory is not enabled", async () => {
   const { transport, reviewCount } = fakeTransport({ reviewed: true, questions: [] });
   const config: PairConfig = { ...DEFAULT_CONFIG };
-  const otherRepo = realpathSync(mkdtempSync(join(tmpdir(), "pair-mode-other-repo-")));
+  const otherRepo = realpathSync(isolated.tempDir("pair-mode-other-repo-"));
   const filePath = join(otherRepo, "file.txt");
 
   await runPair(requestFor(filePath), config, { transport });
 
   expect(reviewCount()).toBe(0);
+});
+
+interface RecordingEditor {
+  editor: Editor;
+  configDirs(): string[];
+}
+
+// prepare() writes a real file so a leaked directory is not silently empty and unnoticed.
+function recordingEditor(): RecordingEditor {
+  let dirs: string[] = [];
+
+  const editor: Editor = {
+    name: "nano",
+    collectMode: "buffer-diff",
+    available: () => true,
+    bufferSuffix: () => ".diff",
+    headerHint: () => [],
+
+    prepare(context: EditorContext): EditorLaunch {
+      dirs = [...dirs, context.configDir];
+      mkdirSync(context.configDir, { recursive: true });
+      writeFileSync(join(context.configDir, "pair.nanorc"), "colour", "utf-8");
+
+      return { argv: ["true"], env: {} };
+    },
+  };
+
+  return { editor, configDirs: () => dirs };
+}
+
+function fakeMultiplexer(result: RunResult): Multiplexer {
+  return {
+    name: "none",
+    available: () => true,
+    run: () => result,
+  };
+}
+
+function editorDirCount(): number {
+  const root = join(stateDir(), "editor");
+
+  return existsSync(root) ? readdirSync(root).length : 0;
+}
+
+test("the pane transport removes its per-review editor config directory after a review", async () => {
+  const recording = recordingEditor();
+  const multiplexer = fakeMultiplexer({ ok: true, detail: "" });
+  const transport = createPaneTransport({ editor: recording.editor, multiplexer });
+
+  expect(editorDirCount()).toBe(0);
+
+  const outcome = await transport.review(requestFor(join(repoRoot, "file.txt")), DEFAULT_CONFIG);
+
+  expect(outcome.reviewed).toBe(true);
+  expect(recording.configDirs()).toHaveLength(1);
+  expect(recording.configDirs().every((dir) => !existsSync(dir))).toBe(true);
+  expect(editorDirCount()).toBe(0);
+});
+
+test("the pane transport removes its editor config directory when the multiplexer fails to launch", async () => {
+  const recording = recordingEditor();
+  const multiplexer = fakeMultiplexer({ ok: false, detail: "editor exited nonzero" });
+  const transport = createPaneTransport({ editor: recording.editor, multiplexer });
+
+  const outcome = await transport.review(requestFor(join(repoRoot, "file.txt")), DEFAULT_CONFIG);
+
+  expect(outcome).toEqual({ reviewed: false, detail: "editor exited nonzero" });
+  expect(recording.configDirs().every((dir) => !existsSync(dir))).toBe(true);
+  expect(editorDirCount()).toBe(0);
+});
+
+test("the pane transport gives each review its own editor config directory", async () => {
+  const recording = recordingEditor();
+  const multiplexer = fakeMultiplexer({ ok: true, detail: "" });
+  const transport = createPaneTransport({ editor: recording.editor, multiplexer });
+  const request = requestFor(join(repoRoot, "file.txt"));
+
+  await transport.review(request, DEFAULT_CONFIG);
+  await transport.review(request, DEFAULT_CONFIG);
+
+  const dirs = recording.configDirs();
+
+  expect(dirs).toHaveLength(2);
+  expect(dirs[0]).not.toBe(dirs[1]);
+  expect(editorDirCount()).toBe(0);
 });

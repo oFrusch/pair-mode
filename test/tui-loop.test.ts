@@ -1,6 +1,8 @@
 import { test, expect, describe } from "vitest";
 import { applyKey, bodyHeight, frameDiff, runTui } from "../src/tui/tui";
 import { buildModel, visibleRows } from "../src/tui/model";
+import { noTokens, paint } from "../src/tui/paint";
+import type { DiffModel, ModelRow } from "../src/tui/model";
 import type { TuiIo, TuiOptions, TuiState } from "../src/tui/tui.types";
 import type { KeyEvent } from "../src/tui/input/input.types";
 
@@ -38,7 +40,7 @@ describe("applyKey — cursor movement", () => {
     const state = makeState();
     const clone = structuredClone(state);
 
-    const next = applyKey(state, key("j"), 24);
+    const next = applyKey(state, key("j"), 24, 120);
 
     expect(next.model.cursor).toBe(1);
     expect(state).toEqual(clone);
@@ -47,7 +49,7 @@ describe("applyKey — cursor movement", () => {
   test("k at the top clamps", () => {
     const state = makeState();
 
-    const next = applyKey(state, key("k"), 24);
+    const next = applyKey(state, key("k"), 24, 120);
 
     expect(next.model.cursor).toBe(0);
   });
@@ -61,7 +63,7 @@ describe("applyKey — cursor movement", () => {
     );
     const state = makeState({ model });
 
-    const next = applyKey(state, key("d", true), 10);
+    const next = applyKey(state, key("d", true), 10, 120);
 
     expect(next.model.cursor).toBe(bodyHeight(10, 0, "browse", "panel") - 1);
   });
@@ -117,7 +119,7 @@ describe("applyKey — hunk jumps", () => {
     );
     const state = makeState({ model: { ...model, cursor: firstChangedIndex } });
 
-    const next = applyKey(state, key("n"), 24);
+    const next = applyKey(state, key("n"), 24, 120);
     const nextEntry = visibleRows(next.model)[next.model.cursor]!;
 
     expect(nextEntry.kind).toBe("row");
@@ -165,7 +167,7 @@ describe("applyKey — hunk jumps match the imperative reference", () => {
     const mismatches = Array.from({ length: total }, (_, cursor) => cursor).flatMap((cursor) =>
       ([1, -1] as const).flatMap((direction) => {
         const state = makeState({ model: { ...model, cursor } });
-        const actual = applyKey(state, key(direction === 1 ? "n" : "N"), 24).model.cursor;
+        const actual = applyKey(state, key(direction === 1 ? "n" : "N"), 24, 120).model.cursor;
         const expected = referenceJump({ ...model, cursor }, direction);
 
         return actual === expected ? [] : [{ cursor, direction, actual, expected }];
@@ -179,11 +181,11 @@ describe("applyKey — hunk jumps match the imperative reference", () => {
 // zellij claims Ctrl s and Ctrl q, so the plain letters must work without a modifier.
 describe("applyKey — send and quit without a modifier", () => {
   test("s sends", () => {
-    expect(applyKey(makeState(), key("s", false, "s"), 24).quit).toBe("send");
+    expect(applyKey(makeState(), key("s", false, "s"), 24, 120).quit).toBe("send");
   });
 
   test("q with no notes quits clean", () => {
-    expect(applyKey(makeState(), key("q", false, "q"), 24).quit).toBe("clean");
+    expect(applyKey(makeState(), key("q", false, "q"), 24, 120).quit).toBe("clean");
   });
 
   test("q with a note asks to confirm rather than discarding it", () => {
@@ -204,15 +206,15 @@ describe("applyKey — send and quit without a modifier", () => {
       ],
     });
 
-    const next = applyKey(withNote, key("q", false, "q"), 24);
+    const next = applyKey(withNote, key("q", false, "q"), 24, 120);
 
     expect(next.quit).toBe("none");
     expect(next.mode).toBe("confirm");
   });
 
   test("the ctrl forms still work as aliases", () => {
-    expect(applyKey(makeState(), key("s", true), 24).quit).toBe("send");
-    expect(applyKey(makeState(), key("q", true), 24).quit).toBe("clean");
+    expect(applyKey(makeState(), key("s", true), 24, 120).quit).toBe("send");
+    expect(applyKey(makeState(), key("q", true), 24, 120).quit).toBe("clean");
   });
 });
 
@@ -227,7 +229,7 @@ describe("applyKey — folds", () => {
     const state = makeState({ model: { ...model, cursor: foldPosition } });
     const before = visibleRows(state.model).length;
 
-    const next = applyKey(state, key(" ", false, " "), 24);
+    const next = applyKey(state, key(" ", false, " "), 24, 120);
 
     expect(visibleRows(next.model).length).toBeGreaterThan(before);
   });
@@ -241,7 +243,7 @@ describe("applyKey — folds", () => {
     const state = makeState({ model: { ...model, cursor: contextPosition } });
     const clone = structuredClone(state);
 
-    const next = applyKey(state, key(" ", false, " "), 24);
+    const next = applyKey(state, key(" ", false, " "), 24, 120);
 
     expect(next).toEqual(clone);
   });
@@ -251,20 +253,20 @@ describe("applyKey — layout and mode", () => {
   test("u swaps the layout both ways", () => {
     const state = makeState({ layout: "split" });
 
-    const toUnified = applyKey(state, key("u"), 24);
+    const toUnified = applyKey(state, key("u"), 24, 120);
     expect(toUnified.layout).toBe("unified");
 
-    const backToSplit = applyKey(toUnified, key("u"), 24);
+    const backToSplit = applyKey(toUnified, key("u"), 24, 120);
     expect(backToSplit.layout).toBe("split");
   });
 
   test("? enters help mode, and j in help mode changes nothing", () => {
     const state = makeState();
 
-    const helpState = applyKey(state, key("?"), 24);
+    const helpState = applyKey(state, key("?"), 24, 120);
     expect(helpState.mode).toBe("help");
 
-    const afterJ = applyKey(helpState, key("j"), 24);
+    const afterJ = applyKey(helpState, key("j"), 24, 120);
     expect(afterJ.model.cursor).toBe(helpState.model.cursor);
     expect(afterJ.mode).toBe("help");
   });
@@ -274,7 +276,7 @@ describe("applyKey — quit", () => {
   test("ctrl s sets quit to send", () => {
     const state = makeState();
 
-    const next = applyKey(state, key("s", true), 24);
+    const next = applyKey(state, key("s", true), 24, 120);
 
     expect(next.quit).toBe("send");
   });
@@ -282,7 +284,7 @@ describe("applyKey — quit", () => {
   test("ctrl q sets quit to clean", () => {
     const state = makeState();
 
-    const next = applyKey(state, key("q", true), 24);
+    const next = applyKey(state, key("q", true), 24, 120);
 
     expect(next.quit).toBe("clean");
   });
@@ -301,7 +303,7 @@ describe("applyKey — scrollTop follows the cursor", () => {
     const rows = bodyHeight(height, 0, "browse", "panel");
 
     for (let step = 0; step < rows; step += 1) {
-      state = applyKey(state, key("j"), height);
+      state = applyKey(state, key("j"), height, 120);
     }
 
     expect(state.model.cursor).toBe(rows);
@@ -317,9 +319,70 @@ describe("applyKey — scrollTop follows the cursor", () => {
     );
     const state = makeState({ model: { ...model, cursor: 5 }, scrollTop: 5 });
 
-    const next = applyKey(state, key("k"), 24);
+    const next = applyKey(state, key("k"), 24, 120);
 
     expect(next.scrollTop).toBe(4);
+  });
+});
+
+const REPLACE_MODEL_ROWS = 12;
+const REPLACE_MODEL_HEIGHT = 12;
+const WIDE_TERMINAL = 120;
+
+function buildAlternatingReplaceModel(): DiffModel {
+  const rows = Array.from({ length: REPLACE_MODEL_ROWS }, (_, index): ModelRow =>
+    index % 2 === 0
+      ? {
+          kind: "context",
+          left: `line${index}`,
+          right: `line${index}`,
+          leftNumber: index + 1,
+          rightNumber: index + 1,
+        }
+      : {
+          kind: "replace",
+          left: `old${index}`,
+          right: `new${index}`,
+          leftNumber: index + 1,
+          rightNumber: index + 1,
+        },
+  );
+
+  return { rows, folds: [], cursor: 0 };
+}
+
+describe("applyKey — scrollTop counts screen lines", () => {
+  test("the cursor row still paints when unified replace rows fill the body", () => {
+    let state = makeState({ model: buildAlternatingReplaceModel(), layout: "unified" });
+
+    for (let step = 0; step < REPLACE_MODEL_ROWS - 1; step += 1) {
+      state = applyKey(state, key("j"), REPLACE_MODEL_HEIGHT, WIDE_TERMINAL);
+    }
+
+    const { map } = paint({
+      model: state.model,
+      width: WIDE_TERMINAL,
+      height: REPLACE_MODEL_HEIGHT,
+      path: "src/example.ts",
+      tokens: noTokens,
+      truecolor: true,
+      rowBand: false,
+      scrollTop: state.scrollTop,
+      layout: state.layout,
+      selection: null,
+      mode: state.mode,
+      draft: "",
+      notes: [],
+      focusedNote: null,
+      notePosition: state.notePosition,
+    });
+
+    const painted = map.rows.flatMap((row) =>
+      row.kind === "row" && row.index !== null ? [row.index] : [],
+    );
+
+    expect(state.model.cursor).toBe(REPLACE_MODEL_ROWS - 1);
+    expect(painted).toContain(REPLACE_MODEL_ROWS - 1);
   });
 });
 

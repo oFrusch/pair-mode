@@ -1,12 +1,9 @@
 import { opcodes } from "../diff";
+import { stripMark } from "../marks";
 import { isRecord } from "../../helpers/isRecord";
-import type { Question } from "./types";
+import type { Anchor, Question } from "./types";
 
-export function anchor(
-  original: string[],
-  numbers: (number | null)[],
-  index: number,
-): { line: number | null; code: string } {
+export function anchor(original: string[], numbers: (number | null)[], index: number): Anchor {
   const preceding = numbers.slice(0, index + 1);
   const i = preceding.findLastIndex((number) => number !== undefined && number !== null);
 
@@ -15,7 +12,8 @@ export function anchor(
   }
 
   const code = original[i];
-  return { line: preceding[i] ?? null, code: code ?? "" };
+
+  return { line: preceding[i] ?? null, code: code === undefined ? "" : stripMark(code) };
 }
 
 export function collect(
@@ -26,7 +24,9 @@ export function collect(
   return opcodes(original, saved)
     .filter((op) => op.tag !== "equal" && op.tag !== "delete")
     .flatMap((op) => {
-      const { line, code } = anchor(original, numbers, op.i1 - 1);
+      // A replace overwrites original[i1], so that row is the anchor; an insert occupies no row.
+      const index = op.tag === "replace" ? op.i1 : op.i1 - 1;
+      const { line, code } = anchor(original, numbers, index);
 
       return Array.from({ length: op.j2 - op.j1 }, (_, offset) => op.j1 + offset)
         .map((j) => ({ line, code, text: (saved[j] ?? "").trim() }))

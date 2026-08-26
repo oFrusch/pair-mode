@@ -16,4 +16,5 @@ export interface WatchIo extends TuiIo {
 export interface WatchOptions {
   directory: string;
   socketPath?: string;
+  io?: WatchIo;
 }

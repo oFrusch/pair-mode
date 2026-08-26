@@ -2,6 +2,7 @@ import { existsSync, openSync, closeSync, readFileSync, statSync } from "node:fs
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { loadConfig, configPath } from "../../core/config";
+import type { ConfigResult, PairConfig } from "../../core/config";
 import { stateDir, sessionSocketPath } from "../../core/state";
 import { probeSocket } from "../../transports/session";
 import { resolve as resolveEditor } from "../../editors/index";
@@ -17,8 +18,7 @@ import {
 } from "../register";
 import type { DoctorCheck, DoctorOptions, DoctorReport } from "./types";
 
-function checkConfig(): DoctorCheck {
-  const result = loadConfig();
+function checkConfig(result: ConfigResult): DoctorCheck {
   const path = configPath();
 
   if (result.errors.length === 0) {
@@ -29,8 +29,10 @@ function checkConfig(): DoctorCheck {
   return { name: `config: ${path}`, passed: false, detail };
 }
 
-function checkEditor(resolvesOnPath: DoctorOptions["resolvesOnPath"]): DoctorCheck {
-  const config = loadConfig().config;
+function checkEditor(
+  config: PairConfig,
+  resolvesOnPath: DoctorOptions["resolvesOnPath"],
+): DoctorCheck {
   const editor = resolveEditor(config.editor, resolvesOnPath);
   const available = editor.available();
 
@@ -41,8 +43,10 @@ function checkEditor(resolvesOnPath: DoctorOptions["resolvesOnPath"]): DoctorChe
   };
 }
 
-function checkMultiplexer(adapters: DoctorOptions["multiplexerAdapters"]): DoctorCheck {
-  const config = loadConfig().config;
+function checkMultiplexer(
+  config: PairConfig,
+  adapters: DoctorOptions["multiplexerAdapters"],
+): DoctorCheck {
   const multiplexer = detectMultiplexer(config.multiplexer, adapters);
   const inside = multiplexer.available();
 
@@ -202,9 +206,7 @@ function checkShiki(resolvesShiki?: () => boolean): DoctorCheck {
   };
 }
 
-function checkTrace(): DoctorCheck | null {
-  const config = loadConfig().config;
-
+function checkTrace(config: PairConfig): DoctorCheck | null {
   if (!config.trace) {
     return null;
   }
@@ -231,10 +233,10 @@ const defaultOpenTty = (): number => openSync("/dev/tty", "r+");
 
 // A watcher that crashed leaves its socket file behind, so the probe distinguishes a live one from a stale one.
 async function checkSession(
+  config: PairConfig,
   directory: string,
   probe: DoctorOptions["probeSocket"],
 ): Promise<DoctorCheck> {
-  const config = loadConfig().config;
   const path = sessionSocketPath(directory);
   const name = `session: ${path}`;
   const wanted = config.transport === "session";
@@ -264,18 +266,22 @@ export async function runDoctor(options: DoctorOptions = {}): Promise<DoctorRepo
   const root = options.installRoot ?? installRoot();
   const openTty = options.openTty ?? defaultOpenTty;
 
+  const loaded: ConfigResult =
+    options.config === undefined ? loadConfig() : { config: options.config, errors: [] };
+  const config = loaded.config;
+
   const checks: DoctorCheck[] = [
-    checkConfig(),
-    checkEditor(options.resolvesOnPath),
-    checkMultiplexer(options.multiplexerAdapters),
+    checkConfig(loaded),
+    checkEditor(config, options.resolvesOnPath),
+    checkMultiplexer(config, options.multiplexerAdapters),
     checkControllingTerminal(openTty),
     ...checkClis(home, root),
     checkEntryPoints(root),
     checkShiki(options.resolvesShiki),
-    await checkSession(options.directory ?? process.cwd(), options.probeSocket),
+    await checkSession(config, options.directory ?? process.cwd(), options.probeSocket),
   ];
 
-  const traceCheck = checkTrace();
+  const traceCheck = checkTrace(config);
 
   if (traceCheck !== null) {
     checks.push(traceCheck);

@@ -1,32 +1,20 @@
-import { mkdtempSync, writeFileSync, realpathSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
-import { test, expect, beforeEach, afterEach, describe } from "vitest";
+import { test, expect, beforeEach, describe } from "vitest";
 import { enable } from "../src/core/state";
 import { handleToolCall } from "../src/adapters/pi";
 import type { RunPairFn } from "../src/adapters/pi";
+import { useIsolatedHome } from "./helpers/env";
 
-let xdgStateHome: string;
-let originalXdgStateHome: string | undefined;
+const isolated = useIsolatedHome();
+
 let filePath: string;
 
 beforeEach(() => {
-  xdgStateHome = mkdtempSync(join(tmpdir(), "pair-mode-state-"));
-  originalXdgStateHome = process.env["XDG_STATE_HOME"];
-  process.env["XDG_STATE_HOME"] = xdgStateHome;
-
-  const targetDir = realpathSync(mkdtempSync(join(tmpdir(), "pair-mode-target-")));
+  const targetDir = realpathSync(isolated.tempDir("pair-mode-target-"));
   filePath = join(targetDir, "example.ts");
   writeFileSync(filePath, "before\n", "utf-8");
   enable(targetDir);
-});
-
-afterEach(() => {
-  if (originalXdgStateHome === undefined) {
-    delete process.env["XDG_STATE_HOME"];
-  } else {
-    process.env["XDG_STATE_HOME"] = originalXdgStateHome;
-  }
 });
 
 function denyingRunPair(reason: string): RunPairFn {
@@ -112,7 +100,7 @@ test("an unrecognised tool name resolves block: false without calling runPair", 
 });
 
 test("a call for a directory pair mode has not enabled resolves block: false", async () => {
-  const disabledDir = realpathSync(mkdtempSync(join(tmpdir(), "pair-mode-disabled-")));
+  const disabledDir = realpathSync(isolated.tempDir("pair-mode-disabled-"));
   const disabledPath = join(disabledDir, "example.ts");
   writeFileSync(disabledPath, "before\n", "utf-8");
 
@@ -145,7 +133,11 @@ test("the module default export is the factory pi calls, and it registers both h
 });
 
 describe("runPairCommand", () => {
-  const directory = mkdtempSync(join(tmpdir(), "pair-pi-cmd-"));
+  let directory: string;
+
+  beforeEach(() => {
+    directory = isolated.tempDir("pair-pi-cmd-");
+  });
 
   test("on then status reports ON, off then status reports OFF", async () => {
     const { runPairCommand } = await import("../src/adapters/pi");

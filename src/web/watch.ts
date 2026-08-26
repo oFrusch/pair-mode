@@ -1,6 +1,6 @@
 import { createConnection } from "node:net";
 import type { Socket } from "node:net";
-import { mkdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { PairConfig } from "../core/config";
 import { sessionSocketPath, sessionUrlPath } from "../core/state";
@@ -11,14 +11,7 @@ import { toWebReview } from "./review";
 import { startWebServer } from "./server";
 import type { WebServer } from "./server.types";
 import type { WebWatchOptions, WebWatcher } from "./watch.types";
-
-function removeQuietly(path: string): void {
-  try {
-    unlinkSync(path);
-  } catch {
-    // Best-effort cleanup only.
-  }
-}
+import { removeQuietly } from "../helpers";
 
 // pair-mode on spawns this watcher detached, so the link and the process id reach the parent through a file.
 function publishUrl(path: string, url: string): void {
@@ -54,19 +47,37 @@ export async function startWebWatch(
 
   const readLines = createLineReader();
 
+  // Rendering awaits shiki, so a cancel can land mid-render and the finished review must not be offered.
+  let ownedId: string | null = null;
+
   client.on("data", (chunk: string) => {
     readLines(chunk).forEach((line) => {
       const message = decodeLine(line);
 
       if (message?.type === "review") {
+        const id = message.id;
+        ownedId = id;
+
         // A render that throws would otherwise become an unhandled rejection and kill the watcher.
         void toWebReview(message, config)
-          .then((review) => web.offer(review))
-          .catch(() => client.write(encode({ type: "verdict", id: message.id, questions: [] })));
+          .then((review) => {
+            if (ownedId === id) {
+              web.offer(review);
+            }
+          })
+          .catch(() => {
+            if (ownedId === id) {
+              client.write(encode({ type: "verdict", id, questions: [] }));
+            }
+          });
         return;
       }
 
       if (message?.type === "cancel") {
+        if (ownedId === message.id) {
+          ownedId = null;
+        }
+
         web.withdraw(message.id);
       }
     });

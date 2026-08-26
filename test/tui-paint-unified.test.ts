@@ -3,7 +3,7 @@ import { chooseLayout, MIN_SPLIT_WIDTH, noTokens, paint, paintUnified } from "..
 import { resolveClick } from "../src/tui/model";
 import { createTokenProvider } from "../src/tui/syntax";
 import type { ShikiHighlighter } from "../src/tui/syntax";
-import type { DiffModel } from "../src/tui/model";
+import type { DiffModel, ModelRow } from "../src/tui/model";
 import type { PaintOptions } from "../src/tui/paint";
 
 const ADD_BAR_FG = "\x1b[38;2;63;185;80m";
@@ -369,5 +369,60 @@ describe("paintUnified — a whole new file drops the change background", () => 
     const { lines } = paintUnified(baseOptions({ model: buildAllDeleteModel(), rowBand: true }));
 
     expect(bodyLines(lines).join("")).toContain(DEL_SPAN_BG);
+  });
+});
+
+const LARGE_ROW_COUNT = 130_000;
+
+function buildAlternatingReplaceModel(rowCount: number): DiffModel {
+  const rows = Array.from({ length: rowCount }, (_, index): ModelRow =>
+    index % 2 === 0
+      ? {
+          kind: "context",
+          left: `line${index}`,
+          right: `line${index}`,
+          leftNumber: index + 1,
+          rightNumber: index + 1,
+        }
+      : {
+          kind: "replace",
+          left: `old${index}`,
+          right: `new${index}`,
+          leftNumber: index + 1,
+          rightNumber: index + 1,
+        },
+  );
+
+  return { rows, folds: [], cursor: 0 };
+}
+
+describe("paintUnified — the body fills with screen lines", () => {
+  test("a replace row that does not fit whole is left out rather than half painted", () => {
+    const model = buildAlternatingReplaceModel(12);
+
+    const { map, lastRow } = paintUnified(baseOptions({ model, height: 12, layout: "unified" }));
+
+    const painted = map.rows.flatMap((row) =>
+      row.kind === "row" && row.index !== null ? [row.index] : [],
+    );
+
+    expect(lastRow).toBe(5);
+    expect(painted).toContain(5);
+    expect(painted).not.toContain(6);
+    expect(painted.filter((index) => index === 5)).toHaveLength(2);
+  });
+
+  test("a diff past the spread argument limit paints instead of overflowing the stack", () => {
+    const rows = Array.from({ length: LARGE_ROW_COUNT }, (_, index): ModelRow => ({
+      kind: "context",
+      left: "same line",
+      right: "same line",
+      leftNumber: index + 1,
+      rightNumber: index + 1,
+    }));
+
+    const model: DiffModel = { rows, folds: [], cursor: 0 };
+
+    expect(() => paintUnified(baseOptions({ model, layout: "unified" }))).not.toThrow();
   });
 });

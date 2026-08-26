@@ -1,8 +1,8 @@
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, expect, beforeEach, afterEach } from "vitest";
-import { startWebServer, startWebWatch, toWebReview } from "../src/web";
+import { startWebServer, startWebWatch, toWebReview, renderPage } from "../src/web";
+import { columnIn, draftRange, escapeHtml, paintCell } from "../src/web/client";
+import type { RangeLike } from "../src/web/client";
 import type { WebServer, WebWatcher } from "../src/web";
 import { DEFAULT_CONFIG } from "../src/core/config";
 import type { PairConfig } from "../src/core/config";
@@ -10,19 +10,23 @@ import type { Question } from "../src/core/collect";
 import type { ReviewMessage } from "../src/transports/session";
 import { createSessionTransport } from "../src/transports/session";
 import { isRecord } from "../src/helpers";
+import { useIsolatedHome } from "./helpers/env";
+
+const isolated = useIsolatedHome();
 
 const TOKEN = "0123456789abcdef0123456789abcdef";
 const OK = 200;
 const NOT_FOUND = 404;
 const BAD_REQUEST = 400;
 const CONFLICT = 409;
+const PAYLOAD_TOO_LARGE = 413;
 
 let web: WebServer | null = null;
 let watcher: WebWatcher | null = null;
 let socketPath: string;
 
 beforeEach(() => {
-  const dir = mkdtempSync(join(tmpdir(), "pair-web-"));
+  const dir = isolated.tempDir("pair-web-");
   socketPath = join(dir, "s.sock");
 });
 
@@ -71,6 +75,33 @@ async function readUntil(url: string, marker: string): Promise<{ text: string; c
   }
 
   return { text, cancel: () => void reader?.cancel() };
+}
+
+// A withdrawal only reaches a viewer that was already listening, so the stream stays open across the test.
+async function openViewer(
+  url: string,
+): Promise<{ until(marker: string): Promise<string>; cancel(): void }> {
+  const response = await fetch(url);
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+
+  return {
+    async until(marker: string): Promise<string> {
+      while (!text.includes(marker)) {
+        const chunk = await reader?.read();
+
+        if (chunk === undefined || chunk.done) {
+          break;
+        }
+
+        text += decoder.decode(chunk.value, { stream: true });
+      }
+
+      return text;
+    },
+    cancel: () => void reader?.cancel(),
+  };
 }
 
 test("the review page loads at the token path", async () => {
@@ -387,5 +418,193 @@ test("a browser verdict travels back to the hook through the session socket", as
   expect(outcome).toEqual({
     reviewed: true,
     questions: [{ line: 2, code: "const b = 3;", text: "why 3?" }],
+  });
+});
+
+test("a withdrawn review reaches an open viewer as a cancel frame and stops accepting a verdict", async () => {
+  const seen: string[] = [];
+  web = await startPlain((id) => seen.push(id));
+
+  const viewer = await openViewer(`${web.url}/events`);
+  await viewer.until(": open");
+
+  web.offer(await toWebReview(review, config));
+  await viewer.until("event: review");
+
+  web.withdraw("id1");
+  const text = await viewer.until("event: cancel");
+
+  const response = await fetch(`${web.url}/verdict`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: "id1", notes: [] }),
+  });
+
+  viewer.cancel();
+
+  expect(text).toContain("event: cancel");
+  expect(text).toContain('{"id":"id1"}');
+  expect(response.status).toBe(CONFLICT);
+  expect(seen).toEqual([]);
+});
+
+test("a withdrawal naming an older review leaves the open one answerable", async () => {
+  const seen: string[] = [];
+  web = await startPlain((id) => seen.push(id));
+  web.offer(await toWebReview(review, config));
+
+  web.withdraw("stale");
+
+  const response = await fetch(`${web.url}/verdict`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: "id1", notes: [] }),
+  });
+
+  expect(response.status).toBe(OK);
+  expect(seen).toEqual(["id1"]);
+});
+
+test("an answered verdict tells every other viewer the review is gone", async () => {
+  web = await startPlain(() => {});
+
+  const viewer = await openViewer(`${web.url}/events`);
+  await viewer.until(": open");
+
+  web.offer(await toWebReview(review, config));
+  await viewer.until("event: review");
+
+  await fetch(`${web.url}/verdict`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: "id1", notes: [] }),
+  });
+
+  const text = await viewer.until("event: cancel");
+  viewer.cancel();
+
+  expect(text).toContain('event: cancel\ndata: {"id":"id1"}');
+});
+
+test("viewerCount counts the streams that are open", async () => {
+  web = await startPlain(() => {});
+
+  expect(web.viewerCount()).toBe(0);
+
+  const viewer = await openViewer(`${web.url}/events`);
+  await viewer.until(": open");
+
+  expect(web.viewerCount()).toBe(1);
+
+  viewer.cancel();
+});
+
+test("a body past the cap answers 413 rather than breaking the connection", async () => {
+  const seen: string[] = [];
+  web = await startPlain((id) => seen.push(id));
+
+  const response = await fetch(`${web.url}/verdict`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "x".repeat(2_000_000),
+  });
+
+  expect(response.status).toBe(PAYLOAD_TOO_LARGE);
+  expect(seen).toEqual([]);
+});
+
+test("the page carries the client bundle inline and fetches nothing", async () => {
+  web = await startPlain(() => {});
+
+  const body = await (await fetch(web.url)).text();
+
+  expect(body).toContain("var PairClient");
+  expect(body).not.toContain("<script src=");
+  expect(body).not.toContain("</script>\n<script");
+});
+
+test("renderPage never emits a closing script tag from inside the script", () => {
+  const page = renderPage();
+  const scripts = page.split("<script>").length - 1;
+
+  expect(scripts).toBe(1);
+  expect(page.split("</script>").length - 1).toBe(1);
+});
+
+test("escapeHtml neutralises a closing script tag in file content", () => {
+  expect(escapeHtml('</script><img onerror="x">')).toBe(
+    "&lt;/script&gt;&lt;img onerror=&quot;x&quot;&gt;",
+  );
+});
+
+test("escapeHtml escapes a lone ampersand and both quote characters", () => {
+  expect(escapeHtml("a & b")).toBe("a &amp; b");
+  expect(escapeHtml(`"quoted" 'single'`)).toBe("&quot;quoted&quot; &#39;single&#39;");
+});
+
+test("paintCell escapes hostile file content rather than emitting markup", () => {
+  const painted = paintCell("</script><img src=x onerror=alert(1)>", [], []);
+
+  expect(painted).not.toContain("<img");
+  expect(painted).not.toContain("</script>");
+  expect(painted).toContain("&lt;img");
+});
+
+test("paintCell drops a token colour that is not a hex colour", () => {
+  const painted = paintCell("ab", [{ start: 0, end: 2, color: '"><img onerror=x>' }], []);
+
+  expect(painted).toBe("ab");
+  expect(painted).not.toContain("<img");
+});
+
+test("paintCell drops a token colour that is valid CSS but not a colour", () => {
+  const colour = "red;background:url(https://attacker.example/pixel.png)";
+  const painted = paintCell("abc", [{ start: 0, end: 3, color: colour }], []);
+
+  expect(painted).toBe("abc");
+  expect(painted).not.toContain("url(");
+});
+
+test("paintCell keeps a hex colour a theme actually emits", () => {
+  const painted = paintCell("ab", [{ start: 0, end: 2, color: "#1e3a1e" }], []);
+
+  expect(painted).toBe('<span style="color:#1e3a1e">ab</span>');
+});
+
+test("paintCell wraps a marked span and leaves the rest alone", () => {
+  const painted = paintCell("abcd", [], [{ start: 1, end: 3 }]);
+
+  expect(painted).toBe('a<mark class="noted">bc</mark>d');
+});
+
+test("columnIn measures the text between the cell start and the selection point", () => {
+  const range: RangeLike = {
+    selectNodeContents: () => {},
+    setEnd: () => {},
+    toString: () => "const b",
+  };
+
+  expect(columnIn(range, {}, {}, 7)).toBe(7);
+});
+
+test("draftRange refuses a selection that crosses panes or leaves the diff", () => {
+  const left = { row: "1", pane: "left" };
+  const right = { row: "1", pane: "right" };
+
+  expect(draftRange(left, right, 0, 3)).toBe(null);
+  expect(draftRange(null, right, 0, 3)).toBe(null);
+  expect(draftRange({ row: "x", pane: "right" }, right, 0, 3)).toBe(null);
+});
+
+test("draftRange reads the row indices the cells carry", () => {
+  const start = { row: "2", pane: "right" };
+  const end = { row: "4", pane: "right" };
+
+  expect(draftRange(start, end, 1, 6)).toEqual({
+    startRow: 2,
+    endRow: 4,
+    pane: "right",
+    startColumn: 1,
+    endColumn: 6,
   });
 });

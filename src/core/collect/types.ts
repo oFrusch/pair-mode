@@ -1,3 +1,8 @@
+export interface Anchor {
+  line: number | null;
+  code: string;
+}
+
 export interface Question {
   line: number | null;
   code: string;

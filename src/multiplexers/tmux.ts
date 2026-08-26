@@ -1,14 +1,10 @@
-import { spawnSync } from "node:child_process";
-import type { Multiplexer, PaneSize, RunResult, Spawn, SpawnResult } from "./multiplexer.types";
+import { randomBytes } from "node:crypto";
+import type { Multiplexer, PaneSize, RunResult, Spawn } from "./multiplexer.types";
 import type { PathResolver } from "../helpers/types";
 import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
+import { defaultSpawn } from "../helpers/spawn";
 
-// The default spawn shells out for real and captures stderr for a failure report.
-const defaultSpawn: Spawn = (command, args): SpawnResult => {
-  const result = spawnSync(command, args, { stdio: ["ignore", "ignore", "pipe"] });
-  const stderr = result.stderr ? result.stderr.toString("utf-8") : "";
-  return { status: result.status, stderr };
-};
+const CHANNEL_BYTES = 8;
 
 const SAFE_UNQUOTED = /^[A-Za-z0-9_\-./]+$/;
 
@@ -33,7 +29,8 @@ export function createTmuxMultiplexer(
     },
 
     run(argv: string[], size: PaneSize): RunResult {
-      const channel = `pair-${process.pid}`;
+      // tmux latches an unconsumed -S signal, so a reused channel name would wake the next wait instantly.
+      const channel = `pair-${randomBytes(CHANNEL_BYTES).toString("hex")}`;
       const inner = argv.map(shellQuote).join(" ");
       const script = `stty -ixon 2>/dev/null; ${inner}; tmux wait-for -S ${channel}`;
 

@@ -1,14 +1,7 @@
-import { spawnSync } from "node:child_process";
-import type { Multiplexer, PaneSize, RunResult, Spawn, SpawnResult } from "./multiplexer.types";
+import type { Multiplexer, PaneSize, RunResult, Spawn } from "./multiplexer.types";
 import type { PathResolver } from "../helpers/types";
 import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
-
-// The default spawn shells out for real and captures stderr for a failure report.
-const defaultSpawn: Spawn = (command, args): SpawnResult => {
-  const result = spawnSync(command, args, { stdio: ["ignore", "ignore", "pipe"] });
-  const stderr = result.stderr ? result.stderr.toString("utf-8") : "";
-  return { status: result.status, stderr };
-};
+import { defaultSpawn } from "../helpers/spawn";
 
 export function createZellijMultiplexer(
   spawn: Spawn = defaultSpawn,

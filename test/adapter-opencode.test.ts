@@ -1,32 +1,20 @@
-import { mkdtempSync, writeFileSync, realpathSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
-import { test, expect, beforeEach, afterEach } from "vitest";
+import { test, expect, beforeEach } from "vitest";
 import { enable } from "../src/core/state";
 import { beforeToolExecute } from "../src/adapters/opencode";
 import type { RunPairFn } from "../src/adapters/opencode";
+import { useIsolatedHome } from "./helpers/env";
 
-let xdgStateHome: string;
-let originalXdgStateHome: string | undefined;
+const isolated = useIsolatedHome();
+
 let filePath: string;
 
 beforeEach(() => {
-  xdgStateHome = mkdtempSync(join(tmpdir(), "pair-mode-state-"));
-  originalXdgStateHome = process.env["XDG_STATE_HOME"];
-  process.env["XDG_STATE_HOME"] = xdgStateHome;
-
-  const targetDir = realpathSync(mkdtempSync(join(tmpdir(), "pair-mode-target-")));
+  const targetDir = realpathSync(isolated.tempDir("pair-mode-target-"));
   filePath = join(targetDir, "example.ts");
   writeFileSync(filePath, "before\n", "utf-8");
   enable(targetDir);
-});
-
-afterEach(() => {
-  if (originalXdgStateHome === undefined) {
-    delete process.env["XDG_STATE_HOME"];
-  } else {
-    process.env["XDG_STATE_HOME"] = originalXdgStateHome;
-  }
 });
 
 function denyingRunPair(reason: string): RunPairFn {
@@ -103,7 +91,7 @@ test("an unrecognised tool resolves without calling runPair", async () => {
 });
 
 test("a call for a directory pair mode has not enabled resolves without calling runPair", async () => {
-  const disabledDir = realpathSync(mkdtempSync(join(tmpdir(), "pair-mode-disabled-")));
+  const disabledDir = realpathSync(isolated.tempDir("pair-mode-disabled-"));
   const disabledPath = join(disabledDir, "example.ts");
   writeFileSync(disabledPath, "before\n", "utf-8");
 

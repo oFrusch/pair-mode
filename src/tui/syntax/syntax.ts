@@ -12,6 +12,12 @@ import type { BundledLanguage, BundledTheme } from "shiki";
 // Matches the palette in src/tui/paint/theme.ts.
 const THEME_ID = "github-dark";
 
+// Roughly ten full reviews of hot lines per language, which caps the shared cache near a megabyte.
+export const MAX_CACHED_LINES = 4096;
+
+// A watcher runs many reviews in one process, so shiki is built once per language and never again.
+const providers = new Map<string, Promise<TokenProvider>>();
+
 function isBundledLanguage(
   lang: string,
   bundled: Record<string, unknown>,
@@ -76,21 +82,21 @@ async function tryLoadHighlighter(
   }
 }
 
-export async function createTokenProvider(
-  options: SyntaxOptions,
-  loadHighlighter: HighlighterLoader = loadShikiHighlighter,
-): Promise<TokenProvider> {
-  if (!options.enabled) {
-    return noTokens;
+// The line cache now outlives one review, so it evicts in insertion order rather than growing forever.
+function remember(cache: Map<string, SyntaxToken[]>, line: string, tokens: SyntaxToken[]): void {
+  if (cache.size >= MAX_CACHED_LINES) {
+    const oldest = cache.keys().next();
+
+    if (oldest.done !== true) {
+      cache.delete(oldest.value);
+    }
   }
 
-  const lang = shikiLanguage(options.path);
+  cache.set(line, tokens);
+}
 
-  if (lang === null) {
-    return noTokens;
-  }
-
-  const highlighter = await tryLoadHighlighter(loadHighlighter, lang, THEME_ID);
+async function buildTokenProvider(load: HighlighterLoader, lang: string): Promise<TokenProvider> {
+  const highlighter = await tryLoadHighlighter(load, lang, THEME_ID);
 
   if (highlighter === null) {
     return noTokens;
@@ -106,7 +112,39 @@ export async function createTokenProvider(
     }
 
     const tokens = tokenizeLine(highlighter, lang, line);
-    cache.set(line, tokens);
+    remember(cache, line, tokens);
+
     return tokens;
   };
+}
+
+export async function createTokenProvider(
+  options: SyntaxOptions,
+  loadHighlighter: HighlighterLoader = loadShikiHighlighter,
+): Promise<TokenProvider> {
+  if (!options.enabled) {
+    return noTokens;
+  }
+
+  const lang = shikiLanguage(options.path);
+
+  if (lang === null) {
+    return noTokens;
+  }
+
+  // An injected loader is a caller-owned test seam, so only the real shiki highlighter is shared process-wide.
+  if (loadHighlighter !== loadShikiHighlighter) {
+    return buildTokenProvider(loadHighlighter, lang);
+  }
+
+  const shared = providers.get(lang);
+
+  if (shared !== undefined) {
+    return shared;
+  }
+
+  const created = buildTokenProvider(loadHighlighter, lang);
+  providers.set(lang, created);
+
+  return created;
 }

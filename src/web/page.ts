@@ -1,4 +1,5 @@
 import { theme } from "../tui/paint";
+import { CLIENT_BUNDLE } from "./client/bundle";
 
 const STYLE = `
 :root {
@@ -180,7 +181,9 @@ textarea {
 #idle { padding: 48px; color: var(--muted); text-align: center; }
 `;
 
-const SCRIPT = String.raw`
+// The page wires the DOM, and every markup and geometry decision lives in the typechecked client bundle.
+const WIRING = String.raw`
+const C = PairClient;
 const token = location.pathname.split("/")[2];
 const diff = document.getElementById("diff");
 const notesPanel = document.getElementById("notes");
@@ -196,104 +199,15 @@ const pathLabel = document.getElementById("path");
 let review = null;
 let notes = [];
 let expanded = new Set();
-let draftRange = null;
+let draft = null;
 
-function escapeHtml(text) {
-  return text.replace(/[&<>]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[ch]);
-}
-
-function textOf(row, pane) {
-  return pane === "right" ? row.right : row.left;
-}
-
-function tokensOf(row, pane) {
-  return pane === "right" ? row.rightTokens : row.leftTokens;
-}
-
-function numberOf(row, pane) {
-  return pane === "right" ? row.rightNumber : row.leftNumber;
-}
-
-// A note covers whole lines between its ends, so only the first and last rows carry a column range.
-function markRange(note, rowIndex, length) {
-  const start = rowIndex === note.startRow ? note.startColumn : 0;
-  const end = rowIndex === note.endRow ? note.endColumn : length;
-  return { start: Math.max(0, start), end: Math.min(length, end) };
-}
-
-function marksFor(rowIndex, pane, length) {
-  return notes
-    .filter((note) => note.pane === pane && rowIndex >= note.startRow && rowIndex <= note.endRow)
-    .map((note) => markRange(note, rowIndex, length))
-    .filter((range) => range.end > range.start);
-}
-
-// One pass per character keeps token colour and note highlight from fighting over the same span.
-function paintCell(text, tokens, marks) {
-  if (text === "") {
-    return "";
+function renderNotes() {
+  if (review === null || notes.length === 0) {
+    notesPanel.innerHTML = '<div class="hint">Select any text in the diff to leave a note.</div>';
+    return;
   }
 
-  const colors = new Array(text.length).fill(null);
-
-  tokens.forEach((token) => {
-    for (let index = token.start; index < token.end && index < text.length; index += 1) {
-      colors[index] = token.color;
-    }
-  });
-
-  const marked = new Array(text.length).fill(false);
-
-  marks.forEach((range) => {
-    for (let index = range.start; index < range.end; index += 1) {
-      marked[index] = true;
-    }
-  });
-
-  const parts = [];
-  let cursor = 0;
-
-  while (cursor < text.length) {
-    let end = cursor + 1;
-
-    while (end < text.length && colors[end] === colors[cursor] && marked[end] === marked[cursor]) {
-      end += 1;
-    }
-
-    const body = escapeHtml(text.slice(cursor, end));
-    const styled = colors[cursor] === null ? body : '<span style="color:' + colors[cursor] + '">' + body + "</span>";
-    parts.push(marked[cursor] ? '<mark class="noted">' + styled + "</mark>" : styled);
-    cursor = end;
-  }
-
-  return parts.join("");
-}
-
-function hiddenRows() {
-  const hidden = new Set();
-
-  review.folds.forEach((fold, foldIndex) => {
-    if (expanded.has(foldIndex)) {
-      return;
-    }
-
-    for (let offset = 0; offset < fold.count; offset += 1) {
-      hidden.add(fold.start + offset);
-    }
-  });
-
-  return hidden;
-}
-
-function cell(row, rowIndex, pane) {
-  const text = textOf(row, pane);
-  const body = paintCell(text, tokensOf(row, pane), marksFor(rowIndex, pane, text.length));
-
-  return (
-    '<td class="num ' + pane + '">' + (numberOf(row, pane) ?? "") + "</td>" +
-    '<td class="bar ' + pane + '"></td>' +
-    '<td class="code ' + pane + '" data-row="' + rowIndex + '" data-pane="' + pane + '">' + body + "</td>"
-  );
+  notesPanel.innerHTML = C.notesHtml(review, notes);
 }
 
 function render() {
@@ -310,62 +224,8 @@ function render() {
   pathLabel.textContent = review.path;
   sendButton.disabled = notes.length === 0;
   approveButton.disabled = false;
-
-  const hidden = hiddenRows();
-  const parts = ["<table>"];
-
-  review.rows.forEach((row, index) => {
-    const foldIndex = review.folds.findIndex((fold) => fold.start === index);
-
-    if (foldIndex >= 0 && !expanded.has(foldIndex)) {
-      const fold = review.folds[foldIndex];
-      parts.push(
-        '<tr class="fold" data-fold="' + foldIndex + '"><td colspan="6">' +
-          fold.count + " unchanged lines</td></tr>",
-      );
-    }
-
-    if (hidden.has(index)) {
-      return;
-    }
-
-    parts.push(
-      '<tr class="' + row.kind + '">' + cell(row, index, "left") + cell(row, index, "right") + "</tr>",
-    );
-  });
-
-  parts.push("</table>");
-  diff.innerHTML = parts.join("");
+  diff.innerHTML = C.tableHtml(review, notes, expanded);
   renderNotes();
-}
-
-function quoteOf(note) {
-  const row = review.rows[note.startRow];
-  const text = textOf(row, note.pane);
-  const end = note.endRow > note.startRow ? text.length : note.endColumn;
-  return text.slice(note.startColumn, end).trim();
-}
-
-function labelOf(note) {
-  const start = numberOf(review.rows[note.startRow], note.pane);
-  const end = numberOf(review.rows[note.endRow], note.pane);
-  return start === end || end === null ? "L" + start : "L" + start + "-" + end;
-}
-
-function renderNotes() {
-  if (review === null || notes.length === 0) {
-    notesPanel.innerHTML = '<div class="hint">Select any text in the diff to leave a note.</div>';
-    return;
-  }
-
-  notesPanel.innerHTML = notes
-    .map((note, index) =>
-      '<div class="note"><button class="drop" data-drop="' + index + '">&times;</button>' +
-      '<div class="where">' + labelOf(note) + "</div>" +
-      '<div class="quote">' + escapeHtml(quoteOf(note)) + "</div>" +
-      '<div class="body">' + escapeHtml(note.text) + "</div></div>",
-    )
-    .join("");
 }
 
 function cellOf(node) {
@@ -373,12 +233,8 @@ function cellOf(node) {
   return element === null ? null : element.closest("td.code");
 }
 
-// A DOM range can start inside a colour span, so the offset comes from the text between the cell start and that point.
-function columnIn(cellNode, node, offset) {
-  const range = document.createRange();
-  range.selectNodeContents(cellNode);
-  range.setEnd(node, offset);
-  return range.toString().length;
+function refOf(cell) {
+  return cell === null ? null : { row: cell.dataset.row, pane: cell.dataset.pane };
 }
 
 function readSelection() {
@@ -392,29 +248,26 @@ function readSelection() {
   const startCell = cellOf(range.startContainer);
   const endCell = cellOf(range.endContainer);
 
-  if (startCell === null || endCell === null || startCell.dataset.pane !== endCell.dataset.pane) {
+  if (startCell === null || endCell === null) {
     return null;
   }
 
-  return {
-    startRow: Number(startCell.dataset.row),
-    endRow: Number(endCell.dataset.row),
-    pane: startCell.dataset.pane,
-    startColumn: columnIn(startCell, range.startContainer, range.startOffset),
-    endColumn: columnIn(endCell, range.endContainer, range.endOffset),
-    rect: range.getBoundingClientRect(),
-  };
+  const startColumn = C.columnIn(document.createRange(), startCell, range.startContainer, range.startOffset);
+  const endColumn = C.columnIn(document.createRange(), endCell, range.endContainer, range.endOffset);
+  const span = C.draftRange(refOf(startCell), refOf(endCell), startColumn, endColumn);
+
+  return span === null ? null : { span, rect: range.getBoundingClientRect() };
 }
 
 function hidePopup() {
   popup.style.display = "none";
   popupText.value = "";
-  draftRange = null;
+  draft = null;
 }
 
 function showPopup(selected) {
-  draftRange = selected;
-  popupQuote.textContent = quoteOf(selected) || "(whole line)";
+  draft = selected.span;
+  popupQuote.textContent = C.quoteOf(review, selected.span) || "(whole line)";
 
   const top = window.scrollY + selected.rect.bottom + 8;
   const left = Math.max(8, Math.min(window.scrollX + selected.rect.left, window.innerWidth - 320));
@@ -442,36 +295,18 @@ diff.addEventListener("click", (event) => {
     return;
   }
 
-  expanded.add(Number(fold.dataset.fold));
+  expanded = new Set(expanded).add(Number(fold.dataset.fold));
   render();
 });
-
-// The panel matches the order the agent receives, so a note sits where its line sits.
-function sortNotes() {
-  notes.sort((first, second) =>
-    first.startRow === second.startRow
-      ? first.startColumn - second.startColumn
-      : first.startRow - second.startRow,
-  );
-}
 
 function saveDraft() {
   const text = popupText.value.trim();
 
-  if (draftRange === null || text === "") {
+  if (draft === null || text === "") {
     return;
   }
 
-  notes.push({
-    startRow: draftRange.startRow,
-    endRow: draftRange.endRow,
-    pane: draftRange.pane,
-    startColumn: draftRange.startColumn,
-    endColumn: draftRange.endColumn,
-    text,
-  });
-
-  sortNotes();
+  notes = C.sortedNotes([...notes, { ...draft, text }]);
   hidePopup();
   window.getSelection()?.removeAllRanges();
   render();
@@ -499,26 +334,46 @@ notesPanel.addEventListener("click", (event) => {
     return;
   }
 
-  notes.splice(Number(drop.dataset.drop), 1);
+  const dropped = Number(drop.dataset.drop);
+  notes = notes.filter((_note, index) => index !== dropped);
   render();
 });
 
+function warn(message) {
+  pathLabel.textContent = message;
+}
+
+function clearReview() {
+  review = null;
+  notes = [];
+  expanded = new Set();
+  render();
+}
+
 function post(payload) {
+  sendButton.disabled = true;
+  approveButton.disabled = true;
+
   return fetch("/r/" + token + "/verdict", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
-  }).then((response) => {
-    // A refused verdict means the open review moved on, so the page keeps what it is showing.
-    if (!response.ok) {
-      return;
-    }
+  })
+    .then((response) => {
+      // A refused verdict means another client already answered, so the notes typed here can never land.
+      if (!response.ok) {
+        clearReview();
+        warn("this review was already answered elsewhere - your notes were not sent");
+        return;
+      }
 
-    review = null;
-    notes = [];
-    expanded = new Set();
-    render();
-  });
+      clearReview();
+    })
+    .catch(() => {
+      sendButton.disabled = notes.length === 0;
+      approveButton.disabled = review === null;
+      warn("could not reach pair mode - check the terminal and try again");
+    });
 }
 
 sendButton.addEventListener("click", () => post({ id: review.id, notes }));
@@ -534,14 +389,26 @@ events.addEventListener("review", (event) => {
   render();
 });
 
-events.addEventListener("cancel", () => {
-  review = null;
-  notes = [];
-  render();
+// A cancel names the review it withdraws, so a late frame never clears the one now open.
+events.addEventListener("cancel", (event) => {
+  const cancelled = JSON.parse(event.data);
+
+  if (review === null || review.id !== cancelled.id) {
+    return;
+  }
+
+  clearReview();
 });
 
 render();
 `;
+
+// A literal closing tag inside the script would end the block early, and only a string can carry one.
+function inlineScript(source: string): string {
+  return source.replaceAll("</script", String.raw`<\/script`);
+}
+
+const SCRIPT = inlineScript(`${CLIENT_BUNDLE}\n${WIRING}`);
 
 export function renderPage(): string {
   return `<!doctype html>

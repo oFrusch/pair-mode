@@ -39,12 +39,6 @@ export interface SyntaxToken {
   color: string;
 }
 
-export interface PaneTextScan {
-  output: string;
-  currentFg: string | null | undefined;
-  currentBg: string | null | undefined;
-}
-
 export type TokenProvider = (line: string, lineNumber: number | null) => SyntaxToken[];
 
 export type NotePosition = "panel" | "anchored";
@@ -70,6 +64,30 @@ export interface PaintOptions {
 export interface PaintResult {
   lines: string[];
   map: ScreenMap;
+  lastRow: number;
+}
+
+// Scroll and cursor arithmetic needs the geometry alone, so it asks for no token provider and no colours.
+export interface ScrollGeometry {
+  model: DiffModel;
+  layout: "split" | "unified";
+  width: number;
+  height: number;
+  notes: Note[];
+  mode: Mode;
+  notePosition: NotePosition;
+  selection: Selection | null;
+}
+
+export interface ChangeCounts {
+  add: number;
+  del: number;
+}
+
+export interface BodyFill {
+  lines: string[];
+  screenRows: ScreenRow[];
+  count: number;
 }
 
 export interface AnsiPair {
