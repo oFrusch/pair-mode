@@ -271,8 +271,10 @@ async function main(config: PairConfig): Promise<number> {
     return 0;
   }
 
+  // Codex requires hookEventName and rejects the whole object without it, which applies the edit.
   const denyJson = JSON.stringify({
     hookSpecificOutput: {
+      hookEventName: "PreToolUse",
       permissionDecision: "deny",
       permissionDecisionReason: verdict.reason,
     },
