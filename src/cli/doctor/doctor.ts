@@ -11,11 +11,16 @@ import { installRoot } from "../install-root";
 import {
   claudeCodeSettingsPath,
   codexHooksPath,
+  isPairCommandRegistered,
   isPreToolUseRegistered,
   isReExportRegistered,
   opencodePluginPath,
+  pairCommandPath,
   piExtensionPath,
 } from "../register";
+import type { CliName } from "../register";
+import { defaultResolvesOnPath } from "../../helpers/resolvesOnPath";
+import type { PathResolver } from "../../helpers/types";
 import type { DoctorCheck, DoctorOptions, DoctorReport } from "./types";
 
 function checkConfig(result: ConfigResult): DoctorCheck {
@@ -69,8 +74,20 @@ function checkControllingTerminal(openTty: () => number): DoctorCheck {
   }
 }
 
+function describeCommand(cli: CliName, home: string): DoctorCheck {
+  const path = pairCommandPath(home, cli);
+  const present = isPairCommandRegistered(home, cli);
+
+  return {
+    name: `${cli} /pair command`,
+    passed: present,
+    detail: present ? `installed at ${path}` : "not installed; run pair-mode setup",
+    warnOnly: true,
+  };
+}
+
 interface RegistrationSpec {
-  cli: string;
+  cli: CliName;
   registered: boolean;
   targetExists: boolean;
 }
@@ -89,41 +106,55 @@ function describeRegistration(spec: RegistrationSpec): DoctorCheck {
   };
 }
 
+// The /pair command runs a bare pair-mode, unlike a hook, which the CLI invokes by absolute path.
+function checkCommandOnPath(resolves: PathResolver): DoctorCheck {
+  const present = resolves("pair-mode");
+
+  return {
+    name: "pair-mode on PATH",
+    passed: present,
+    detail: present
+      ? "the /pair command can run it"
+      : "not on PATH; the /pair command cannot run it. Install pair-mode globally.",
+    warnOnly: true,
+  };
+}
+
 function checkClis(home: string, root: string): DoctorCheck[] {
   const claudeCommand = join(root, "dist", "claude-code.js");
-  const claudeRegistered = isPreToolUseRegistered(claudeCodeSettingsPath(home), claudeCommand);
-
   const codexCommand = join(root, "dist", "codex.js");
-  const codexRegistered = isPreToolUseRegistered(codexHooksPath(home), codexCommand);
-
   const opencodeTarget = join(root, "dist", "opencode.js");
-  const opencodeRegistered = isReExportRegistered(opencodePluginPath(home), opencodeTarget);
-
   const piTarget = join(root, "dist", "pi.js");
-  const piRegistered = isReExportRegistered(piExtensionPath(home), piTarget);
 
-  return [
-    describeRegistration({
+  const specs: RegistrationSpec[] = [
+    {
       cli: "claude-code",
-      registered: claudeRegistered,
+      registered: isPreToolUseRegistered(claudeCodeSettingsPath(home), claudeCommand),
       targetExists: existsSync(claudeCommand),
-    }),
-    describeRegistration({
+    },
+    {
       cli: "codex",
-      registered: codexRegistered,
+      registered: isPreToolUseRegistered(codexHooksPath(home), codexCommand),
       targetExists: existsSync(codexCommand),
-    }),
-    describeRegistration({
+    },
+    {
       cli: "opencode",
-      registered: opencodeRegistered,
+      registered: isReExportRegistered(opencodePluginPath(home), opencodeTarget),
       targetExists: existsSync(opencodeTarget),
-    }),
-    describeRegistration({
+    },
+    {
       cli: "pi",
-      registered: piRegistered,
+      registered: isReExportRegistered(piExtensionPath(home), piTarget),
       targetExists: existsSync(piTarget),
-    }),
+    },
   ];
+
+  // A CLI with no hook has no use for the command, so only a registered CLI reports one.
+  const commandChecks = specs
+    .filter((spec) => spec.registered)
+    .map((spec) => describeCommand(spec.cli, home));
+
+  return [...specs.map(describeRegistration), ...commandChecks];
 }
 
 // The build script prepends this exact line, so a mismatch means the entry point was not built by scripts/build.mjs.
@@ -273,6 +304,7 @@ export async function runDoctor(options: DoctorOptions = {}): Promise<DoctorRepo
   const checks: DoctorCheck[] = [
     checkConfig(loaded),
     checkEditor(config, options.resolvesOnPath),
+    checkCommandOnPath(options.resolvesOnPath ?? defaultResolvesOnPath),
     checkMultiplexer(config, options.multiplexerAdapters),
     checkControllingTerminal(openTty),
     ...checkClis(home, root),

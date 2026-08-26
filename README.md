@@ -30,6 +30,31 @@ script, but a git checkout does not run that script.
 Codex has no `MultiEdit` matcher alias. Its `apply_patch` parser reads single-file Add,
 Update, and Delete patches only. A multi-file or rename patch passes through untouched.
 
+## The /pair command
+
+`pair-mode setup` installs a `/pair` command for every CLI whose hook it registers. The
+command toggles pair mode for the current directory. It also tells the agent how a held
+edit comes back.
+
+| CLI         | Installed at                          | Invoked as                 |
+| ----------- | ------------------------------------- | -------------------------- |
+| Claude Code | `~/.claude/commands/pair.md`          | `/pair on`, `/pair off`    |
+| Codex       | `~/.codex/skills/pair/SKILL.md`       | `$pair on`, `$pair off`    |
+| opencode    | `~/.config/opencode/commands/pair.md` | `/pair on`, `/pair off`    |
+| pi          | `~/.pi/agent/skills/pair/SKILL.md`    | ask for pair mode in words |
+
+Codex deprecated `~/.codex/prompts/` in favour of skills, so pair mode installs a skill
+there. Codex invokes a skill with `$`, not `/`.
+
+The command runs a bare `pair-mode`, unlike a hook, which each CLI invokes by absolute
+path. So `pair-mode` must resolve on your PATH. `npx pair-mode setup` alone does not put
+it there.
+
+`pair-mode doctor` warns when the command is missing, and warns when `pair-mode` does not
+resolve on PATH. Neither warning raises the exit code.
+
+Setup backs up an existing file before it rewrites the file.
+
 ## Editors
 
 | Editor         | Diff colour | Syntax colour on changed rows                                                                                                                                                                                                    |

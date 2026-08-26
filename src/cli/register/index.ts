@@ -14,3 +14,12 @@ export {
   piExtensionSource,
   registerPi,
 } from "./register";
+
+export {
+  isPairCommandRegistered,
+  pairCommandPath,
+  pairCommandSource,
+  registerPairCommand,
+} from "./commands";
+
+export type { CliName } from "./commands.types";

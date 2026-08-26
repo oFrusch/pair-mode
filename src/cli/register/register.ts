@@ -342,7 +342,7 @@ export function correctMultiEditMatchers(homeDir: string): RegisterResult {
   return { path, changed: true, backupPath, note };
 }
 
-function writeFileIfChanged(path: string, content: string): RegisterResult {
+export function writeFileIfChanged(path: string, content: string): RegisterResult {
   if (existsSync(path) && readFileSync(path, "utf-8") === content) {
     return { path, changed: false, backupPath: null };
   }
