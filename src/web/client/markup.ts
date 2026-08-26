@@ -2,7 +2,7 @@ import { isHexColor } from "../../helpers/hexColor";
 import type { SyntaxToken } from "../../tui/paint";
 import type { WebNote } from "../notes.types";
 import type { WebReview, WebRow } from "../review.types";
-import type { MarkRange, Pane, SpanRange } from "./markup.types";
+import type { InlineLine, MarkRange, Pane, SpanRange } from "./markup.types";
 
 const ESCAPES: Record<string, string> = {
   "&": "&amp;",
@@ -226,12 +226,6 @@ export function tableHtml(
   return parts.join("");
 }
 
-interface InlineLine {
-  pane: Pane;
-  sign: string;
-  kind: string;
-}
-
 // A replace row changed on both sides, so one column has to show the old line above the new one.
 function inlineLines(kind: string): InlineLine[] {
   if (kind === "del") {
@@ -270,18 +264,22 @@ function inlineMarks(
   ];
 }
 
+// A del row renders no right line, so a note taken on that side anchors to the line the row does render.
+function anchorsHere(line: InlineLine, panes: readonly Pane[], notePane: Pane): boolean {
+  return line.pane === notePane || !panes.includes(notePane);
+}
+
 // One line can carry several notes, so the anchor holds every index that starts here.
 function anchorsAt(
   notes: readonly WebNote[],
   rowIndex: number,
-  kind: string,
-  pane: Pane,
+  line: InlineLine,
+  panes: readonly Pane[],
 ): number[] {
   return notes
     .map((note, index) => ({ note, index }))
     .filter(
-      (entry) =>
-        entry.note.startRow === rowIndex && (kind === "context" || entry.note.pane === pane),
+      (entry) => entry.note.startRow === rowIndex && anchorsHere(line, panes, entry.note.pane),
     )
     .map((entry) => entry.index);
 }
@@ -291,6 +289,7 @@ function inlineRowHtml(
   notes: readonly WebNote[],
   rowIndex: number,
   line: InlineLine,
+  panes: readonly Pane[],
 ): string {
   const row = review.rows[rowIndex];
 
@@ -304,7 +303,7 @@ function inlineRowHtml(
     tokensOf(row, line.pane),
     inlineMarks(notes, rowIndex, row.kind, line.pane, text.length),
   );
-  const anchors = anchorsAt(notes, rowIndex, row.kind, line.pane);
+  const anchors = anchorsAt(notes, rowIndex, line, panes);
   const leftNumber = line.pane === "left" ? (row.leftNumber ?? "") : "";
   const rightNumber = line.pane === "right" ? (row.rightNumber ?? "") : "";
 
@@ -317,7 +316,9 @@ function inlineRowHtml(
     leftNumber +
     '</td><td class="num new">' +
     rightNumber +
-    '</td><td class="sign">' +
+    '</td><td class="sign ' +
+    line.pane +
+    '">' +
     line.sign +
     '</td><td class="code ' +
     line.pane +
@@ -352,8 +353,11 @@ export function inlineHtml(
       return;
     }
 
-    inlineLines(row.kind).forEach((line) => {
-      parts.push(inlineRowHtml(review, notes, index, line));
+    const lines = inlineLines(row.kind);
+    const panes = lines.map((line) => line.pane);
+
+    lines.forEach((line) => {
+      parts.push(inlineRowHtml(review, notes, index, line, panes));
     });
   });
 
@@ -408,13 +412,13 @@ function threadsAt(
       (entry) =>
         '<tr class="thread"><td colspan="' +
         columns +
-        '"><div class="at">' +
+        '"><button class="drop" data-drop="' +
+        entry.index +
+        '" aria-label="Remove note">&times;</button><div class="at">' +
         escapeHtml(labelOf(review, entry.note)) +
         "</div><p>" +
         escapeHtml(entry.note.text) +
-        '</p><button class="drop" data-drop="' +
-        entry.index +
-        '" aria-label="Remove note">&times;</button></td></tr>',
+        "</p></td></tr>",
     )
     .join("");
 }

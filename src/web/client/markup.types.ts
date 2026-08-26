@@ -13,3 +13,10 @@ export interface SpanRange {
   startColumn: number;
   endColumn: number;
 }
+
+// The inline layout renders one line per pane, so a replace row produces two of these.
+export interface InlineLine {
+  pane: Pane;
+  sign: string;
+  kind: string;
+}

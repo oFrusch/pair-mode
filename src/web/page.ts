@@ -2,8 +2,6 @@ import type { Layout } from "../core/config";
 import { theme } from "../tui/paint";
 import { CLIENT_BUNDLE } from "./client/bundle";
 
-const FONTS = "https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz@1,6..72&display=swap";
-
 const STYLE = `
 :root {
   --bg: #0d1117;
@@ -20,7 +18,7 @@ const STYLE = `
   --note-tint: rgba(210, 168, 255, 0.16);
   --amber: ${theme.chrome};
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --serif: Newsreader, Georgia, "Times New Roman", serif;
+  --serif: "Iowan Old Style", Georgia, "Times New Roman", serif;
 }
 
 * { box-sizing: border-box; }
@@ -52,7 +50,6 @@ header {
 header .seg { padding: 6px 13px; white-space: nowrap; }
 header .mode { background: var(--amber); color: ${theme.statusText}; font-weight: 700; letter-spacing: 0.1em; }
 header .path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
-header .path b { color: var(--text); font-weight: 500; }
 header .plus { color: var(--add-bar); }
 header .minus { color: var(--del-bar); }
 header .tally { color: var(--note); }
@@ -226,8 +223,6 @@ tr.thread p, .note p {
 
 .drop:hover { color: var(--del-bar); }
 
-tr.thread .drop { float: right; margin-top: -18px; }
-
 /* ---- popup ---- */
 
 #popup {
@@ -282,7 +277,10 @@ textarea {
 #idle { padding: 64px 24px; color: var(--dim); text-align: center; }
 
 @media (max-width: 900px) {
-  #margin, #leaders { display: none; }
+  main { flex-wrap: wrap; }
+  #leaders { display: none; }
+  #margin { width: 100%; padding: 12px 16px; border-top: 1px solid var(--rule); }
+  .note { position: static; margin-bottom: 12px; }
 }
 `;
 
@@ -351,7 +349,8 @@ function drawLeaders() {
 
     // The line leaves from under the marked run, so it continues that underline and crosses no glyph.
     const marks = row.querySelectorAll("mark.noted");
-    const source = marks.length === 0 ? row : marks[marks.length - 1];
+    const ordinal = (row.dataset.anchor ?? "").split(" ").indexOf(String(index));
+    const source = marks[ordinal] ?? marks[marks.length - 1] ?? row;
     const a = source.getBoundingClientRect();
     const b = card.getBoundingClientRect();
     const x1 = a.right - base.left + 5;
@@ -407,6 +406,7 @@ function render() {
     approveButton.disabled = true;
     hidePopup();
     renderMargin();
+    refreshLeaders();
     return;
   }
 
@@ -478,9 +478,11 @@ function readSelection() {
   return span === null ? null : { span, rect: range.getBoundingClientRect() };
 }
 
+// A hidden textarea still holds focus, and the key handler ignores every key while it does.
 function hidePopup() {
   popup.style.display = "none";
   popupText.value = "";
+  popupText.blur();
   draft = null;
 }
 
@@ -508,7 +510,7 @@ diff.addEventListener("mouseup", () => {
 });
 
 diff.addEventListener("click", (event) => {
-  const fold = event.target.closest("[data-fold]");
+  const fold = event.target instanceof Element ? event.target.closest("[data-fold]") : null;
 
   if (fold === null) {
     return;
@@ -547,7 +549,7 @@ popupText.addEventListener("keydown", (event) => {
 });
 
 document.addEventListener("click", (event) => {
-  const drop = event.target.closest("[data-drop]");
+  const drop = event.target instanceof Element ? event.target.closest("[data-drop]") : null;
 
   if (drop === null) {
     return;
@@ -570,6 +572,24 @@ document.addEventListener("keydown", (event) => {
 
   if (event.key === "u") {
     setLayout(isInline() ? "split" : "inline");
+  }
+});
+
+// The footer names ^S and ^Q, so both keys act rather than reaching the browser.
+document.addEventListener("keydown", (event) => {
+  if (!event.ctrlKey || event.metaKey || event.altKey || review === null) {
+    return;
+  }
+
+  if (event.key === "s" && notes.length > 0) {
+    event.preventDefault();
+    post({ id: review.id, notes });
+    return;
+  }
+
+  if (event.key === "q") {
+    event.preventDefault();
+    post({ id: review.id, notes: [] });
   }
 });
 
@@ -660,9 +680,6 @@ export function renderPage(layout: Layout = "split"): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>pair mode</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="${FONTS}">
 <style>${STYLE}</style>
 </head>
 <body data-layout="${layout}">

@@ -165,7 +165,7 @@ test("inlineHtml renders a deletion once, on the left pane", () => {
   expect(html.split("<tr").length - 1).toBe(1);
   expect(html).toContain('<tr class="del">');
   expect(html).toContain('<td class="num old">4</td><td class="num new"></td>');
-  expect(html).toContain('<td class="sign">-</td>');
+  expect(html).toContain('<td class="sign left">-</td>');
   expect(html).toContain('<td class="code left" data-row="0" data-pane="left">gone</td>');
 });
 
@@ -175,7 +175,7 @@ test("inlineHtml renders an addition once, on the right pane", () => {
   expect(html.split("<tr").length - 1).toBe(1);
   expect(html).toContain('<tr class="add">');
   expect(html).toContain('<td class="num old"></td><td class="num new">9</td>');
-  expect(html).toContain('<td class="sign">+</td>');
+  expect(html).toContain('<td class="sign right">+</td>');
   expect(html).toContain('<td class="code right" data-row="0" data-pane="right">fresh</td>');
 });
 
@@ -185,7 +185,7 @@ test("inlineHtml renders a context row once, on the right pane", () => {
   expect(html.split("<tr").length - 1).toBe(1);
   expect(html).toContain('<tr class="context">');
   expect(html).toContain('<td class="num old"></td><td class="num new">6</td>');
-  expect(html).toContain('<td class="sign"> </td>');
+  expect(html).toContain('<td class="sign right"> </td>');
   expect(html).toContain('data-pane="right"');
 });
 
@@ -195,9 +195,9 @@ test("inlineHtml splits a replace row into the old line then the new line", () =
   expect(html.split("<tr").length - 1).toBe(2);
   expect(html.indexOf('<tr class="del">')).toBeLessThan(html.indexOf('<tr class="add">'));
   expect(html).toContain(
-    '<td class="num old">2</td><td class="num new"></td><td class="sign">-</td>',
+    '<td class="num old">2</td><td class="num new"></td><td class="sign left">-</td>',
   );
-  expect(html).toContain('<td class="num new">3</td><td class="sign">+</td>');
+  expect(html).toContain('<td class="num new">3</td><td class="sign right">+</td>');
   expect(html).toContain('data-row="0" data-pane="left">old</td>');
   expect(html).toContain('data-row="0" data-pane="right">new</td>');
 });
