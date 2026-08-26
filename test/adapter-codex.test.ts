@@ -174,6 +174,28 @@ test("an apply_patch Update File payload parses into the right before and after 
   expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("why?");
 });
 
+// Codex validates the whole object against its schema and drops a deny that omits hookEventName.
+test("a deny carries the exact hookSpecificOutput shape the Codex schema requires", () => {
+  const harness = setupHarness();
+  const editorScript = writeEditorScript(harness.targetDir, "why?");
+
+  const payload = JSON.stringify({
+    tool_name: "Write",
+    tool_input: { file_path: harness.filePath, content: "hello\n" },
+  });
+
+  const outcome = runAdapter(payload, harness, editorScript);
+  const parsed = JSON.parse(outcome.stdout);
+
+  expect(Object.keys(parsed)).toEqual(["hookSpecificOutput"]);
+  expect(Object.keys(parsed.hookSpecificOutput).sort()).toEqual([
+    "hookEventName",
+    "permissionDecision",
+    "permissionDecisionReason",
+  ]);
+  expect(parsed.hookSpecificOutput.hookEventName).toBe("PreToolUse");
+});
+
 test("an unparseable apply_patch patch exits 0 with no output", () => {
   const harness = setupHarness();
   writeFileSync(harness.filePath, "line one\n", "utf-8");
