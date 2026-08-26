@@ -1,0 +1,21 @@
+{
+  "version": "1",
+  "name": "pair-mode",
+  "owner": {
+    "name": "ofrusch",
+    "url": "https://github.com/oFrusch"
+  },
+  "plugins": [
+    {
+      "name": "pair-mode",
+      "source": {
+        "source": "npm",
+        "package": "pair-mode"
+      },
+      "description": "Hold every proposed edit, annotate the diff line by line, and hand the notes back to the agent.",
+      "homepage": "https://github.com/oFrusch/pair-mode#readme",
+      "license": "MIT"
+    }
+  ],
+  "description": "Pair mode holds a coding agent's proposed edits so you can annotate them line by line."
+}

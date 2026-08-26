@@ -7,6 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- Pair mode ships as a Claude Code plugin and as a Codex plugin.
+- The repo hosts its own plugin marketplace for both CLIs.
+- A `pair` skill ships in the package, so a skill index can find it.
+
 ## [0.2.1] - 2026-08-26
 
 ### Added

@@ -1,0 +1,23 @@
+{
+  "name": "pair-mode",
+  "version": "0.2.1",
+  "description": "Hold every proposed edit, annotate the diff line by line, and hand the notes back to the agent.",
+  "author": {
+    "name": "ofrusch",
+    "url": "https://github.com/oFrusch"
+  },
+  "homepage": "https://github.com/oFrusch/pair-mode#readme",
+  "license": "MIT",
+  "keywords": ["code-review", "diff", "hooks", "pair-programming", "terminal"],
+  "hooks": "./hooks/codex.json",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Pair Mode",
+    "shortDescription": "Review each proposed edit before it lands",
+    "longDescription": "Pair mode intercepts every proposed edit. It renders the diff in a terminal pane or a browser page, collects notes anchored to line numbers, then holds the edit and returns those notes to the agent. A review you close with no notes applies the edit as proposed.",
+    "developerName": "ofrusch",
+    "category": "Engineering",
+    "websiteURL": "https://github.com/oFrusch/pair-mode",
+    "logo": "./assets/duck.png"
+  }
+}

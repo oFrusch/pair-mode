@@ -1,0 +1,16 @@
+{
+  "name": "pair-mode",
+  "interface": {
+    "displayName": "Pair Mode"
+  },
+  "plugins": [
+    {
+      "name": "pair-mode",
+      "source": {
+        "source": "npm",
+        "package": "pair-mode"
+      },
+      "category": "Engineering"
+    }
+  ]
+}

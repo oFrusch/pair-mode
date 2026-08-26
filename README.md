@@ -21,6 +21,28 @@ npm install -g pair-mode
 pair-mode setup
 ```
 
+### Or install it as a plugin
+
+A plugin resolves its own path at runtime, so it needs no global install and no setup step.
+
+Claude Code:
+
+```
+/plugin marketplace add oFrusch/pair-mode
+/plugin install pair-mode
+```
+
+Codex:
+
+```
+codex plugin marketplace add oFrusch/pair-mode
+codex plugin add pair-mode@pair-mode
+```
+
+The plugin registers the hook and the `/pair` command for that one CLI. Run
+`npm install -g pair-mode` as well if you want the `pair-mode` command on your PATH, which
+`pair-mode watch` and `pair-mode config` need.
+
 Install pair-mode globally before you run setup. Setup writes the install path into each CLI's config as an absolute path. `npx pair-mode setup` runs from a package cache that npm later prunes, which would leave every hook pointing at a deleted file. Setup detects that case and stops.
 
 The setup command detects the CLIs and multiplexers on your machine, registers the

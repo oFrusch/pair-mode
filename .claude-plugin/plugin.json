@@ -1,0 +1,12 @@
+{
+  "name": "pair-mode",
+  "version": "0.2.1",
+  "description": "Hold every proposed edit, annotate the diff line by line, and hand the notes back to the agent.",
+  "author": {
+    "name": "ofrusch",
+    "email": "owenc343@gmail.com"
+  },
+  "homepage": "https://github.com/oFrusch/pair-mode#readme",
+  "repository": "https://github.com/oFrusch/pair-mode.git",
+  "license": "MIT"
+}

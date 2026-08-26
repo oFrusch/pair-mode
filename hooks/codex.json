@@ -1,0 +1,17 @@
+{
+  "description": "Pair mode holds a proposed edit so the user can annotate the diff line by line.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/dist/codex.js\"",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -31,6 +31,11 @@
   "files": [
     "dist",
     "assets",
+    ".claude-plugin/plugin.json",
+    ".codex-plugin/plugin.json",
+    "hooks",
+    "commands",
+    "skills",
     "README.md"
   ],
   "type": "module",
