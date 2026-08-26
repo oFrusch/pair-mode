@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/oFrusch/pair-mode/main/docs/images/duck.png" alt="The pair-mode duck" width="120" align="right">
+
 # pair mode
 
 #### For when your agent needs a rubber ducky.

@@ -7,6 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- The web page serves a duck favicon, and it marks its header with the duck.
+- The web page shows the duck while it waits for an edit.
+- The watch idle screen draws a duck.
+
 ## [0.2.0] - 2026-08-26
 
 ### Added
