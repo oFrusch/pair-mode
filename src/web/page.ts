@@ -670,12 +670,13 @@ function pressed(layout: Layout, wanted: Layout): string {
   return layout === wanted ? "true" : "false";
 }
 
-export function renderPage(layout: Layout = "split"): string {
+export function renderPage(layout: Layout = "split", faviconPath = "favicon.png"): string {
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/png" href="${faviconPath}">
 <title>pair mode</title>
 <style>${STYLE}</style>
 </head>

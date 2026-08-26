@@ -115,6 +115,26 @@ test("the review page loads at the token path", async () => {
   expect(body).toContain('id="diff"');
 });
 
+test("the token path serves the duck favicon as a PNG", async () => {
+  web = await startPlain(() => {});
+
+  const response = await fetch(`${web.url}/favicon.png`);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+
+  expect(response.status).toBe(OK);
+  expect(response.headers.get("content-type")).toBe("image/png");
+  expect(Array.from(bytes.slice(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+});
+
+test("the review page resolves its favicon inside the token path", async () => {
+  web = await startPlain(() => {});
+
+  const body = await (await fetch(web.url)).text();
+  const href = body.match(/<link rel="icon" type="image\/png" href="([^"]+)">/)?.[1];
+
+  expect(new URL(href ?? "", web.url).pathname).toBe(`/r/${TOKEN}/favicon.png`);
+});
+
 test("a wrong token returns 404 rather than 403", async () => {
   web = await startPlain(() => {});
 
@@ -529,6 +549,10 @@ test("renderPage never emits a closing script tag from inside the script", () =>
 
   expect(scripts).toBe(1);
   expect(page.split("</script>").length - 1).toBe(1);
+});
+
+test("renderPage links its duck favicon through the token path", () => {
+  expect(renderPage()).toContain('<link rel="icon" type="image/png" href="favicon.png">');
 });
 
 test("renderPage stamps the split layout on the body when no layout is asked for", () => {
