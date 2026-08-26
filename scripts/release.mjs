@@ -9,6 +9,8 @@ const projectRoot = path.resolve(__dirname, "..");
 const LEVELS = ["patch", "minor", "major"];
 const RELEASE_BRANCH = "main";
 
+const PLUGIN_MANIFESTS = [".claude-plugin/plugin.json", ".codex-plugin/plugin.json"];
+
 const args = process.argv.slice(2);
 const level = args.find((arg) => LEVELS.includes(arg));
 const dryRun = args.includes("--dry-run");
@@ -78,6 +80,18 @@ function requireUnusedTag(tag) {
   }
 }
 
+// A machine without Claude Code can still cut a release, so a missing binary skips the check.
+function validatePluginManifests() {
+  const probe = run("which", ["claude"], { capture: true, allowFailure: true });
+
+  if (probe.status !== 0) {
+    console.log("release: claude is not on PATH, so the plugin manifests go unvalidated.");
+    return;
+  }
+
+  run("claude", ["plugin", "validate", ".", "--strict"]);
+}
+
 function runGates() {
   console.log("release: running the gates");
   run("pnpm", ["run", "typecheck"]);
@@ -85,11 +99,28 @@ function runGates() {
   run("pnpm", ["run", "fmt:check"]);
   run("pnpm", ["test"]);
   run("pnpm", ["run", "build"]);
+  validatePluginManifests();
 }
 
 function bumpVersion() {
   run("npm", ["version", level, "--no-git-tag-version"]);
   return readVersion();
+}
+
+// Each plugin manifest carries its own version, and a marketplace serves whatever it finds there.
+function bumpPluginManifests(version) {
+  for (const manifest of PLUGIN_MANIFESTS) {
+    const manifestPath = path.join(projectRoot, manifest);
+    const text = readFileSync(manifestPath, "utf-8");
+    const parsed = JSON.parse(text);
+
+    if (parsed.version === undefined) {
+      fail(`${manifest} has no "version" field.`);
+    }
+
+    parsed.version = version;
+    writeFileSync(manifestPath, `${JSON.stringify(parsed, null, 2)}\n`, "utf-8");
+  }
 }
 
 function today() {
@@ -137,8 +168,9 @@ function main() {
 
   requireUnusedTag(tag);
   rollChangelog(version);
+  bumpPluginManifests(version);
 
-  run("git", ["add", "package.json", "CHANGELOG.md"]);
+  run("git", ["add", "package.json", "CHANGELOG.md", ...PLUGIN_MANIFESTS]);
   run("git", ["commit", "-m", `chore(release): ${tag}`]);
   run("git", ["tag", "-a", tag, "-m", tag]);
 
