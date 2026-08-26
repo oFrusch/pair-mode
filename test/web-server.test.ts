@@ -531,6 +531,53 @@ test("renderPage never emits a closing script tag from inside the script", () =>
   expect(page.split("</script>").length - 1).toBe(1);
 });
 
+test("renderPage stamps the split layout on the body when no layout is asked for", () => {
+  expect(renderPage()).toContain('<body data-layout="split">');
+});
+
+test("renderPage stamps the layout it is given on the body", () => {
+  expect(renderPage("inline")).toContain('<body data-layout="inline">');
+});
+
+test("renderPage presses the swap button that matches the layout", () => {
+  const page = renderPage("inline");
+
+  expect(page).toContain('<button data-layout="inline" aria-pressed="true">');
+  expect(page).toContain('<button data-layout="split" aria-pressed="false">');
+});
+
+test("renderPage presses the split button for the default layout", () => {
+  const page = renderPage();
+
+  expect(page).toContain('<button data-layout="split" aria-pressed="true">');
+  expect(page).toContain('<button data-layout="inline" aria-pressed="false">');
+});
+
+test("renderPage lays the page out as a header, a main and a footer", () => {
+  const page = renderPage();
+
+  expect(page).toContain("<header>");
+  expect(page).toContain("<main>");
+  expect(page).toContain("<footer>");
+  expect(page).not.toContain("<aside");
+});
+
+test("renderPage gives main the leader canvas, the diff and the margin", () => {
+  const page = renderPage();
+
+  expect(page).toContain('id="leaders"');
+  expect(page).toContain('id="diff"');
+  expect(page).toContain('id="margin"');
+});
+
+test("the served page carries the layout the server was started with", async () => {
+  web = await startWebServer({ port: 0, token: TOKEN, layout: "inline", onVerdict: () => {} });
+
+  const body = await (await fetch(web.url)).text();
+
+  expect(body).toContain('<body data-layout="inline">');
+});
+
 test("escapeHtml neutralises a closing script tag in file content", () => {
   expect(escapeHtml('</script><img onerror="x">')).toBe(
     "&lt;/script&gt;&lt;img onerror=&quot;x&quot;&gt;",

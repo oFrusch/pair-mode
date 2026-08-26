@@ -1,10 +1,11 @@
 export {
   escapeHtml,
   hiddenRows,
+  inlineHtml,
   labelOf,
+  marginNotesHtml,
   markRange,
   marksFor,
-  notesHtml,
   numberOf,
   paintCell,
   quoteOf,

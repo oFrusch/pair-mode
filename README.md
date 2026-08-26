@@ -125,9 +125,13 @@ Run this command in the directory or any subdirectory of where you are working w
 pair-mode on --web
 ```
 
-![The web review in a browser, with a note popup open under a selected span](https://raw.githubusercontent.com/oFrusch/pair-mode/main/docs/images/web.png)
+![The inline web layout, with two notes in the right margin joined to their lines by a leader](https://raw.githubusercontent.com/oFrusch/pair-mode/main/docs/images/web-inline.png)
 
-That spawns a detached watcher, binds an HTTP server on `127.0.0.1`, and prints a link carrying a random token. Drag across any text in the diff. A popup opens under the selection. Type the note and press Enter. Same stuff as the other solutions, just within an HTML page.
+That spawns a detached watcher, binds an HTTP server on `127.0.0.1`, and prints a link carrying a random token. Drag across any text in the diff. A popup opens under the selection. Type the note and press Enter.
+
+The page opens in the layout your `layout` setting names, and `u` swaps it while you read. The inline layout puts every note in the right margin and draws a leader from the marked run to the card. The split layout threads each note under the last line it covers, and it hatches the side of a row that has no line.
+
+![The split web layout, with a note threaded under the line it covers](https://raw.githubusercontent.com/oFrusch/pair-mode/main/docs/images/web-split.png)
 
 ## Configuration
 
@@ -163,8 +167,9 @@ existing config with no `editor` key now opens pair mode's own pane by default.
 
 `notes` and `layout` both describe position, and they are easy to confuse. `layout`
 controls the diff itself — split into two columns, or one inline column. `notes`
-controls only where a note you write renders — in a docked panel, or anchored next to
-the span it annotates. Setting one does not affect the other.
+controls only where a note you write renders in the pair pane — in a docked panel, or
+anchored next to the span it annotates. Setting one does not affect the other. The web
+view anchors every note, so it reads `layout` and ignores `notes`.
 
 ## License
 
