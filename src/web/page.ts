@@ -47,7 +47,8 @@ header {
 }
 
 header .seg { padding: 6px 13px; white-space: nowrap; }
-header .mode { background: var(--amber); color: ${theme.statusText}; font-weight: 700; letter-spacing: 0.1em; }
+header .mode { display: flex; align-items: center; gap: 7px; color: var(--amber); font-weight: 700; letter-spacing: 0.1em; }
+header .mark { border-radius: 4px; }
 header .path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 header .plus { color: var(--add-bar); }
 header .minus { color: var(--del-bar); }
@@ -271,7 +272,15 @@ textarea {
 
 .hint { color: var(--dim); font-size: 11px; }
 
-#idle { padding: 64px 24px; color: var(--dim); text-align: center; }
+#idle { padding: 72px 24px; color: var(--dim); text-align: center; }
+#idle img { border-radius: 14px; opacity: 0.75; animation: bob 3.2s ease-in-out infinite; }
+#idle p { margin: 16px 0 0; }
+
+@keyframes bob { 50% { transform: translateY(-6px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  #idle img { animation: none; }
+}
 
 @media (max-width: 900px) {
   main { flex-wrap: wrap; }
@@ -284,6 +293,7 @@ textarea {
 // The page wires the DOM, and every markup and geometry decision lives in the typechecked client bundle.
 const WIRING = String.raw`
 const C = PairClient;
+const assets = document.body.dataset.assets ?? "";
 const token = location.pathname.split("/")[2];
 const main = document.querySelector("main");
 const diff = document.getElementById("diff");
@@ -394,7 +404,8 @@ function renderMargin() {
 
 function render() {
   if (review === null) {
-    diff.innerHTML = '<div id="idle">waiting for an edit</div>';
+    diff.innerHTML =
+      '<div id="idle"><img src="' + assets + '/duck.png" alt="" width="88" height="88"><p>waiting for an edit</p></div>';
     pathLabel.textContent = "no review open";
     plusLabel.textContent = "";
     minusLabel.textContent = "";
@@ -670,19 +681,19 @@ function pressed(layout: Layout, wanted: Layout): string {
   return layout === wanted ? "true" : "false";
 }
 
-export function renderPage(layout: Layout = "split", faviconPath = "favicon.png"): string {
+export function renderPage(layout: Layout = "split", assetBase = ""): string {
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" type="image/png" href="${faviconPath}">
+<link rel="icon" type="image/png" href="${assetBase}/favicon.png">
 <title>pair mode</title>
 <style>${STYLE}</style>
 </head>
-<body data-layout="${layout}">
+<body data-layout="${layout}" data-assets="${assetBase}">
 <header>
-  <span class="seg mode">PAIR</span>
+  <span class="seg mode"><img class="mark" src="${assetBase}/duck.png" alt="" width="18" height="18">pair</span>
   <span class="seg path" id="path">no review open</span>
   <span class="seg plus" id="plus"></span>
   <span class="seg minus" id="minus"></span>

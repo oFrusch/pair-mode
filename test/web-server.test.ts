@@ -135,6 +135,17 @@ test("the review page resolves its favicon inside the token path", async () => {
   expect(new URL(href ?? "", web.url).pathname).toBe(`/r/${TOKEN}/favicon.png`);
 });
 
+test("the token path serves the duck mascot as a PNG", async () => {
+  web = await startPlain(() => {});
+
+  const response = await fetch(`${web.url}/duck.png`);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+
+  expect(response.status).toBe(OK);
+  expect(response.headers.get("content-type")).toBe("image/png");
+  expect(Array.from(bytes.slice(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+});
+
 test("a wrong token returns 404 rather than 403", async () => {
   web = await startPlain(() => {});
 
@@ -551,16 +562,26 @@ test("renderPage never emits a closing script tag from inside the script", () =>
   expect(page.split("</script>").length - 1).toBe(1);
 });
 
-test("renderPage links its duck favicon through the token path", () => {
-  expect(renderPage()).toContain('<link rel="icon" type="image/png" href="favicon.png">');
+test("renderPage links its duck favicon through the asset base", () => {
+  expect(renderPage("split", "/r/abc")).toContain(
+    '<link rel="icon" type="image/png" href="/r/abc/favicon.png">',
+  );
+});
+
+test("renderPage marks the header with the duck", () => {
+  expect(renderPage("split", "/r/abc")).toContain('<img class="mark" src="/r/abc/duck.png"');
+});
+
+test("renderPage hands the asset base to the client through the body", () => {
+  expect(renderPage("split", "/r/abc")).toContain('data-assets="/r/abc"');
 });
 
 test("renderPage stamps the split layout on the body when no layout is asked for", () => {
-  expect(renderPage()).toContain('<body data-layout="split">');
+  expect(renderPage()).toContain('<body data-layout="split"');
 });
 
 test("renderPage stamps the layout it is given on the body", () => {
-  expect(renderPage("inline")).toContain('<body data-layout="inline">');
+  expect(renderPage("inline")).toContain('<body data-layout="inline"');
 });
 
 test("renderPage presses the swap button that matches the layout", () => {
@@ -599,7 +620,7 @@ test("the served page carries the layout the server was started with", async () 
 
   const body = await (await fetch(web.url)).text();
 
-  expect(body).toContain('<body data-layout="inline">');
+  expect(body).toContain('<body data-layout="inline"');
 });
 
 test("escapeHtml neutralises a closing script tag in file content", () => {

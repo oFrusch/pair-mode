@@ -5,6 +5,8 @@ const TITLE = "pair-mode watch";
 const HINT = "waiting for an edit · q quits";
 const LABEL_WIDTH = 10;
 
+const DUCK = ["   __", " <(o )___", "  ( ._> /", "   `---'"];
+
 function line(label: string, value: string, truecolor: boolean): string {
   return fg(theme.fold, truecolor) + label.padEnd(LABEL_WIDTH) + RESET + value;
 }
@@ -25,8 +27,12 @@ export function renderIdle(status: IdleStatus, width: number, truecolor: boolean
     TITLE.padEnd(width).slice(0, width) +
     RESET;
 
+  const duck = DUCK.map((row) => fg(theme.chrome, truecolor) + row + RESET);
+
   return [
     heading,
+    "",
+    ...duck,
     "",
     line("session", status.directory, truecolor),
     line("socket", status.socketPath, truecolor),

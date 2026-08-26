@@ -14,9 +14,17 @@ const HOST = "127.0.0.1";
 const TOKEN_BYTES = 16;
 const MAX_BODY_BYTES = 1_000_000;
 
-const bundledFavicon = fileURLToPath(new URL("../assets/favicon.png", import.meta.url));
-const sourceFavicon = fileURLToPath(new URL("../../assets/favicon.png", import.meta.url));
-const FAVICON = readFileSync(existsSync(bundledFavicon) ? bundledFavicon : sourceFavicon);
+// The build copies assets next to dist, and a source run reads them one level higher.
+function readAsset(name: string): Buffer {
+  const bundled = fileURLToPath(new URL(`../assets/${name}`, import.meta.url));
+  const source = fileURLToPath(new URL(`../../assets/${name}`, import.meta.url));
+  return readFileSync(existsSync(bundled) ? bundled : source);
+}
+
+const IMAGES: Record<string, Buffer> = {
+  "favicon.png": readAsset("favicon.png"),
+  "duck.png": readAsset("duck.png"),
+};
 
 const NOT_FOUND = 404;
 const OK = 200;
@@ -204,13 +212,15 @@ export function startWebServer(options: WebServerOptions): Promise<WebServer> {
 
     if (url === base && request.method === "GET") {
       response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
-      response.end(renderPage(options.layout, `${base}/favicon.png`));
+      response.end(renderPage(options.layout, base));
       return;
     }
 
-    if (url === `${base}/favicon.png` && request.method === "GET") {
+    const image = url.startsWith(`${base}/`) ? IMAGES[url.slice(base.length + 1)] : undefined;
+
+    if (image !== undefined && request.method === "GET") {
       response.writeHead(OK, { "content-type": "image/png" });
-      response.end(FAVICON);
+      response.end(image);
       return;
     }
 
