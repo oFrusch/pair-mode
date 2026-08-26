@@ -42,19 +42,16 @@ Update, and Delete patches only. A multi-file or rename patch passes through unt
 command toggles pair mode for the current directory. It also tells the agent how a held
 edit comes back.
 
-| CLI         | Installed at                          | Invoked as                 |
-| ----------- | ------------------------------------- | -------------------------- |
-| Claude Code | `~/.claude/commands/pair.md`          | `/pair on`, `/pair off`    |
-| Codex       | `~/.codex/skills/pair/SKILL.md`       | `$pair on`, `$pair off`    |
-| opencode    | `~/.config/opencode/commands/pair.md` | `/pair on`, `/pair off`    |
-| pi          | `~/.pi/agent/skills/pair/SKILL.md`    | ask for pair mode in words |
+| CLI         | Installed at                    | Invoked as              |
+| ----------- | ------------------------------- | ----------------------- |
+| Claude Code | `~/.claude/commands/pair.md`    | `/pair on`, `/pair off` |
+| Codex       | `~/.codex/skills/pair/SKILL.md` | `$pair on`, `$pair off` |
 
 Codex deprecated `~/.codex/prompts/` in favour of skills, so pair mode installs a skill
 there. Codex invokes a skill with `$`, not `/`.
 
 The command runs a bare `pair-mode`, unlike a hook, which each CLI invokes by absolute
-path. So `pair-mode` must resolve on your PATH. `npx pair-mode setup` alone does not put
-it there.
+path. So `pair-mode` must resolve on your PATH. A global install puts it there.
 
 `pair-mode doctor` warns when the command is missing, and warns when `pair-mode` does not
 resolve on PATH. Neither warning raises the exit code.
