@@ -32,24 +32,28 @@ Update, and Delete patches only. A multi-file or rename patch passes through unt
 
 ## The /pair command
 
-`pair-mode setup` installs a `/pair` command for every CLI it registers. The command
-toggles pair mode for the current directory and tells the agent how a held edit comes
-back.
+`pair-mode setup` installs a `/pair` command for every CLI whose hook it registers. The
+command toggles pair mode for the current directory. It also tells the agent how a held
+edit comes back.
 
-| CLI         | Installed at                          |
-| ----------- | ------------------------------------- |
-| Claude Code | `~/.claude/commands/pair.md`          |
-| Codex       | `~/.codex/prompts/pair.md`            |
-| opencode    | `~/.config/opencode/commands/pair.md` |
-| pi          | `~/.pi/agent/skills/pair/SKILL.md`    |
+| CLI         | Installed at                          | Invoked as                 |
+| ----------- | ------------------------------------- | -------------------------- |
+| Claude Code | `~/.claude/commands/pair.md`          | `/pair on`, `/pair off`    |
+| Codex       | `~/.codex/skills/pair/SKILL.md`       | `$pair on`, `$pair off`    |
+| opencode    | `~/.config/opencode/commands/pair.md` | `/pair on`, `/pair off`    |
+| pi          | `~/.pi/agent/skills/pair/SKILL.md`    | ask for pair mode in words |
 
-Use `/pair on`, `/pair off`, and `/pair status` inside the agent. pi reads the action
-from your message instead, because pi loads the file as a skill.
+Codex deprecated `~/.codex/prompts/` in favour of skills, so pair mode installs a skill
+there. Codex invokes a skill with `$`, not `/`.
 
-`pair-mode doctor` reports the command as a warning when it is missing. A missing
-command never breaks the hook, so the exit code stays 0.
+The command runs a bare `pair-mode`, unlike a hook, which each CLI invokes by absolute
+path. So `pair-mode` must resolve on your PATH. `npx pair-mode setup` alone does not put
+it there.
 
-Setup backs up a file you edited before it rewrites one.
+`pair-mode doctor` warns when the command is missing, and warns when `pair-mode` does not
+resolve on PATH. Neither warning raises the exit code.
+
+Setup backs up an existing file before it rewrites the file.
 
 ## Editors
 

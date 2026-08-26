@@ -1,7 +1,8 @@
-export type CliName = "claude-code" | "codex" | "opencode" | "pi";
+import type { CliName } from "../detect/types";
+
+export type { CliName };
 
 export interface CommandSpec {
-  cli: CliName;
   // The path is relative to the home directory, in segments, so join builds it per platform.
   segments: string[];
   frontMatter: string[];

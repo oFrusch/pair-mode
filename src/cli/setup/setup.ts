@@ -21,7 +21,6 @@ import type { Prompter, SetupOptions, SetupResult } from "./types";
 const EDITOR_NAMES: EditorName[] = ["auto", "pair", "micro", "nvim", "vim", "nano"];
 const MULTIPLEXER_NAMES: MultiplexerName[] = ["auto", "zellij", "tmux", "none"];
 const LAYOUTS: Layout[] = ["split", "inline"];
-const CLI_NAMES: CliName[] = ["claude-code", "codex", "opencode", "pi"];
 
 function toEditorName(value: string): EditorName {
   return EDITOR_NAMES.find((name) => name === value) ?? "auto";
@@ -172,6 +171,8 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
       changedFiles.push(configBackupPath);
     }
 
+    const registeredClis: CliName[] = [];
+
     for (const name of selectedClis) {
       if (name === "claude-code") {
         const result = registerClaudeCode(home, root);
@@ -188,6 +189,7 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
           );
         }
 
+        registeredClis.push("claude-code");
         continue;
       }
 
@@ -229,6 +231,7 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
         console.log(
           "Codex asks you to trust a hook definition once. Run /hooks inside Codex to trust it.",
         );
+        registeredClis.push("codex");
         continue;
       }
 
@@ -239,6 +242,7 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
           pushChanged(changedFiles, result.path, result.backupPath);
         }
 
+        registeredClis.push("opencode");
         continue;
       }
 
@@ -248,17 +252,13 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
         if (result.changed) {
           pushChanged(changedFiles, result.path, result.backupPath);
         }
+
+        registeredClis.push("pi");
       }
     }
 
-    // Every registered CLI also gets the /pair command, so a fresh install ships the toggle.
-    for (const name of selectedClis) {
-      const cli = CLI_NAMES.find((candidate) => candidate === name);
-
-      if (cli === undefined) {
-        continue;
-      }
-
+    // A CLI whose hook failed gets no command, because the command would then have no hook to toggle.
+    for (const cli of registeredClis) {
       const result = registerPairCommand(home, cli);
 
       if (result.changed) {

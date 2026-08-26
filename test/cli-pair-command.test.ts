@@ -18,7 +18,7 @@ const ALL_CLIS: CliName[] = ["claude-code", "codex", "opencode", "pi"];
 
 const EXPECTED_SEGMENTS: { cli: CliName; segments: string[] }[] = [
   { cli: "claude-code", segments: [".claude", "commands", "pair.md"] },
-  { cli: "codex", segments: [".codex", "prompts", "pair.md"] },
+  { cli: "codex", segments: [".codex", "skills", "pair", "SKILL.md"] },
   { cli: "opencode", segments: [".config", "opencode", "commands", "pair.md"] },
   { cli: "pi", segments: [".pi", "agent", "skills", "pair", "SKILL.md"] },
 ];
@@ -87,7 +87,7 @@ test("the pi skill carries the name key pi loads the skill by", () => {
 });
 
 test("the codex command hints at its arguments, and the pi skill reads the action from the message", () => {
-  expect(pairCommandSource("codex")).toContain("argument-hint: on | off | status");
+  expect(pairCommandSource("codex")).toContain("name: pair");
 
   // pi substitutes no $ARGUMENTS, so the skill body must tell the agent where the action comes from.
   expect(pairCommandSource("pi")).not.toContain("$ARGUMENTS");
@@ -97,7 +97,8 @@ test("the codex command hints at its arguments, and the pi skill reads the actio
 test("each command body names that CLI's own write tools", () => {
   expect(pairCommandSource("claude-code")).toContain("Write, Edit, and MultiEdit");
   expect(pairCommandSource("codex")).toContain("apply_patch, Write, and Edit");
-  expect(pairCommandSource("opencode")).toContain("write, edit, and patch");
+  expect(pairCommandSource("opencode")).toContain("write and edit");
+  expect(pairCommandSource("opencode")).not.toContain("patch");
   expect(pairCommandSource("pi")).toContain("write and edit");
 
   // Codex has no MultiEdit alias, so naming it there would point the agent at a tool it cannot call.
@@ -132,20 +133,20 @@ test("a user-edited command file is backed up and rewritten", () => {
 
 test("a missing command file is not registered", () => {
   ALL_CLIS.forEach((cli) => {
-    expect(isPairCommandRegistered(pairCommandPath(homeDir, cli))).toBe(false);
+    expect(isPairCommandRegistered(homeDir, cli)).toBe(false);
   });
 });
 
-test("a command file that never mentions pair-mode is not registered", () => {
+test("a command file that drifted from the canonical source is not registered", () => {
   const path = pairCommandPath(homeDir, "codex");
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, "---\ndescription: someone else's command\n---\n\nDo nothing.\n", "utf-8");
 
-  expect(isPairCommandRegistered(path)).toBe(false);
+  expect(isPairCommandRegistered(homeDir, "codex")).toBe(false);
 
   registerPairCommand(homeDir, "codex");
 
-  expect(isPairCommandRegistered(path)).toBe(true);
+  expect(isPairCommandRegistered(homeDir, "codex")).toBe(true);
 });
 
 test("doctor reports the /pair command check only for a CLI whose hook is registered", async () => {
