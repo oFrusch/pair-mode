@@ -1,6 +1,8 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomBytes } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { isRecord } from "../helpers";
 import { renderPage } from "./page";
 import { webNotesToQuestions } from "./notes";
@@ -11,6 +13,10 @@ import type { BodyResult, WebServer, WebServerOptions } from "./server.types";
 const HOST = "127.0.0.1";
 const TOKEN_BYTES = 16;
 const MAX_BODY_BYTES = 1_000_000;
+
+const bundledFavicon = fileURLToPath(new URL("../assets/favicon.png", import.meta.url));
+const sourceFavicon = fileURLToPath(new URL("../../assets/favicon.png", import.meta.url));
+const FAVICON = readFileSync(existsSync(bundledFavicon) ? bundledFavicon : sourceFavicon);
 
 const NOT_FOUND = 404;
 const OK = 200;
@@ -198,7 +204,13 @@ export function startWebServer(options: WebServerOptions): Promise<WebServer> {
 
     if (url === base && request.method === "GET") {
       response.writeHead(OK, { "content-type": "text/html; charset=utf-8" });
-      response.end(renderPage(options.layout));
+      response.end(renderPage(options.layout, `${base}/favicon.png`));
+      return;
+    }
+
+    if (url === `${base}/favicon.png` && request.method === "GET") {
+      response.writeHead(OK, { "content-type": "image/png" });
+      response.end(FAVICON);
       return;
     }
 
