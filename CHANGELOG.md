@@ -7,6 +7,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- The release script stamps the new version into every plugin manifest.
+- The release gates validate the plugin manifests.
+
 ### Added
 
 - Pair mode ships as a Claude Code plugin and as a Codex plugin.
@@ -90,6 +95,10 @@ The script refuses to run unless the branch is `main`, the tree is clean, and `H
 matches `origin/main`. It then runs the typecheck, the lint, the format check, the tests,
 and the build. It bumps the version, moves the `[Unreleased]` entries into a dated
 section, commits, tags `v<version>`, publishes to npm, and pushes the commit and the tag.
+
+The script also stamps the new version into every plugin manifest, and it runs
+`claude plugin validate . --strict` as a gate. A machine without Claude Code skips that
+one check and still cuts the release.
 
 The script publishes before it pushes. A failed publish therefore leaves the remote
 untouched, and `git tag -d v<version> && git reset --hard HEAD~1` undoes the local state.
