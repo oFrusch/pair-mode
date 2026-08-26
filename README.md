@@ -1,8 +1,15 @@
 # pair mode
+#### For when your agent needs a rubber ducky.
 
-A coding agent proposes an edit. Pair mode opens a side-by-side diff in a terminal
-editor. Every line you type becomes a question the model must answer, and the edit
-does not apply until you close the editor.
+`pair-mode` is a tool that allows you to sit somewhere between being an approval monkey for your agent running in manual mode and just totally vibe coding in auto mode.
+
+If you've ever found yourself wanting to pay attention to the code that your agent of choice is generating and (god forbid) suggest changes, I'm sure you've run into: "_oh no, I clicked 'reject' and now the proposed diff is gone - what did I want to suggest again?_"
+
+`pair-mode` attempts to solve this.
+
+When enabled, your agent will push diffs to your editing interface of choice (your choices are currently: in a separate terminal tab/pane, multiplexer sub-pane or web - sorry if your interface of choice is not actually here (yet)). From there you can go line by line over the diff and add comments, suggestions, chidings, deranged ramblings, etc. Your agent will receive your thoughts and proceed accordingly.
+
+![The pair review pane open in a zellij floating pane, with three notes anchored to line numbers](https://raw.githubusercontent.com/oFrusch/pair-mode/main/docs/images/pane-zellij.png)
 
 ## Install
 
@@ -11,54 +18,35 @@ npm install -g pair-mode
 pair-mode setup
 ```
 
-Install pair-mode globally before you run setup. Setup writes the install path into each
-CLI's config as an absolute path. `npx pair-mode setup` runs from a package cache that
-npm later prunes, which would leave every hook pointing at a deleted file. Setup detects
-that case and stops.
+Install pair-mode globally before you run setup. Setup writes the install path into each CLI's config as an absolute path. `npx pair-mode setup` runs from a package cache that npm later prunes, which would leave every hook pointing at a deleted file. Setup detects that case and stops.
 
 The setup command detects the CLIs and multiplexers on your machine, registers the
-required hooks, and writes a config file. Restart Claude Code after setup, because
-Claude Code loads hooks only at startup.
-
-If you install from git instead of npm, run `pnpm build` first. The package does not
-ship a committed `dist/` directory; npm builds it fresh through the `prepublishOnly`
-script, but a git checkout does not run that script.
+required hooks, and writes a config file.
 
 ## Supported CLIs
 
 | CLI         | Hook                                             | Status                                                                                        |
 | ----------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| Claude Code | `PreToolUse`, matcher `Write\|Edit\|MultiEdit`   | Shipped.                                                                                      |
-| Codex       | `PreToolUse`, matcher `apply_patch\|Edit\|Write` | Shipped.                                                                                      |
-| pi          | `tool_call` extension hook                       | Planned for 1.0.0. The adapter exists and passes its unit tests. Setup does not offer it yet. |
-| opencode    | `tool.execute.before` plugin hook                | Planned for 1.0.0. Nobody has run it against a live opencode. Setup does not offer it yet.    |
-
-Codex has no `MultiEdit` matcher alias. Its `apply_patch` parser reads single-file Add,
-Update, and Delete patches only. A multi-file or rename patch passes through untouched.
+| Claude Code | `PreToolUse`, matcher `Write\|Edit\|MultiEdit`   | Should work.                                                                                      |
+| Codex       | `PreToolUse`, matcher `apply_patch\|Edit\|Write` | Should work.                                                                                      |
+| pi          | `tool_call` extension hook                       | Will maybe work. Probably not. Coming soon. |
+| opencode    | `tool.execute.before` plugin hook                | Will maybe work. Probably not. Coming soon.    |
 
 ## The /pair command
 
-`pair-mode setup` installs a `/pair` command for every CLI whose hook it registers. The
-command toggles pair mode for the current directory. It also tells the agent how a held
-edit comes back.
+`pair-mode setup` installs a `/pair` (`$pair` for Codex) command for every CLI whose hook it registers. The command toggles pair mode for the current directory. It also tells the agent how a held edit comes back.
 
 | CLI         | Installed at                    | Invoked as              |
 | ----------- | ------------------------------- | ----------------------- |
 | Claude Code | `~/.claude/commands/pair.md`    | `/pair on`, `/pair off` |
 | Codex       | `~/.codex/skills/pair/SKILL.md` | `$pair on`, `$pair off` |
 
-Codex deprecated `~/.codex/prompts/` in favour of skills, so pair mode installs a skill
-there. Codex invokes a skill with `$`, not `/`.
-
 The command runs a bare `pair-mode`, unlike a hook, which each CLI invokes by absolute
 path. So `pair-mode` must resolve on your PATH. A global install puts it there.
 
-`pair-mode doctor` warns when the command is missing, and warns when `pair-mode` does not
-resolve on PATH. Neither warning raises the exit code.
-
-Setup backs up an existing file before it rewrites the file.
-
 ## Editors
+
+This is what will render your diff if you choose to use one of the CLI-based approaches. We ship the `pair` editor, which has good syntax highlight and mouse highlighting support. This makes the annotation process a bit easier. But we also support most popular terminal-based editors.
 
 | Editor         | Diff colour | Syntax colour on changed rows                                                                                                                                                                                                    |
 | -------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -97,28 +85,17 @@ keyboard only.
 | `Ctrl+q` `Ctrl+c`  | —                | Quit. With no notes, the edit applies. With notes pending, asks: `s` sends, `d` discards and quits, `Esc` cancels. |
 | `?`                | —                | Toggle the keymap overlay.                                                                                         |
 
-zellij consumes the mouse scroll wheel, so pair mode never depends on it. `Ctrl+d` and
-`Ctrl+u` page instead.
-
-Holding `shift` during a click or drag passes the mouse event straight through to the
-terminal, which then selects text for copy — the same as any other terminal program.
 
 ## Multiplexers
 
-Claude Code and Codex run their hooks with no controlling terminal. `/dev/tty` returns
-`ENXIO` there. Pane mode needs zellij or tmux to open an editor pane under those two
-CLIs.
-
-Session mode removes the requirement. See the next section.
+If you want to do all your development in one terminal pane while using either Claude Code or Codex, you'll need to use a multiplexer (I use zellij but tmux works great as well). Both harnesses run their hooks with no controlling terminal. A multiplexer allows us to open up the agent's diff in a floating sub-pane.
 
 ## Session modes
 
-Pane mode is the default. The hook opens an editor in a floating pane and blocks. That
-needs a multiplexer under Claude Code and Codex.
-
 Session mode moves the review out of the agent's process. The hook posts to a Unix
-socket and waits. A client you start renders the review and answers. There are two
-clients, and both remove the multiplexer requirement.
+socket and waits. A client you start (another terminal tab or the web view) renders the review and allows you to provide your annotations.
+
+### Session mode config
 
 Set `transport` to `"session"`, then pick a client.
 
@@ -126,39 +103,37 @@ Set `transport` to `"session"`, then pick a client.
 pair-mode config transport session
 ```
 
-`pair-mode config` with no argument prints every setting and its value. `pair-mode
-config <key>` prints one. `pair-mode config <key> <value>` changes one and validates it
-before it writes.
+- `pair-mode config` with no argument prints every setting and its value.
+- `pair-mode config <key>` prints one.
+- `pair-mode config <key> <value>` changes one and validates it before it writes.
 
 **Watch mode** reviews in a terminal you own.
 
 ```
-pair-mode watch          # in any terminal, at the repo root
+pair-mode watch
 ```
 
-The watcher paints an idle screen between reviews and opens the pair TUI for each one.
+![Claude Code on the left, the pair review pane on the right in a second terminal pane](https://raw.githubusercontent.com/oFrusch/pair-mode/main/docs/images/watch-terminal.png)
+
+Run this command in the directory or any subdirectory of where you are working with your agent. The diffs your agent suggests will be pushed to the running Unix socket and rendered wherever this command was run. You can then mark up the diffs as you please and send them back to your agent.
+
 `q` on the idle screen quits and releases the socket.
 
 **Web mode** reviews in a browser and needs no terminal at all.
 
 ```
-pair-mode on --web       # prints a link
+pair-mode on --web
 ```
 
-That spawns a detached watcher, binds an HTTP server on `127.0.0.1`, and prints a link
-carrying a random token. Drag across any text in the diff. A popup opens under the
-selection. Type the note and press Enter. `pair-mode off` stops the watcher.
+![The web review in a browser, with a note popup open under a selected span](https://raw.githubusercontent.com/oFrusch/pair-mode/main/docs/images/web.png)
 
-The watcher process binds the socket, so there is no separate daemon to manage. If the
-watcher dies, the socket goes away and every hook fails open at once.
-
-A hook that finds no watcher applies the edit rather than hanging. So does a hook whose
-watcher never answers within `session.timeout`.
+That spawns a detached watcher, binds an HTTP server on `127.0.0.1`, and prints a link carrying a random token. Drag across any text in the diff. A popup opens under the selection. Type the note and press Enter. Same stuff as the other solutions, just within an HTML page.
 
 ## Configuration
 
-Pair mode reads `$XDG_CONFIG_HOME/pair-mode/config.json`, or `~/.config/pair-mode/config.json`
-when `XDG_CONFIG_HOME` is not set.
+Run `pair-mode setup` when first installing and that should get you most of the way there in terms of pair mode working for your setup. Regardless, all configuration options and their accepted values are listed below.
+
+Pair mode reads `$XDG_CONFIG_HOME/pair-mode/config.json`, or `~/.config/pair-mode/config.json` when `XDG_CONFIG_HOME` is not set.
 
 | Key               | Type                                                                                    | Default     | Meaning                                                          |
 | ----------------- | --------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------- |
@@ -190,19 +165,6 @@ existing config with no `editor` key now opens pair mode's own pane by default.
 controls the diff itself — split into two columns, or one inline column. `notes`
 controls only where a note you write renders — in a docked panel, or anchored next to
 the span it annotates. Setting one does not affect the other.
-
-## Limits
-
-- Pair mode opens one pane per tool call. It cannot batch a changeset, because a hook
-  returns one verdict per call and an allow cannot be withdrawn.
-- The pane reviews. It does not edit the proposal.
-- Syntax colour in pair needs `shiki` installed. A missing package disables colour and
-  the pane still works.
-- A client answers one review at a time. It cannot skip ahead in the queue.
-- Web mode does not defend against another user on the same machine. The token sits in
-  the URL, and a local user can read the process list.
-- Watch mode needs the watcher running before the agent edits. A missing watcher fails
-  open, so an unattended agent applies its edits.
 
 ## License
 
