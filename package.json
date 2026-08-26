@@ -31,6 +31,9 @@
   "files": [
     "dist",
     "assets",
+    ".claude-plugin/plugin.json",
+    "hooks",
+    "commands",
     "README.md"
   ],
   "type": "module",
