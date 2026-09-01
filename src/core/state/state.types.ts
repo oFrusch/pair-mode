@@ -16,3 +16,11 @@ export interface SessionRecord {
   createdAt: string;
   pid: number;
 }
+
+// The watchers pass their own options object, so this names only the fields the record is built from.
+export interface SessionRecordOptions {
+  directory: string;
+  sessionKey?: SessionKey;
+  agentSessionId?: string;
+  agentKind?: string;
+}
