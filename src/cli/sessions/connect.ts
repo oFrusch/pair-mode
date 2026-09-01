@@ -6,7 +6,8 @@ const CLEAR_SCREEN = "\x1b[2J\x1b[H";
 const DOWN_KEYS = ["j", "\x1b[B"];
 const UP_KEYS = ["k", "\x1b[A"];
 const SELECT_KEYS = ["\r", "\n"];
-const QUIT_KEYS = ["q", "\x1b", "\x03"];
+// A bare escape byte can arrive split from the arrow sequence it opens, so escape never quits.
+const QUIT_KEYS = ["q", "\x03"];
 const HELP = "j/k move, Enter watches, q quits";
 
 // A silent session answers no status, so its client count is unknown rather than zero.

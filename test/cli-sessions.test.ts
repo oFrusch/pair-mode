@@ -489,6 +489,47 @@ describe("runConnect", () => {
     await server.close();
   });
 
+  test("a bare escape byte never quits the picker", async () => {
+    const id = "s-aaaaaaaa";
+
+    writeRecord(id, "escape@main", "/repo");
+    const server = await startSessionServer({ socketPath: join(sessionsDir(), `${id}.sock`) });
+
+    const fake = fakeIo(true);
+    const run = runConnect(fake.io);
+
+    await fake.waitForPaint();
+    fake.pressKey("\x1b");
+    fake.pressKey("\r");
+
+    const result = await run;
+
+    expect(result.selected).toBe(id);
+
+    await server.close();
+  });
+
+  test("Ctrl-C quits without selecting", async () => {
+    const id = "s-aaaaaaaa";
+
+    writeRecord(id, "interrupt@main", "/repo");
+    const server = await startSessionServer({ socketPath: join(sessionsDir(), `${id}.sock`) });
+
+    const fake = fakeIo(true);
+    const run = runConnect(fake.io);
+
+    await fake.waitForPaint();
+    fake.pressKey("\x03");
+
+    const result = await run;
+
+    expect(result.selected).toBeNull();
+    expect(result.exitCode).toBe(0);
+    expect(fake.counts.shutdown).toBe(1);
+
+    await server.close();
+  });
+
   test("with a TTY and no sessions it exits 0, says so, and restores the terminal", async () => {
     const fake = fakeIo(true);
     const result = await runConnect(fake.io);
