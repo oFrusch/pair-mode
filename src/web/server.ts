@@ -293,6 +293,7 @@ export function startWebServer(options: WebServerOptions): Promise<WebServer> {
           return new Promise((done) => {
             viewers.forEach((viewer) => viewer.end());
             viewers.clear();
+            pending = [];
             server.close(() => done());
           });
         },

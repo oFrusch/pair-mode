@@ -179,7 +179,7 @@ export async function startSessionServer(options: SessionServerOptions): Promise
   function handleVerdict(socket: Socket, message: VerdictMessage): void {
     const held = holders.get(message.id);
 
-    if (held === undefined) {
+    if (held === undefined || !held.has(socket)) {
       return;
     }
 
