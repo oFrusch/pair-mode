@@ -10,8 +10,8 @@ import {
   emptyQueue,
   enqueue,
   findReview,
+  offerAll,
   release,
-  takeNext,
   waitingDepth,
 } from "./queue";
 import { createLineReader, decodeLine, encode } from "./wire";
@@ -127,29 +127,35 @@ export async function startSessionServer(options: SessionServerOptions): Promise
 
   // Every idle client takes a waiting review, so a burst of submits spreads across whoever is attached.
   function dispatch(): void {
+    const offer = offerAll(queue);
+    queue = offer.state;
+
     let client = idleClient();
+    const unassigned: string[] = [];
 
-    while (client !== null) {
-      const result = takeNext(queue);
-
-      if (result.review === null) {
-        break;
+    for (const review of offer.reviews) {
+      if (client === null) {
+        unassigned.push(review.id);
+        continue;
       }
 
-      queue = result.state;
-      clients.set(client, result.review.id);
+      clients.set(client, review.id);
 
       send(client, {
         type: "review",
-        id: result.review.id,
-        tool: result.review.request.tool,
-        path: result.review.request.filePath,
-        before: result.review.request.before,
-        after: result.review.request.after,
+        id: review.id,
+        tool: review.request.tool,
+        path: review.request.filePath,
+        before: review.request.before,
+        after: review.request.after,
       });
 
       client = idleClient();
     }
+
+    unassigned.forEach((id) => {
+      queue = release(queue, id);
+    });
 
     announce();
   }
