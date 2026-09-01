@@ -23,6 +23,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - `.erb` renders as ERB, not as plain HTML.
 
+### Removed
+
+- Node 20 support. That release went end of life on 2026-04-30, and pnpm 11 no longer runs on it.
+
 ## [0.3.0] - 2026-08-26
 
 ### Changed
