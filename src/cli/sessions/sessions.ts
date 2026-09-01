@@ -4,20 +4,25 @@ import { basename, join } from "node:path";
 import { sessionsDir } from "../../core/state";
 import type { SessionKind, SessionRecord } from "../../core/state";
 import { createLineReader, decodeLine, encode } from "../../transports/session";
-import type { StateMessage } from "../../transports/session";
 import { removeQuietly, isRecord } from "../../helpers";
-import type { SessionListing, SessionsResult } from "./sessions.types";
+import type { SessionListing, SessionProbe, SessionsResult } from "./sessions.types";
 
 const STATUS_TIMEOUT_MS = 250;
 const UNKNOWN_LABEL = "unknown";
 const UNKNOWN_AGE = "-";
+const UNKNOWN_COUNT = "?";
+const SESSION_KINDS: string[] = ["session", "directory"];
 
-// A socket that answers a status request is live. Anything else is a file a crashed watcher left behind.
-function askStatus(socketPath: string): Promise<StateMessage | null> {
+// Only these connect failures prove no listener owns the path. Any other error leaves the session alone.
+const ABANDONED_CODES: string[] = ["ECONNREFUSED", "ENOENT", "ENOTSOCK", "ENOTDIR"];
+
+// A watcher blocked past the timeout is still alive, so only a failed connect proves the socket is abandoned.
+function probeSession(socketPath: string): Promise<SessionProbe> {
   return new Promise((resolve) => {
     let settled = false;
+    let connected = false;
 
-    const settle = (state: StateMessage | null): void => {
+    const settle = (probe: SessionProbe): void => {
       if (settled) {
         return;
       }
@@ -25,39 +30,77 @@ function askStatus(socketPath: string): Promise<StateMessage | null> {
       settled = true;
       clearTimeout(timer);
       socket.destroy();
-      resolve(state);
+      resolve(probe);
     };
 
-    const timer = setTimeout(() => settle(null), STATUS_TIMEOUT_MS);
+    const timer = setTimeout(() => settle({ status: "silent" }), STATUS_TIMEOUT_MS);
 
     const socket = createConnection(socketPath);
     socket.setEncoding("utf-8");
 
     const readLines = createLineReader();
 
-    socket.on("error", () => settle(null));
-    socket.on("close", () => settle(null));
+    socket.on("error", (error: Error) => {
+      const code = "code" in error ? error.code : null;
+      const abandoned = !connected && isString(code) && ABANDONED_CODES.includes(code);
+
+      settle(abandoned ? { status: "refused" } : { status: "silent" });
+    });
+
+    socket.on("close", () => settle({ status: "silent" }));
 
     socket.on("data", (chunk: string) => {
       readLines(chunk).forEach((line) => {
         const message = decodeLine(line);
 
         if (message?.type === "state") {
-          settle(message);
+          settle({ status: "answered", state: message });
         }
       });
     });
 
-    socket.on("connect", () => socket.write(encode({ type: "status" })));
+    socket.on("connect", () => {
+      connected = true;
+      socket.write(encode({ type: "status" }));
+    });
   });
 }
 
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || isString(value);
+}
+
+function isSessionKind(value: unknown): value is SessionKind {
+  return isString(value) && SESSION_KINDS.includes(value);
+}
+
+// Every field the type claims is checked, so nothing unvalidated reaches a listing through the narrowing.
 function isSessionRecord(value: unknown): value is SessionRecord {
   if (!isRecord(value)) {
     return false;
   }
 
-  return typeof value["label"] === "string" && typeof value["directory"] === "string";
+  if (!isString(value["id"]) || !isSessionKind(value["kind"])) {
+    return false;
+  }
+
+  if (!isString(value["label"]) || !isString(value["directory"])) {
+    return false;
+  }
+
+  if (!isNullableString(value["branch"]) || !isNullableString(value["agentSessionId"])) {
+    return false;
+  }
+
+  if (!isNullableString(value["agentKind"]) || !isString(value["createdAt"])) {
+    return false;
+  }
+
+  return typeof value["pid"] === "number";
 }
 
 // A malformed sidecar must never hide a live socket, so a failed read degrades to an unknown label.
@@ -87,7 +130,7 @@ function sessionIds(): string[] {
   }
 }
 
-// Only the files this socket owns are removed, so a neighbouring live session keeps all of its state.
+// Only the files this socket owns are removed, so a session a person muted keeps its flag and its opt-out.
 function removeSession(id: string): void {
   [".sock", ".json", ".url"].forEach((extension) =>
     removeQuietly(join(sessionsDir(), `${id}${extension}`)),
@@ -102,16 +145,17 @@ function kindOf(id: string, record: SessionRecord | null): SessionKind {
   return id.startsWith("s-") ? "session" : "directory";
 }
 
-function toListing(id: string, state: StateMessage): SessionListing {
+function toListing(id: string, probe: SessionProbe): SessionListing {
   const record = readRecord(id);
+  const state = probe.status === "answered" ? probe.state : null;
 
   return {
     id,
     kind: kindOf(id, record),
     label: record?.label ?? UNKNOWN_LABEL,
     directory: record?.directory ?? "",
-    clients: state.clientCount,
-    waiting: state.waitingDepth,
+    clients: state?.clientCount ?? null,
+    waiting: state?.waitingDepth ?? null,
     createdAt: record?.createdAt ?? "",
     alive: true,
   };
@@ -119,28 +163,26 @@ function toListing(id: string, state: StateMessage): SessionListing {
 
 async function scan(): Promise<{ listings: SessionListing[]; swept: string[] }> {
   const ids = sessionIds();
-  const states = await Promise.all(ids.map((id) => askStatus(join(sessionsDir(), `${id}.sock`))));
+  const probes = await Promise.all(
+    ids.map((id) => probeSession(join(sessionsDir(), `${id}.sock`))),
+  );
 
   const listings: SessionListing[] = [];
   const swept: string[] = [];
 
   ids.forEach((id, index) => {
-    const state = states[index];
+    const probe = probes[index];
 
-    if (state === undefined || state === null) {
+    if (probe === undefined || probe.status === "refused") {
       removeSession(id);
       swept.push(id);
       return;
     }
 
-    listings.push(toListing(id, state));
+    listings.push(toListing(id, probe));
   });
 
   return { listings, swept };
-}
-
-function pad(value: string, width: number): string {
-  return value.length >= width ? value : value + " ".repeat(width - value.length);
 }
 
 const SECOND_MS = 1000;
@@ -173,14 +215,19 @@ function formatAge(createdAt: string, now: number): string {
   return `${Math.floor(elapsed / SECOND_MS)}s`;
 }
 
+// A watcher too busy to answer has a real but unknown count, which reads as a question rather than a zero.
+function formatCount(count: number | null): string {
+  return count === null ? UNKNOWN_COUNT : String(count);
+}
+
 function formatTable(listings: SessionListing[], now: number): string {
   const header = ["ID", "LABEL", "KIND", "WATCHERS", "QUEUED", "AGE"];
   const rows = listings.map((entry) => [
     entry.id,
     entry.label,
     entry.kind,
-    String(entry.clients),
-    String(entry.waiting),
+    formatCount(entry.clients),
+    formatCount(entry.waiting),
     formatAge(entry.createdAt, now),
   ]);
 
@@ -190,7 +237,7 @@ function formatTable(listings: SessionListing[], now: number): string {
 
   const line = (cells: string[]): string =>
     cells
-      .map((cell, column) => pad(cell, widths[column] ?? 0))
+      .map((cell, column) => cell.padEnd(widths[column] ?? 0))
       .join("  ")
       .trimEnd();
 
