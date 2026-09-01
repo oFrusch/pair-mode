@@ -11,6 +11,7 @@ import { supportsTruecolor } from "../../tui/paint";
 import { createTokenProvider } from "../../tui/syntax";
 import { runTui } from "../../tui";
 import type { TuiOptions } from "../../tui";
+import { sweepDeadSessions } from "../sessions";
 import { renderIdle } from "./idle";
 import { createWatchIo } from "./io";
 import type { IdleStatus, WatchIo, WatchOptions } from "./watch.types";
@@ -85,6 +86,9 @@ export async function runWatch(options: WatchOptions, config: PairConfig): Promi
       errors = [...errors, error];
     },
   });
+
+  // This socket is listening by now, so the sweep can only clear the sockets other watchers abandoned.
+  await sweepDeadSessions();
 
   const truecolor = supportsTruecolor(process.env);
   const io = options.io ?? createWatchIo();

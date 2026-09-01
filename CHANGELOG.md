@@ -14,6 +14,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - `pnpm run syntax` fetches the micro syntax assets.
 - Each agent coding session gets its own review socket, so concurrent sessions in one repository stop sharing diffs.
 - A session can opt out of a directory flag, and the opt-out never silences another session.
+- `pair-mode sessions` lists every live session and removes the dead ones.
+- `pair-mode connect` picks a session from a list and watches it.
+- `pair-mode watch <id>` attaches to one session.
 
 ### Changed
 
@@ -24,6 +27,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Every attached client receives every review. The first verdict completes it, and the other clients receive a cancel.
 - A client that attaches during an outstanding review receives it right away, instead of waiting for the next edit.
 - The web review page queues every pending review in order. It shows one review at a time, so a second edit never replaces the first before the reviewer answers it.
+- `pair-mode doctor` removes a stale socket rather than printing an `rm` command.
 
 ### Fixed
 

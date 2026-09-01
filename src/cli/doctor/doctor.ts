@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { loadConfig, configPath } from "../../core/config";
 import type { ConfigResult, PairConfig } from "../../core/config";
-import { stateDir, sessionSocketPath } from "../../core/state";
+import { stateDir, sessionSocketPath, resolveSocketPath } from "../../core/state";
 import { probeSocket } from "../../transports/session";
 import { resolve as resolveEditor } from "../../editors/index";
 import { detect as detectMultiplexer } from "../../multiplexers/index";
@@ -20,6 +20,7 @@ import {
   piExtensionPath,
 } from "../register";
 import type { CliName } from "../register";
+import { removeQuietly } from "../../helpers";
 import { defaultResolvesOnPath } from "../../helpers/resolvesOnPath";
 import type { PathResolver } from "../../helpers/types";
 import type { DoctorCheck, DoctorOptions, DoctorReport } from "./types";
@@ -266,13 +267,16 @@ function checkTrace(config: PairConfig): DoctorCheck | null {
 
 const defaultOpenTty = (): number => openSync("/dev/tty", "r+");
 
+// The hook resolves the socket from an edited file, so doctor names a file in the directory to resolve the same one.
+const PROBE_NAME = ".pair-mode-doctor-probe";
+
 // A watcher that crashed leaves its socket file behind, so the probe distinguishes a live one from a stale one.
 async function checkSession(
   config: PairConfig,
   directory: string,
   probe: DoctorOptions["probeSocket"],
 ): Promise<DoctorCheck> {
-  const path = sessionSocketPath(directory);
+  const path = resolveSocketPath(join(directory, PROBE_NAME)) ?? sessionSocketPath(directory);
   const name = `session: ${path}`;
   const wanted = config.transport === "session";
 
@@ -293,7 +297,9 @@ async function checkSession(
     return { name, passed: true, detail: "a watcher is attached" };
   }
 
-  return { name, passed: false, detail: `stale socket, remove it with: rm ${path}` };
+  removeQuietly(path);
+
+  return { name, passed: true, detail: "removed a stale socket", warnOnly: true };
 }
 
 export async function runDoctor(options: DoctorOptions = {}): Promise<DoctorReport> {

@@ -145,6 +145,27 @@ A bare `pair-mode off` inside a session turns pair mode off for that session onl
 clears a directory flag, so it never silences another session. `pair-mode off <dir>` names
 its target and clears the directory flag.
 
+### Finding a session
+
+```
+pair-mode sessions
+```
+
+That prints every live session with its id, its label, how many watchers are attached, and
+how many reviews are queued. It also removes any socket whose watcher has died.
+
+```
+pair-mode connect
+```
+
+That opens the same list, interactive. `j`, `k`, and the arrow keys move the cursor. `Enter`
+watches the session under the cursor. `q` quits.
+
+`pair-mode watch <id>` attaches directly when you already know the id.
+
+Several clients can watch one session at once. A terminal watcher and a browser tab both
+receive every diff, and the first answer wins. The other client sees the review withdraw.
+
 ### Session mode config
 
 Set `transport` to `"session"`, then pick a client.

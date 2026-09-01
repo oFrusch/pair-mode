@@ -3,8 +3,9 @@ import { join, resolve } from "node:path";
 import { runSetup } from "./setup";
 import { runDoctor } from "./doctor";
 import { pairOn, pairOnWeb, pairOff, pairStatus, pairToggle, agentSessionId } from "./toggle";
-import { runWatch } from "./watch";
+import { runWatch, createWatchIo } from "./watch";
 import { runConfig } from "./config";
+import { listSessions, runConnect, sweepDeadSessions } from "./sessions";
 import { startWebWatch } from "../web";
 import { loadConfig } from "../core/config";
 import { sessionKeySocketPath, sessionKey } from "../core/state";
@@ -28,6 +29,8 @@ Commands:
   watch [dir]          review edits in this terminal (default: cwd)
   watch --web [dir]    serve the review in a browser and print the link
   watch <id>           review edits for one session (see: pair-mode sessions)
+  sessions             list every live pair mode session
+  connect              pick a session from a list and watch it
   --version            print the installed version
   --help               print this message
 `;
@@ -86,6 +89,39 @@ function parseWatchArgs(args: string[]) {
   };
 }
 
+// Both `watch` and `connect` end here, so the terminal pane and the web watcher are started in one place.
+async function watchSession(
+  directory: string,
+  sessionKey: string | undefined,
+  wantsWeb: boolean,
+): Promise<number> {
+  const { config, errors } = loadConfig();
+
+  errors.forEach((error) => console.error(`config ${error.path}: ${error.message}`));
+
+  if (!wantsWeb && !config.web.enabled) {
+    // runWatch builds its own IO, so the picker's shut-down instance is never reused here.
+    return await runWatch({ directory, sessionKey }, config);
+  }
+
+  const watcher = await startWebWatch({ directory, sessionKey, port: config.web.port }, config);
+
+  console.log(`pair mode is watching ${directory}`);
+  console.log(watcher.url);
+
+  // The web watcher has no TTY loop of its own, so the process stays alive until a signal stops it.
+  await new Promise<void>((done) => {
+    const stop = (): void => {
+      void watcher.close().then(done);
+    };
+
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+  });
+
+  return 0;
+}
+
 function reportUnknownFlag(command: string, flag: string): number {
   console.error(`unknown option for ${command}: ${flag}`);
   console.error(USAGE);
@@ -128,6 +164,9 @@ async function main(): Promise<number> {
     if (parsed.unknownFlag !== null) {
       return reportUnknownFlag(command, parsed.unknownFlag);
     }
+
+    // A watcher that died leaves its socket behind, so starting pair mode clears the dead ones first.
+    await sweepDeadSessions();
 
     if (parsed.web) {
       console.log(await pairOnWeb(parsed.directory, process.argv[1] ?? ""));
@@ -186,33 +225,23 @@ async function main(): Promise<number> {
       return 1;
     }
 
-    const wantsWeb = parsed.web;
-    const directory = parsed.directory;
-    const sessionKey = parsed.sessionKey;
-    const { config, errors } = loadConfig();
+    return await watchSession(parsed.directory, parsed.sessionKey, parsed.web);
+  }
 
-    errors.forEach((error) => console.error(`config ${error.path}: ${error.message}`));
+  if (command === "sessions") {
+    const result = await listSessions();
+    console.log(result.text);
+    return result.exitCode;
+  }
 
-    if (!wantsWeb && !config.web.enabled) {
-      return runWatch({ directory, sessionKey }, config);
+  if (command === "connect") {
+    const result = await runConnect(createWatchIo());
+
+    if (result.selected === null) {
+      return result.exitCode;
     }
 
-    const watcher = await startWebWatch({ directory, sessionKey, port: config.web.port }, config);
-
-    console.log(`pair mode is watching ${directory}`);
-    console.log(watcher.url);
-
-    // The web watcher has no TTY loop of its own, so the process stays alive until a signal stops it.
-    await new Promise<void>((done) => {
-      const stop = (): void => {
-        void watcher.close().then(done);
-      };
-
-      process.once("SIGINT", stop);
-      process.once("SIGTERM", stop);
-    });
-
-    return 0;
+    return await watchSession(process.cwd(), result.selected, false);
   }
 
   console.error(`unknown command: ${command}`);

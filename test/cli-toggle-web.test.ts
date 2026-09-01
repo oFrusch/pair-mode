@@ -86,17 +86,20 @@ test("doctor reports a live watcher when the socket accepts a connection", async
   expect(session?.detail).toBe("a watcher is attached");
 });
 
-test("doctor names the unlink command for a stale socket", async () => {
-  const socket = sessionSocketPath(repoRoot);
-  mkdirSync(dirname(socket), { recursive: true });
-  writeFileSync(socket, "");
+test("doctor removes a stale socket rather than naming rm", async () => {
+  const directory = isolated.tempDir("pair-doctor-stale-");
+  const socketPath = sessionSocketPath(directory);
+
+  mkdirSync(dirname(socketPath), { recursive: true });
+  writeFileSync(socketPath, "", "utf-8");
 
   const report = await runDoctor({
-    directory: repoRoot,
-    probeSocket: () => Promise.resolve(false),
+    directory,
+    config: { ...DEFAULT_CONFIG, transport: "session" },
+    probeSocket: async () => false,
   });
-  const session = report.checks.find((check) => check.name.startsWith("session:"));
 
-  expect(session?.passed).toBe(false);
-  expect(session?.detail).toContain(`rm ${socket}`);
+  expect(report.text).toContain("removed a stale socket");
+  expect(report.text).not.toContain("rm ");
+  expect(existsSync(socketPath)).toBe(false);
 });
