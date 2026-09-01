@@ -10,6 +10,7 @@ import {
   enableSession,
   optOutSession,
   isEnabled,
+  flagPath,
 } from "../core/state";
 import type { SessionKey } from "../core/state";
 import { isRecord } from "../helpers";
@@ -195,8 +196,9 @@ export async function pairToggle(
   web: boolean,
   key?: SessionKey,
 ): Promise<string> {
-  // The spec has toggle read the resolved state, so a session with no flag of its own still sees a directory flag.
-  const on = isEnabled(statusProbe(directory), key);
+  // A session with no flag of its own still sees a directory flag; a plain directory toggle checks only its own path.
+  const on =
+    key === undefined ? existsSync(flagPath(directory)) : isEnabled(statusProbe(directory), key);
 
   if (on) {
     return pairOff(directory, key);
