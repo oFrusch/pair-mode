@@ -21,13 +21,13 @@ The goal: each agent session gets its own socket, and a watcher attaches to exac
 Both harnesses carry a session identity in the `PreToolUse` payload. We confirmed this by
 experiment, not by documentation.
 
-| Fact | Claude Code | Codex 0.149.1 |
-| --- | --- | --- |
-| `session_id` in the payload | yes | yes |
-| Stable across resume | yes, for `--resume` and `--continue` | yes, for `codex exec resume` |
-| A subagent inherits the parent id | yes | yes |
-| A subagent adds | `agent_id`, `agent_type` | `agent_id`, `agent_type` |
-| Environment variable | `CLAUDE_CODE_SESSION_ID` | `CODEX_SESSION_ID`, `CODEX_THREAD_ID` |
+| Fact                              | Claude Code                          | Codex 0.149.1                         |
+| --------------------------------- | ------------------------------------ | ------------------------------------- |
+| `session_id` in the payload       | yes                                  | yes                                   |
+| Stable across resume              | yes, for `--resume` and `--continue` | yes, for `codex exec resume`          |
+| A subagent inherits the parent id | yes                                  | yes                                   |
+| A subagent adds                   | `agent_id`, `agent_type`             | `agent_id`, `agent_type`              |
+| Environment variable              | `CLAUDE_CODE_SESSION_ID`             | `CODEX_SESSION_ID`, `CODEX_THREAD_ID` |
 
 Method for Claude Code: a throwaway `PreToolUse` hook appended each raw payload to a JSONL
 file. One run wrote a file directly and then delegated a second write to a
@@ -189,16 +189,16 @@ No age-based expiry. `probeSocket` at `server.ts:36-50` already exists, already 
 
 ## Command surface
 
-| Command | Behaviour |
-| --- | --- |
-| `pair-mode on` | Prints `pair mode on · s-a3f91c2b · pair-mode@feat/multi-pair` |
-| `pair-mode sessions` | Prints id, label, kind, watchers, queued, age, then exits |
-| `pair-mode connect` | Opens the same list, interactive. Enter attaches |
-| `pair-mode watch <id>` | Attaches to one session socket |
-| `pair-mode watch [dir]` | Unchanged. Binds the directory socket |
-| `pair-mode off` | Writes the session opt-out. Never affects another session |
-| `pair-mode off <dir>` | Clears the directory flag |
-| `pair-mode status`, `toggle` | Resolve through the same four-step chain |
+| Command                      | Behaviour                                                      |
+| ---------------------------- | -------------------------------------------------------------- |
+| `pair-mode on`               | Prints `pair mode on · s-a3f91c2b · pair-mode@feat/multi-pair` |
+| `pair-mode sessions`         | Prints id, label, kind, watchers, queued, age, then exits      |
+| `pair-mode connect`          | Opens the same list, interactive. Enter attaches               |
+| `pair-mode watch <id>`       | Attaches to one session socket                                 |
+| `pair-mode watch [dir]`      | Unchanged. Binds the directory socket                          |
+| `pair-mode off`              | Writes the session opt-out. Never affects another session      |
+| `pair-mode off <dir>`        | Clears the directory flag                                      |
+| `pair-mode status`, `toggle` | Resolve through the same four-step chain                       |
 
 `pair-mode connect` opens the same list, interactive. `j`, `k`, and the arrow keys move
 the cursor. `Enter` attaches to the session under the cursor. `q` and `Esc` quit.

@@ -30,40 +30,40 @@
 
 **New files**
 
-| Path | Responsibility |
-| --- | --- |
-| `src/core/state/state.types.ts` | `SessionKey`, `SessionKind`, `SessionRecord`, `FlagState` |
-| `src/cli/sessions/sessions.ts` | Read every sidecar, probe each socket, sweep the dead, format the table |
-| `src/cli/sessions/index.ts` | Re-export the module surface |
-| `src/cli/sessions/sessions.types.ts` | `SessionListing`, `SessionsResult` |
-| `src/cli/sessions/connect.ts` | The interactive picker |
-| `test/state-session-keys.test.ts` | Key derivation and both resolution chains |
-| `test/session-broadcast.test.ts` | Broadcast dispatch and first-verdict-wins |
-| `test/cli-sessions.test.ts` | Listing, sweeping, and the picker |
+| Path                                 | Responsibility                                                          |
+| ------------------------------------ | ----------------------------------------------------------------------- |
+| `src/core/state/state.types.ts`      | `SessionKey`, `SessionKind`, `SessionRecord`, `FlagState`               |
+| `src/cli/sessions/sessions.ts`       | Read every sidecar, probe each socket, sweep the dead, format the table |
+| `src/cli/sessions/index.ts`          | Re-export the module surface                                            |
+| `src/cli/sessions/sessions.types.ts` | `SessionListing`, `SessionsResult`                                      |
+| `src/cli/sessions/connect.ts`        | The interactive picker                                                  |
+| `test/state-session-keys.test.ts`    | Key derivation and both resolution chains                               |
+| `test/session-broadcast.test.ts`     | Broadcast dispatch and first-verdict-wins                               |
+| `test/cli-sessions.test.ts`          | Listing, sweeping, and the picker                                       |
 
 **Modified files**
 
-| Path | Change |
-| --- | --- |
-| `src/core/state/state.ts` | Key derivation, session paths, both resolution chains, three-state flag |
-| `src/core/state/index.ts` | Export the new functions |
-| `src/transports/transport.types.ts` | `EditRequest` gains `sessionId?: string` |
-| `src/adapters/claude-code/claude-code.ts` | Read `session_id`, pass it to `isEnabled` and `simulate` |
-| `src/adapters/codex/codex.ts` | Same |
-| `src/core/simulate/simulate.ts` | Carry `sessionId` onto the `EditRequest` it builds |
-| `src/core/run/run.ts` | Pass `request.sessionId` to `isEnabled` |
-| `src/transports/session/client.ts` | Use the resolution chain |
-| `src/cli/toggle.ts` | Session-scoped `on`, `off`, `toggle`, `status` |
-| `src/cli/watch/watch.ts` | Accept a session key |
-| `src/web/watch.ts` | Accept a session key |
-| `src/transports/session/queue.ts` | Broadcast state instead of a single holder |
-| `src/transports/session/queue.types.ts` | `ReviewStatus` drops `inFlight` |
-| `src/transports/session/server.ts` | Broadcast dispatch, `status` frame, sidecar, `lastAttachAt` |
-| `src/transports/session/server.types.ts` | `SessionServer` gains `lastAttachAt` |
-| `src/transports/session/wire.ts` | Encode and decode `status` and `state` |
-| `src/transports/session/wire.types.ts` | `StatusMessage`, `StateMessage` |
-| `src/cli/index.ts` | Dispatch `sessions` and `connect`, `watch <id>`, USAGE |
-| `src/cli/doctor/doctor.ts` | Remove a stale socket rather than suggest `rm` |
+| Path                                      | Change                                                                  |
+| ----------------------------------------- | ----------------------------------------------------------------------- |
+| `src/core/state/state.ts`                 | Key derivation, session paths, both resolution chains, three-state flag |
+| `src/core/state/index.ts`                 | Export the new functions                                                |
+| `src/transports/transport.types.ts`       | `EditRequest` gains `sessionId?: string`                                |
+| `src/adapters/claude-code/claude-code.ts` | Read `session_id`, pass it to `isEnabled` and `simulate`                |
+| `src/adapters/codex/codex.ts`             | Same                                                                    |
+| `src/core/simulate/simulate.ts`           | Carry `sessionId` onto the `EditRequest` it builds                      |
+| `src/core/run/run.ts`                     | Pass `request.sessionId` to `isEnabled`                                 |
+| `src/transports/session/client.ts`        | Use the resolution chain                                                |
+| `src/cli/toggle.ts`                       | Session-scoped `on`, `off`, `toggle`, `status`                          |
+| `src/cli/watch/watch.ts`                  | Accept a session key                                                    |
+| `src/web/watch.ts`                        | Accept a session key                                                    |
+| `src/transports/session/queue.ts`         | Broadcast state instead of a single holder                              |
+| `src/transports/session/queue.types.ts`   | `ReviewStatus` drops `inFlight`                                         |
+| `src/transports/session/server.ts`        | Broadcast dispatch, `status` frame, sidecar, `lastAttachAt`             |
+| `src/transports/session/server.types.ts`  | `SessionServer` gains `lastAttachAt`                                    |
+| `src/transports/session/wire.ts`          | Encode and decode `status` and `state`                                  |
+| `src/transports/session/wire.types.ts`    | `StatusMessage`, `StateMessage`                                         |
+| `src/cli/index.ts`                        | Dispatch `sessions` and `connect`, `watch <id>`, USAGE                  |
+| `src/cli/doctor/doctor.ts`                | Remove a stale socket rather than suggest `rm`                          |
 
 ---
 
@@ -84,12 +84,14 @@ git checkout -b feat/session-keyed-sockets/pm-16
 ### Task 1: Session key derivation and path helpers
 
 **Files:**
+
 - Create: `src/core/state/state.types.ts`
 - Modify: `src/core/state/state.ts`
 - Modify: `src/core/state/index.ts`
 - Test: `test/state-session-keys.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces:
   - `type SessionKey = string`
@@ -303,11 +305,13 @@ git commit -m "feat(state): derive a session key and its per-session paths"
 ### Task 2: The three-state flag
 
 **Files:**
+
 - Modify: `src/core/state/state.ts`
 - Modify: `src/core/state/index.ts`
 - Test: `test/state-session-keys.test.ts`
 
 **Interfaces:**
+
 - Consumes: `sessionKey`, `sessionKeyFlagPath`, `sessionKeyOptOutPath` from Task 1.
 - Produces:
   - `isEnabled(filePath: string, key?: SessionKey): boolean` — the existing signature gains an optional second parameter
@@ -524,11 +528,13 @@ git commit -m "feat(state): let a session opt out of a directory flag"
 ### Task 3: The socket resolution chain
 
 **Files:**
+
 - Modify: `src/core/state/state.ts`
 - Modify: `src/core/state/index.ts`
 - Test: `test/state-session-keys.test.ts`
 
 **Interfaces:**
+
 - Consumes: `sessionKeySocketPath` from Task 1, `findSessionSocket` from the existing module.
 - Produces:
   - `resolveSocketPath(filePath: string, key?: SessionKey): string | null`
@@ -663,6 +669,7 @@ git commit -m "feat(state): resolve a socket by session, then by directory"
 ### Task 4: Thread the session id from the payload to the transport
 
 **Files:**
+
 - Modify: `src/transports/transport.types.ts`
 - Modify: `src/core/simulate/simulate.ts`
 - Modify: `src/core/run/run.ts`
@@ -672,6 +679,7 @@ git commit -m "feat(state): resolve a socket by session, then by directory"
 - Test: `test/session-client.test.ts`
 
 **Interfaces:**
+
 - Consumes: `isEnabled(filePath, key?)` from Task 2, `resolveSocketPath(filePath, key?)` from Task 3, `sessionKey` from Task 1.
 - Produces:
   - `EditRequest` gains `sessionId?: string`
@@ -707,7 +715,13 @@ describe("the resolution chain in the client", () => {
     const transport = createSessionTransport();
 
     const outcome = await transport.review(
-      { tool: "Write", filePath, before: "before\n", after: "after\n", sessionId: "d95655de-eb7f-45e5-867d-9797a355353e" },
+      {
+        tool: "Write",
+        filePath,
+        before: "before\n",
+        after: "after\n",
+        sessionId: "d95655de-eb7f-45e5-867d-9797a355353e",
+      },
       DEFAULT_CONFIG,
     );
 
@@ -866,11 +880,11 @@ import { isEnabled, sessionKey } from "../state";
 Then replace the enabled check:
 
 ```ts
-  const key = request.sessionId === undefined ? undefined : sessionKey(request.sessionId);
+const key = request.sessionId === undefined ? undefined : sessionKey(request.sessionId);
 
-  if (!isEnabled(request.filePath, key)) {
-    return { decision: "allow", reviewed: false };
-  }
+if (!isEnabled(request.filePath, key)) {
+  return { decision: "allow", reviewed: false };
+}
 ```
 
 - [ ] **Step 7: Read session_id in the Claude Code adapter**
@@ -878,20 +892,20 @@ Then replace the enabled check:
 In `src/adapters/claude-code/claude-code.ts`, inside `main`, after the `toolInput` guard, add:
 
 ```ts
-  const rawSessionId = payload["session_id"];
-  const sessionId = typeof rawSessionId === "string" ? rawSessionId : undefined;
+const rawSessionId = payload["session_id"];
+const sessionId = typeof rawSessionId === "string" ? rawSessionId : undefined;
 ```
 
 Then replace the `isEnabled` call and the `simulate` call:
 
 ```ts
-  const key = sessionId === undefined ? undefined : sessionKey(sessionId);
+const key = sessionId === undefined ? undefined : sessionKey(sessionId);
 
-  if (!isEnabled(filePath, key)) {
-    return 0;
-  }
+if (!isEnabled(filePath, key)) {
+  return 0;
+}
 
-  const request = simulate(tool, toolInput, readFileOrEmpty, sessionId);
+const request = simulate(tool, toolInput, readFileOrEmpty, sessionId);
 ```
 
 Add `sessionKey` to the state import at the top of the file.
@@ -1035,11 +1049,13 @@ git commit -m "feat(hook): resolve a socket from the payload session id"
 ### Task 5: Session-scoped on, off, toggle, and status
 
 **Files:**
+
 - Modify: `src/cli/toggle.ts`
 - Modify: `src/cli/toggle.types.ts`
 - Test: `test/cli-toggle.test.ts`
 
 **Interfaces:**
+
 - Consumes: `enableSession`, `optOutSession`, `sessionFlagState`, `sessionKey`, `isEnabled` from Tasks 1 and 2.
 - Produces:
   - `agentSessionId(env: NodeJS.ProcessEnv): string | null` — reads `CLAUDE_CODE_SESSION_ID`, then `CODEX_SESSION_ID`, then `CODEX_THREAD_ID`
@@ -1189,8 +1205,7 @@ export async function pairToggle(
   web: boolean,
   key?: SessionKey,
 ): Promise<string> {
-  const on =
-    key === undefined ? existsSync(flagPath(directory)) : sessionFlagState(key) === "on";
+  const on = key === undefined ? existsSync(flagPath(directory)) : sessionFlagState(key) === "on";
 
   if (on) {
     return pairOff(directory, key);
@@ -1255,6 +1270,7 @@ git commit -m "feat(cli): scope on, off, toggle, and status to the agent session
 ### Task 6: Bind a watcher to a session key
 
 **Files:**
+
 - Modify: `src/cli/watch/watch.ts`
 - Modify: `src/cli/watch/watch.types.ts`
 - Modify: `src/web/watch.ts`
@@ -1263,6 +1279,7 @@ git commit -m "feat(cli): scope on, off, toggle, and status to the agent session
 - Test: `test/cli-watch.test.ts`
 
 **Interfaces:**
+
 - Consumes: `sessionKeySocketPath` from Task 1, `agentSessionId` and the key-aware commands from Task 5.
 - Produces:
   - `WatchOptions` gains `sessionKey?: SessionKey`
@@ -1314,11 +1331,11 @@ Import the type: `import type { SessionKey } from "../../core/state";`
 In `src/cli/watch/watch.ts`, replace the socket path line:
 
 ```ts
-  const socketPath =
-    options.socketPath ??
-    (options.sessionKey === undefined
-      ? sessionSocketPath(options.directory)
-      : sessionKeySocketPath(options.sessionKey));
+const socketPath =
+  options.socketPath ??
+  (options.sessionKey === undefined
+    ? sessionSocketPath(options.directory)
+    : sessionKeySocketPath(options.sessionKey));
 ```
 
 Add `sessionKeySocketPath` to the state import.
@@ -1352,11 +1369,11 @@ In the `watch` branch, replace `parseDirectoryArgs(process.argv.slice(3), ["--we
 guard:
 
 ```ts
-    if (parsed.sessionKey !== undefined && !existsSync(sessionKeySocketPath(parsed.sessionKey))) {
-      console.error(`unknown session: ${parsed.sessionKey}`);
-      console.error("run pair-mode sessions to list the live ones");
-      return 1;
-    }
+if (parsed.sessionKey !== undefined && !existsSync(sessionKeySocketPath(parsed.sessionKey))) {
+  console.error(`unknown session: ${parsed.sessionKey}`);
+  console.error("run pair-mode sessions to list the live ones");
+  return 1;
+}
 ```
 
 Pass `sessionKey: parsed.sessionKey` into both `runWatch` and `startWebWatch`.
@@ -1407,12 +1424,14 @@ git commit -m "feat(cli): bind a watcher to one session key"
 ### Task 7: Wire the toggle commands to the environment, then open PR 1
 
 **Files:**
+
 - Modify: `src/cli/index.ts`
 - Modify: `README.md`
 - Modify: `CHANGELOG.md`
 - Test: `test/cli-toggle.test.ts`
 
 **Interfaces:**
+
 - Consumes: `agentSessionId` from Task 5.
 - Produces: no new exports.
 
@@ -1523,12 +1542,14 @@ git checkout -b feat/broadcast-reviews/pm-17
 ### Task 8: Replace the single-holder queue with a broadcast set
 
 **Files:**
+
 - Modify: `src/transports/session/queue.ts`
 - Modify: `src/transports/session/queue.types.ts`
 - Modify: `src/transports/session/index.ts`
 - Test: `test/session-queue.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces:
   - `ReviewStatus` becomes `"waiting" | "offered"`
@@ -1667,11 +1688,13 @@ Expected: FAIL, and only in `src/transports/session/server.ts`, which still call
 ### Task 9: Broadcast in the server, first verdict wins
 
 **Files:**
+
 - Modify: `src/transports/session/server.ts`
 - Test: `test/session-server.test.ts`
 - Test: `test/session-broadcast.test.ts`
 
 **Interfaces:**
+
 - Consumes: `offerAll` and `release` from Task 8.
 - Produces: no new exports. `dispatch` broadcasts, and `handleVerdict` cancels every other holder.
 
@@ -1720,7 +1743,12 @@ Create `test/session-broadcast.test.ts`:
 import { join } from "node:path";
 import { test, expect, describe } from "vitest";
 import { useIsolatedHome } from "./helpers/env";
-import { startSessionServer, encode, decodeLine, createLineReader } from "../src/transports/session";
+import {
+  startSessionServer,
+  encode,
+  decodeLine,
+  createLineReader,
+} from "../src/transports/session";
 
 const isolated = useIsolatedHome();
 
@@ -1836,8 +1864,8 @@ Expected: FAIL. The server still hands each review to one client.
 In `src/transports/session/server.ts`, replace the `clients` map with a set and add a holders map:
 
 ```ts
-  const clients = new Set<Socket>();
-  const holders = new Map<string, Set<Socket>>();
+const clients = new Set<Socket>();
+const holders = new Map<string, Set<Socket>>();
 ```
 
 - [ ] **Step 5: Rewrite dispatch**
@@ -1845,102 +1873,102 @@ In `src/transports/session/server.ts`, replace the `clients` map with a set and 
 Replace `idleClient`, `clientHolding`, and `dispatch` with:
 
 ```ts
-  // Every attached client is a view of one review, so all of them see it and the first verdict ends it.
-  function dispatch(): void {
-    if (clients.size > 0) {
-      const result = offerAll(queue);
-      queue = result.state;
+// Every attached client is a view of one review, so all of them see it and the first verdict ends it.
+function dispatch(): void {
+  if (clients.size > 0) {
+    const result = offerAll(queue);
+    queue = result.state;
 
-      result.reviews.forEach((review) => {
-        holders.set(review.id, new Set(clients));
+    result.reviews.forEach((review) => {
+      holders.set(review.id, new Set(clients));
 
-        clients.forEach((client) => {
-          send(client, {
-            type: "review",
-            id: review.id,
-            tool: review.request.tool,
-            path: review.request.filePath,
-            before: review.request.before,
-            after: review.request.after,
-          });
+      clients.forEach((client) => {
+        send(client, {
+          type: "review",
+          id: review.id,
+          tool: review.request.tool,
+          path: review.request.filePath,
+          before: review.request.before,
+          after: review.request.after,
         });
       });
-    }
-
-    announce();
+    });
   }
+
+  announce();
+}
 ```
 
 - [ ] **Step 6: Rewrite the attach, verdict, and drop handlers**
 
 ```ts
-  function handleAttach(socket: Socket): void {
-    clients.add(socket);
-    lastAttachAt = new Date().toISOString();
-    dispatch();
+function handleAttach(socket: Socket): void {
+  clients.add(socket);
+  lastAttachAt = new Date().toISOString();
+  dispatch();
+}
+
+// The first verdict wins. Every other client holding the same review hears cancel instead.
+function handleVerdict(socket: Socket, message: VerdictMessage): void {
+  const held = holders.get(message.id);
+
+  if (held === undefined) {
+    return;
   }
 
-  // The first verdict wins. Every other client holding the same review hears cancel instead.
-  function handleVerdict(socket: Socket, message: VerdictMessage): void {
-    const held = holders.get(message.id);
+  const agent = agents.get(message.id);
 
-    if (held === undefined) {
-      return;
-    }
-
-    const agent = agents.get(message.id);
-
-    if (agent !== undefined) {
-      send(agent, message);
-      agents.delete(message.id);
-    }
-
-    held.forEach((client) => {
-      if (client !== socket) {
-        send(client, { type: "cancel", id: message.id });
-      }
-    });
-
-    holders.delete(message.id);
-    queue = complete(queue, message.id);
-
-    dispatch();
+  if (agent !== undefined) {
+    send(agent, message);
+    agents.delete(message.id);
   }
 
-  function dropAgent(socket: Socket): void {
-    const owned = [...agents.entries()].filter(([, agentSocket]) => agentSocket === socket);
+  held.forEach((client) => {
+    if (client !== socket) {
+      send(client, { type: "cancel", id: message.id });
+    }
+  });
 
-    owned.forEach(([id]) => {
-      agents.delete(id);
+  holders.delete(message.id);
+  queue = complete(queue, message.id);
 
-      holders.get(id)?.forEach((client) => send(client, { type: "cancel", id }));
+  dispatch();
+}
+
+function dropAgent(socket: Socket): void {
+  const owned = [...agents.entries()].filter(([, agentSocket]) => agentSocket === socket);
+
+  owned.forEach(([id]) => {
+    agents.delete(id);
+
+    holders.get(id)?.forEach((client) => send(client, { type: "cancel", id }));
+    holders.delete(id);
+
+    queue = complete(queue, id);
+  });
+
+  if (owned.length > 0) {
+    dispatch();
+  }
+}
+
+// The last client to drop hands its reviews back, so a fresh attach picks them up.
+function dropClient(socket: Socket): void {
+  if (!clients.delete(socket)) {
+    return;
+  }
+
+  holders.forEach((held, id) => {
+    held.delete(socket);
+
+    if (held.size === 0 && findReview(queue, id) !== null) {
+      queue = release(queue, id);
       holders.delete(id);
-
-      queue = complete(queue, id);
-    });
-
-    if (owned.length > 0) {
-      dispatch();
     }
-  }
+  });
 
-  // The last client to drop hands its reviews back, so a fresh attach picks them up.
-  function dropClient(socket: Socket): void {
-    if (!clients.delete(socket)) {
-      return;
-    }
-
-    holders.forEach((held, id) => {
-      held.delete(socket);
-
-      if (held.size === 0 && findReview(queue, id) !== null) {
-        queue = release(queue, id);
-        holders.delete(id);
-      }
-    });
-
-    dispatch();
-  }
+  dispatch();
+}
 ```
 
 Add `let lastAttachAt: string | null = null;` beside the other closure state.
@@ -2025,6 +2053,7 @@ git checkout -b feat/sessions-listing/pm-18
 ### Task 10: The status and state wire frames
 
 **Files:**
+
 - Modify: `src/transports/session/wire.ts`
 - Modify: `src/transports/session/wire.types.ts`
 - Modify: `src/transports/session/server.ts`
@@ -2034,6 +2063,7 @@ git checkout -b feat/sessions-listing/pm-18
 - Test: `test/session-server.test.ts`
 
 **Interfaces:**
+
 - Consumes: the broadcast server from Task 9.
 - Produces:
   - `interface StatusMessage { type: "status" }`
@@ -2075,7 +2105,12 @@ describe("the status and state frames", () => {
   });
 
   test("a state frame with a non-numeric count decodes to null", () => {
-    const line = JSON.stringify({ type: "state", clientCount: "two", waitingDepth: 0, lastAttachAt: null });
+    const line = JSON.stringify({
+      type: "state",
+      clientCount: "two",
+      waitingDepth: 0,
+      lastAttachAt: null,
+    });
 
     expect(decodeLine(line)).toBeNull();
   });
@@ -2176,13 +2211,13 @@ function toState(raw: Record<string, unknown>): StateMessage | null {
 In `decodeLine`, add these two branches before the final `return null`:
 
 ```ts
-  if (type === "status") {
-    return { type: "status" };
-  }
+if (type === "status") {
+  return { type: "status" };
+}
 
-  if (type === "state") {
-    return toState(parsed);
-  }
+if (type === "state") {
+  return toState(parsed);
+}
 ```
 
 Import both new types at the top of the file.
@@ -2192,15 +2227,15 @@ Import both new types at the top of the file.
 In `src/transports/session/server.ts`, add to `handleLine`, before the `verdict` branch:
 
 ```ts
-    if (message.type === "status") {
-      send(socket, {
-        type: "state",
-        clientCount: clients.size,
-        waitingDepth: waitingDepth(queue),
-        lastAttachAt,
-      });
-      return;
-    }
+if (message.type === "status") {
+  send(socket, {
+    type: "state",
+    clientCount: clients.size,
+    waitingDepth: waitingDepth(queue),
+    lastAttachAt,
+  });
+  return;
+}
 ```
 
 Task 9 already added the `lastAttachAt` accessor and its type, so this step only adds the
@@ -2234,6 +2269,7 @@ git commit -m "feat(session): answer a status request with the live client count
 ### Task 11: Write and read the session sidecar
 
 **Files:**
+
 - Modify: `src/transports/session/server.ts`
 - Modify: `src/transports/session/server.types.ts`
 - Modify: `src/cli/watch/watch.ts`
@@ -2241,6 +2277,7 @@ git commit -m "feat(session): answer a status request with the live client count
 - Test: `test/session-server.test.ts`
 
 **Interfaces:**
+
 - Consumes: `SessionRecord` from Task 1, `sessionKeyRecordPath` from Task 1.
 - Produces:
   - `SessionServerOptions` gains `record?: SessionRecord`
@@ -2328,9 +2365,9 @@ function writeRecord(socketPath: string, record: SessionRecord): void {
 After `await bindSocket(server, options.socketPath);` add:
 
 ```ts
-  if (options.record !== undefined) {
-    writeRecord(options.socketPath, options.record);
-  }
+if (options.record !== undefined) {
+  writeRecord(options.socketPath, options.record);
+}
 ```
 
 Inside `close`, add `removeQuietly(recordPathFor(options.socketPath));` beside the existing `removeQuietly(options.socketPath)`.
@@ -2409,12 +2446,14 @@ git commit -m "feat(session): record a label and a directory beside each socket"
 ### Task 12: The sessions listing and the sweep
 
 **Files:**
+
 - Create: `src/cli/sessions/sessions.ts`
 - Create: `src/cli/sessions/sessions.types.ts`
 - Create: `src/cli/sessions/index.ts`
 - Test: `test/cli-sessions.test.ts`
 
 **Interfaces:**
+
 - Consumes: `probeSocket` from the session module, `sessionsDir` and `SessionRecord` from Task 1, the `status` frame from Task 10.
 - Produces:
   - `interface SessionListing { id: string; kind: SessionKind; label: string; directory: string; clients: number; waiting: number; createdAt: string; alive: boolean }`
@@ -2771,7 +2810,10 @@ function formatTable(listings: SessionListing[]): string {
   );
 
   const line = (cells: string[]): string =>
-    cells.map((cell, column) => pad(cell, widths[column] ?? 0)).join("  ").trimEnd();
+    cells
+      .map((cell, column) => pad(cell, widths[column] ?? 0))
+      .join("  ")
+      .trimEnd();
 
   return [line(header), ...rows.map(line)].join("\n");
 }
@@ -2823,11 +2865,13 @@ git commit -m "feat(cli): list live sessions and sweep the dead ones"
 ### Task 13: The connect picker
 
 **Files:**
+
 - Create: `src/cli/sessions/connect.ts`
 - Modify: `src/cli/sessions/index.ts`
 - Test: `test/cli-sessions.test.ts`
 
 **Interfaces:**
+
 - Consumes: `listSessions` from Task 12.
 - Produces:
   - `runConnect(io: ConnectIo): Promise<{ selected: string | null; exitCode: number }>`
@@ -2900,8 +2944,12 @@ describe("runConnect", () => {
     writeRecord(first, "one@main", "/repo");
     writeRecord(second, "two@main", "/repo");
 
-    const serverOne = await startSessionServer({ socketPath: join(sessionsDir(), `${first}.sock`) });
-    const serverTwo = await startSessionServer({ socketPath: join(sessionsDir(), `${second}.sock`) });
+    const serverOne = await startSessionServer({
+      socketPath: join(sessionsDir(), `${first}.sock`),
+    });
+    const serverTwo = await startSessionServer({
+      socketPath: join(sessionsDir(), `${second}.sock`),
+    });
 
     const fake = fakeIo(true);
     const run = runConnect(fake.io);
@@ -3092,7 +3140,6 @@ export function createConnectIo(): ConnectIo {
 }
 ```
 
-
 - [ ] **Step 5: Export it**
 
 Add to `src/cli/sessions/index.ts`:
@@ -3126,6 +3173,7 @@ git commit -m "feat(cli): add an interactive session picker"
 ### Task 14: Dispatch the commands, sweep on start, fix doctor, then open PR 3
 
 **Files:**
+
 - Modify: `src/cli/index.ts`
 - Modify: `src/cli/doctor/doctor.ts`
 - Modify: `src/cli/watch/watch.ts`
@@ -3135,6 +3183,7 @@ git commit -m "feat(cli): add an interactive session picker"
 - Test: `test/cli-toggle-web.test.ts`
 
 **Interfaces:**
+
 - Consumes: `listSessions`, `sweepDeadSessions`, `runConnect` from Tasks 12 and 13.
 - Produces: no new exports.
 
@@ -3172,9 +3221,9 @@ Expected: FAIL. Doctor still prints `rm`.
 In `src/cli/doctor/doctor.ts`, replace the final return of `checkSession`:
 
 ```ts
-  removeQuietly(path);
+removeQuietly(path);
 
-  return { name, passed: true, detail: "removed a stale socket", warnOnly: true };
+return { name, passed: true, detail: "removed a stale socket", warnOnly: true };
 ```
 
 Add `removeQuietly` to the helpers import.
@@ -3184,16 +3233,16 @@ Add `removeQuietly` to the helpers import.
 In `src/cli/index.ts`, add before the `unknown command` fallback:
 
 ```ts
-  if (command === "sessions") {
-    const result = await listSessions();
-    console.log(result.text);
-    return result.exitCode;
-  }
+if (command === "sessions") {
+  const result = await listSessions();
+  console.log(result.text);
+  return result.exitCode;
+}
 
-  if (command === "connect") {
-    const result = await runConnect(createConnectIo());
-    return result.exitCode;
-  }
+if (command === "connect") {
+  const result = await runConnect(createConnectIo());
+  return result.exitCode;
+}
 ```
 
 Task 13 already wrote and exported `createConnectIo`, so import it from `./sessions`.
@@ -3239,15 +3288,15 @@ The `watch` branch then calls `watchSession(parsed.directory, parsed.sessionKey,
 The `connect` branch calls it with the picked id:
 
 ```ts
-  if (command === "connect") {
-    const result = await runConnect(createConnectIo());
+if (command === "connect") {
+  const result = await runConnect(createConnectIo());
 
-    if (result.selected === null) {
-      return result.exitCode;
-    }
-
-    return await watchSession(process.cwd(), result.selected, false);
+  if (result.selected === null) {
+    return result.exitCode;
   }
+
+  return await watchSession(process.cwd(), result.selected, false);
+}
 ```
 
 Add to `USAGE`, directly before the `--version` line:
@@ -3269,16 +3318,19 @@ In `README.md`, add after the `### One socket per agent session` subsection from
 
 ```markdown
 ### Finding a session
-
 ```
+
 pair-mode sessions
+
 ```
 
 That prints every live session with its id, its label, how many watchers are attached, and
 how many reviews are queued. It also removes any socket whose watcher has died.
 
 ```
+
 pair-mode connect
+
 ```
 
 That opens the same list, interactive. `j`, `k`, and the arrow keys move the cursor. `Enter`

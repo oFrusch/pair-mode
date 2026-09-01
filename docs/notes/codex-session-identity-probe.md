@@ -36,7 +36,7 @@ We built an isolated `CODEX_HOME` to avoid touching the user's real config:
 1. Created a temp dir, symlinked `auth.json` from the real `~/.codex`, wrote a minimal
    `config.toml` with a trusted project entry, and wrote a `hooks.json`.
 2. Ran `CODEX_HOME=<temp> codex exec --sandbox workspace-write --skip-git-repo-check
-   "Create codex.txt containing the word codex." < /dev/null`.
+"Create codex.txt containing the word codex." < /dev/null`.
 
 Result: Codex created the file every time. The hook never fired. We tried the matcher
 `apply_patch|Edit|Write`, which is what the user's real `~/.codex/hooks.json` already
