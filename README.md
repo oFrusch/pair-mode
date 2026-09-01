@@ -86,6 +86,14 @@ This is what will render your diff if you choose to use one of the CLI-based app
 | nvim           | Yes         | Yes. Same `matchadd()` overlay as vim.                                                                                                                                                                                           |
 | nano           | Yes         | No. nano has no syntax engine here, so a changed row gets the diff band only.                                                                                                                                                    |
 
+Pair mode names the language from the extension first, then the exact filename, then the
+shebang on the first line. So `Gemfile`, `Dockerfile`, `Makefile`, and an extensionless
+script all get colour. A brand new file has nothing on disk yet, so its first review reads
+no shebang.
+
+The pair pane and the web view colour every language Shiki bundles. micro colours the 54
+languages that ship a syntax asset.
+
 Keys:
 
 - pair: see [Keymap](#keymap) below.

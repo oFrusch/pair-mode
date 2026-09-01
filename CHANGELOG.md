@@ -10,10 +10,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Added
 
 - `pair-mode toggle` reads the current state and moves to the other one.
+- Language detection reads the extension, then the exact filename, then the shebang. `Gemfile`, `Dockerfile`, `Makefile`, and an extensionless script now get colour.
+- `pnpm run syntax` fetches the micro syntax assets.
 
 ### Changed
 
 - The plugin ships one `toggle` skill. It replaces two entries that both registered as `pair`.
+- Shiki now colours every language it bundles, not only the 22 that ship a micro asset.
+- The repo ships 54 micro syntax assets, up from 22.
+
+### Fixed
+
+- `.erb` renders as ERB, not as plain HTML.
+
+### Removed
+
+- Node 20 support. That release went end of life on 2026-04-30, and pnpm 11 no longer runs on it.
 
 ## [0.3.0] - 2026-08-26
 
