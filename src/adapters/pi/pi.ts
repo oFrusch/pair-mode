@@ -1,4 +1,4 @@
-import { isEnabled } from "../../core/state";
+import { isEnabled, sessionKey } from "../../core/state";
 import { simulate } from "../../core/simulate";
 import { pairOff, pairOn, pairStatus } from "../../cli/toggle";
 import { runPair as defaultRunPair } from "../../core/run";
@@ -74,11 +74,15 @@ export async function handleToolCall(
       return { block: false };
     }
 
-    if (!isEnabled(call.filePath)) {
+    // pi names the session on the event, so pair mode keys off it exactly as the hook adapters do.
+    const sessionId = event.sessionId === "" ? undefined : event.sessionId;
+    const key = sessionId === undefined ? undefined : sessionKey(sessionId);
+
+    if (!isEnabled(call.filePath, key)) {
       return { block: false };
     }
 
-    const request = simulate(call.tool, call.input, readFileOrEmpty);
+    const request = simulate(call.tool, call.input, readFileOrEmpty, sessionId);
 
     if (request === null) {
       return { block: false };

@@ -6,6 +6,7 @@ export type RunPairFn = (request: EditRequest, config: PairConfig) => Promise<Ru
 export interface PiToolCallEvent {
   toolName: string;
   input: unknown;
+  sessionId?: string;
 }
 
 export interface PiToolCallResult {

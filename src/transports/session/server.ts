@@ -24,6 +24,7 @@ import { removeQuietly } from "../../helpers";
 const ID_BYTES = 8;
 const OWNER_ONLY_DIR = 0o700;
 const OWNER_ONLY_SOCKET = 0o600;
+const OWNER_ONLY_RECORD = 0o600;
 const STALE_PROBE_TIMEOUT_MS = 250;
 
 function defaultGenerateId(): string {
@@ -104,7 +105,10 @@ function recordPathFor(socketPath: string): string {
 
 function writeRecord(socketPath: string, record: SessionRecord): void {
   try {
-    writeFileSync(recordPathFor(socketPath), JSON.stringify(record, null, 2) + "\n", "utf-8");
+    writeFileSync(recordPathFor(socketPath), JSON.stringify(record, null, 2) + "\n", {
+      encoding: "utf-8",
+      mode: OWNER_ONLY_RECORD,
+    });
   } catch {
     // A sidecar that fails to write must never stop a watcher from serving reviews.
   }

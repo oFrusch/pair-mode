@@ -1,10 +1,10 @@
 import { existsSync, openSync, closeSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { loadConfig, configPath } from "../../core/config";
 import type { ConfigResult, PairConfig } from "../../core/config";
 import { stateDir, sessionSocketPath, resolveSocketPath } from "../../core/state";
-import { probeSession } from "../sessions";
+import { probeSession, removeSession } from "../sessions";
 import { currentSessionKey } from "../toggle";
 import { resolve as resolveEditor } from "../../editors/index";
 import { detect as detectMultiplexer } from "../../multiplexers/index";
@@ -21,7 +21,6 @@ import {
   piExtensionPath,
 } from "../register";
 import type { CliName } from "../register";
-import { removeQuietly } from "../../helpers";
 import { defaultResolvesOnPath } from "../../helpers/resolvesOnPath";
 import type { PathResolver } from "../../helpers/types";
 import type { DoctorCheck, DoctorOptions, DoctorReport } from "./types";
@@ -300,7 +299,8 @@ async function checkSession(
     return { name, passed: true, detail: "a watcher is attached" };
   }
 
-  removeQuietly(path);
+  // The sweep and doctor must agree, so doctor removes the sidecar and the link file with the socket.
+  removeSession(basename(path, ".sock"));
 
   return { name, passed: true, detail: "removed a stale socket", warnOnly: true };
 }

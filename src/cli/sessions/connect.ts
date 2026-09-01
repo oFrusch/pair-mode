@@ -35,7 +35,7 @@ function pick(io: WatchIo, listings: SessionListing[]): Promise<ConnectResult> {
       }
 
       if (SELECT_KEYS.includes(key)) {
-        resolve({ selected: listings[cursor]?.id ?? null, exitCode: 0 });
+        resolve({ selected: listings[cursor] ?? null, exitCode: 0 });
         return;
       }
 

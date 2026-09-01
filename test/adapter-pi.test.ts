@@ -1,7 +1,7 @@
 import { writeFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect, beforeEach, describe } from "vitest";
-import { enable } from "../src/core/state";
+import { enable, enableSession, optOutSession, sessionKey } from "../src/core/state";
 import { handleToolCall } from "../src/adapters/pi";
 import type { RunPairFn } from "../src/adapters/pi";
 import { useIsolatedHome } from "./helpers/env";
@@ -156,5 +156,59 @@ describe("runPairCommand", () => {
 
     expect(message).toContain("on, off, or status");
     expect(runPairCommand("status", directory)).toContain("ON");
+  });
+});
+
+describe("the session id the harness supplies", () => {
+  test("a session flag written by pair-mode on holds an edit no directory flag covers", async () => {
+    const targetDir = realpathSync(isolated.tempDir("pair-mode-session-"));
+    const loosePath = join(targetDir, "loose.ts");
+    writeFileSync(loosePath, "before\n", "utf-8");
+    enableSession(sessionKey("pi-session"));
+
+    const result = await handleToolCall(
+      {
+        toolName: "write",
+        input: { path: loosePath, content: "after\n" },
+        sessionId: "pi-session",
+      },
+      denyingRunPair("held"),
+    );
+
+    expect(result).toEqual({ block: true, reason: "held" });
+  });
+
+  test("a session opt-out lets an edit through under a live directory flag", async () => {
+    optOutSession(sessionKey("pi-muted"));
+
+    const result = await handleToolCall(
+      { toolName: "write", input: { path: filePath, content: "after\n" }, sessionId: "pi-muted" },
+      denyingRunPair("nope"),
+    );
+
+    expect(result).toEqual({ block: false });
+  });
+
+  test("the request carries the session id, so the hook resolves that session's socket", async () => {
+    const seen: Array<string | undefined> = [];
+
+    await handleToolCall(
+      { toolName: "write", input: { path: filePath, content: "after\n" }, sessionId: "pi-session" },
+      async (request) => {
+        seen.push(request.sessionId);
+        return { decision: "allow", reviewed: true };
+      },
+    );
+
+    expect(seen).toEqual(["pi-session"]);
+  });
+
+  test("an event with no session id behaves exactly as it did before", async () => {
+    const result = await handleToolCall(
+      { toolName: "write", input: { path: filePath, content: "after\n" } },
+      denyingRunPair("nope"),
+    );
+
+    expect(result).toEqual({ block: true, reason: "nope" });
   });
 });

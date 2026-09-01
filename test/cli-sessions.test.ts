@@ -1,10 +1,15 @@
 import { createConnection, createServer } from "node:net";
 import type { Socket } from "node:net";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect, describe } from "vitest";
 import { useIsolatedHome, useShortStateHome } from "./helpers/env";
-import { listSessions, sweepDeadSessions, runConnect } from "../src/cli/sessions";
+import {
+  listSessions,
+  sweepDeadSessions,
+  sweepExpiredFlags,
+  runConnect,
+} from "../src/cli/sessions";
 import type { WatchIo } from "../src/cli/watch";
 import { startSessionServer, encode } from "../src/transports/session";
 import { sessionsDir } from "../src/core/state";
@@ -397,6 +402,61 @@ describe("runConnect", () => {
     expect(fake.counts.shutdown).toBe(1);
   });
 
+  test("Enter hands back the whole listing, so the caller reads the directory and the kind", async () => {
+    const id = "s-66666666";
+
+    writeRecord(id, "listing@main", "/repo/listing");
+    const server = await startSessionServer({ socketPath: join(sessionsDir(), `${id}.sock`) });
+
+    const fake = fakeIo(true);
+    const run = runConnect(fake.io);
+
+    await fake.waitForPaint();
+    fake.pressKey("\r");
+
+    const result = await run;
+
+    expect(result.selected?.directory).toBe("/repo/listing");
+    expect(result.selected?.kind).toBe("session");
+
+    await server.close();
+  });
+
+  test("Enter on a directory session reports the directory kind rather than a session key", async () => {
+    const id = "4f2c9e91a0000000";
+
+    mkdirSync(sessionsDir(), { recursive: true });
+
+    const record = {
+      id,
+      kind: "directory",
+      label: "repo@main",
+      directory: "/repo/plain",
+      branch: "main",
+      agentSessionId: null,
+      agentKind: null,
+      createdAt: DEFAULT_CREATED_AT,
+      pid: process.pid,
+    };
+
+    writeFileSync(join(sessionsDir(), `${id}.json`), JSON.stringify(record), "utf-8");
+
+    const server = await startSessionServer({ socketPath: join(sessionsDir(), `${id}.sock`) });
+
+    const fake = fakeIo(true);
+    const run = runConnect(fake.io);
+
+    await fake.waitForPaint();
+    fake.pressKey("\r");
+
+    const result = await run;
+
+    expect(result.selected?.kind).toBe("directory");
+    expect(result.selected?.directory).toBe("/repo/plain");
+
+    await server.close();
+  });
+
   test("Enter selects the session under the cursor", async () => {
     const id = "s-77777777";
 
@@ -411,7 +471,7 @@ describe("runConnect", () => {
 
     const result = await run;
 
-    expect(result.selected).toBe(id);
+    expect(result.selected?.id).toBe(id);
     expect(result.exitCode).toBe(0);
     expect(fake.counts.shutdown).toBe(1);
 
@@ -441,7 +501,7 @@ describe("runConnect", () => {
 
     const result = await run;
 
-    expect(result.selected).toBe(second);
+    expect(result.selected?.id).toBe(second);
 
     await serverOne.close();
     await serverTwo.close();
@@ -470,7 +530,7 @@ describe("runConnect", () => {
 
     const result = await run;
 
-    expect(result.selected).toBe(first);
+    expect(result.selected?.id).toBe(first);
 
     await serverOne.close();
     await serverTwo.close();
@@ -492,7 +552,7 @@ describe("runConnect", () => {
 
     const result = await run;
 
-    expect(result.selected).toBe(only);
+    expect(result.selected?.id).toBe(only);
 
     await server.close();
   });
@@ -533,7 +593,7 @@ describe("runConnect", () => {
 
     const result = await run;
 
-    expect(result.selected).toBe(id);
+    expect(result.selected?.id).toBe(id);
 
     await server.close();
   });
@@ -567,5 +627,83 @@ describe("runConnect", () => {
     expect(result.selected).toBeNull();
     expect(fake.written.join("")).toContain("no pair-mode sessions");
     expect(fake.counts.shutdown).toBe(1);
+  });
+});
+
+describe("session flag expiry", () => {
+  useShortStateHome();
+
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  function writeFlag(name: string, ageMs: number): string {
+    mkdirSync(sessionsDir(), { recursive: true });
+
+    const path = join(sessionsDir(), name);
+    writeFileSync(path, "", "utf-8");
+
+    const when = new Date(Date.now() - ageMs);
+    utimesSync(path, when, when);
+
+    return path;
+  }
+
+  test("a flag whose session died long ago goes away", async () => {
+    const path = writeFlag("s-33333331.on", 20 * DAY_MS);
+
+    const result = await listSessions();
+
+    expect(existsSync(path)).toBe(false);
+    expect(result.expired).toContain("s-33333331.on");
+    expect(result.text).toContain("expired 1 stale session flag");
+  });
+
+  test("an opt-out expires on the same rule as a flag", async () => {
+    const path = writeFlag("s-33333332.off", 20 * DAY_MS);
+
+    await listSessions();
+
+    expect(existsSync(path)).toBe(false);
+  });
+
+  test("a recent flag stays, so a session that just started keeps its state", async () => {
+    const path = writeFlag("s-33333333.on", 1 * DAY_MS);
+
+    const result = await listSessions();
+
+    expect(existsSync(path)).toBe(true);
+    expect(result.expired).toHaveLength(0);
+  });
+
+  test("an old opt-out stays while its session still owns a socket", async () => {
+    const id = "s-33333334";
+    const path = writeFlag(`${id}.off`, 20 * DAY_MS);
+
+    const server = await startSessionServer({ socketPath: join(sessionsDir(), `${id}.sock`) });
+
+    await listSessions();
+
+    expect(existsSync(path)).toBe(true);
+
+    await server.close();
+  });
+
+  test("the directory flag beside the sessions directory is never touched", async () => {
+    mkdirSync(sessionsDir(), { recursive: true });
+
+    const path = join(sessionsDir(), "4f2c9e91a0000000.on");
+    writeFileSync(path, "", "utf-8");
+
+    const when = new Date(Date.now() - 40 * DAY_MS);
+    utimesSync(path, when, when);
+
+    await listSessions();
+
+    expect(existsSync(path)).toBe(true);
+  });
+
+  test("sweepExpiredFlags names what it removed", () => {
+    writeFlag("s-33333335.on", 30 * DAY_MS);
+
+    expect(sweepExpiredFlags()).toEqual(["s-33333335.on"]);
   });
 });

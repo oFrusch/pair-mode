@@ -18,14 +18,19 @@ export interface SessionListing {
   alive: boolean;
 }
 
-export interface SessionsResult {
+export interface SessionScan {
   listings: SessionListing[];
   swept: string[];
+  expired: string[];
+}
+
+export interface SessionsResult extends SessionScan {
   text: string;
   exitCode: number;
 }
 
+// The picker hands back the whole listing, so the caller reads the kind and the directory rather than guessing them.
 export interface ConnectResult {
-  selected: string | null;
+  selected: SessionListing | null;
   exitCode: number;
 }

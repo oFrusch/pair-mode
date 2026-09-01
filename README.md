@@ -134,9 +134,10 @@ socket and waits. A client you start (another terminal tab or the web view) rend
 
 ### One socket per agent session
 
-`pair-mode on` inside an agent session reads that session's id and mints a socket for it
-alone. It prints the socket id. Another session in the same checkout gets its own socket
-and never sees the first session's diffs.
+`pair-mode on` inside an agent session reads that session's id, turns pair mode on for that
+session alone, and prints the session id. It mints no socket. Run `pair-mode watch <id>`
+with the id it printed, and that watcher mints the socket. Another session in the same
+checkout gets its own socket and never sees the first session's diffs.
 
 `pair-mode on <dir>` from a plain terminal keeps the old behaviour. It writes a directory
 flag, and its socket catches every session that has no socket of its own.
@@ -161,7 +162,13 @@ pair-mode connect
 That opens the same list, interactive. `j`, `k`, and the arrow keys move the cursor. `Enter`
 watches the session under the cursor. `q` quits.
 
-`pair-mode watch <id>` attaches directly when you already know the id.
+`pair-mode watch <id>` attaches directly when you already know the id. It mints the socket
+when nothing owns it yet, which is how a session first gets a watcher. An id that is not
+`s-` followed by eight hex characters is rejected as a typo.
+
+A session flag outlives the agent that wrote it. `pair-mode sessions` removes a session flag
+and a session opt-out once the session has had no socket for fourteen days, and it says how
+many it removed.
 
 Several terminal watchers can watch one session at once. The first one to watch a session
 owns its socket. Every later one attaches to that socket as a viewer. Each attached client

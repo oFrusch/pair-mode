@@ -1,17 +1,22 @@
 import { createConnection } from "node:net";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import { sessionsDir } from "../../core/state";
 import type { SessionKind, SessionRecord } from "../../core/state";
 import { createLineReader, decodeLine, encode } from "../../transports/session";
 import { removeQuietly, isRecord } from "../../helpers";
-import type { SessionListing, SessionProbe, SessionsResult } from "./sessions.types";
+import type { SessionListing, SessionProbe, SessionScan, SessionsResult } from "./sessions.types";
 
 const STATUS_TIMEOUT_MS = 250;
 const UNKNOWN_LABEL = "unknown";
 const UNKNOWN_AGE = "-";
 const UNKNOWN_COUNT = "?";
 const SESSION_KINDS: string[] = ["session", "directory"];
+
+const SECOND_MS = 1000;
+const MINUTE_MS = 60 * SECOND_MS;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
 
 // Only these connect failures prove no listener owns the path. Any other error leaves the session alone.
 const ABANDONED_CODES: string[] = ["ECONNREFUSED", "ENOENT", "ENOTSOCK", "ENOTDIR"];
@@ -131,10 +136,59 @@ function sessionIds(): string[] {
 }
 
 // Only the files this socket owns are removed, so a session a person muted keeps its flag and its opt-out.
-function removeSession(id: string): void {
+export function removeSession(id: string): void {
   [".sock", ".json", ".url"].forEach((extension) =>
     removeQuietly(join(sessionsDir(), `${id}${extension}`)),
   );
+}
+
+const FLAG_EXTENSIONS: string[] = [".on", ".off"];
+
+// A session flag outlives the agent that wrote it, so a flag this old belongs to a session nobody can reach.
+const FLAG_EXPIRY_MS = 14 * DAY_MS;
+
+function flagFiles(): string[] {
+  try {
+    return readdirSync(sessionsDir())
+      .filter((name) => FLAG_EXTENSIONS.some((extension) => name.endsWith(extension)))
+      .filter((name) => name.startsWith("s-"))
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
+function ageOf(path: string, now: number): number | null {
+  try {
+    return now - statSync(path).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+// A flag whose session still has a socket is in use, so only a flag with no socket and no recent write expires.
+export function sweepExpiredFlags(now: number = Date.now()): string[] {
+  const expired: string[] = [];
+
+  flagFiles().forEach((name) => {
+    const id = name.replace(/\.(on|off)$/, "");
+
+    if (existsSync(join(sessionsDir(), `${id}.sock`))) {
+      return;
+    }
+
+    const path = join(sessionsDir(), name);
+    const age = ageOf(path, now);
+
+    if (age === null || age < FLAG_EXPIRY_MS) {
+      return;
+    }
+
+    removeQuietly(path);
+    expired.push(name);
+  });
+
+  return expired;
 }
 
 function kindOf(id: string, record: SessionRecord | null): SessionKind {
@@ -161,7 +215,7 @@ function toListing(id: string, probe: SessionProbe): SessionListing {
   };
 }
 
-async function scan(): Promise<{ listings: SessionListing[]; swept: string[] }> {
+async function scan(): Promise<SessionScan> {
   const ids = sessionIds();
   const probes = await Promise.all(
     ids.map((id) => probeSession(join(sessionsDir(), `${id}.sock`))),
@@ -182,13 +236,9 @@ async function scan(): Promise<{ listings: SessionListing[]; swept: string[] }> 
     listings.push(toListing(id, probe));
   });
 
-  return { listings, swept };
+  // The socket sweep runs first, so a flag whose watcher just died is judged on its own age straight away.
+  return { listings, swept, expired: sweepExpiredFlags() };
 }
-
-const SECOND_MS = 1000;
-const MINUTE_MS = 60 * SECOND_MS;
-const HOUR_MS = 60 * MINUTE_MS;
-const DAY_MS = 24 * HOUR_MS;
 
 // A person scans the age, so the largest whole unit is the only one worth printing.
 function formatAge(createdAt: string, now: number): string {
@@ -250,13 +300,25 @@ function sweptLine(swept: readonly string[]): string {
   return `swept ${swept.length} dead ${noun}`;
 }
 
+// An expired flag is a file a person never sees, so the count says one went away.
+function expiredLine(expired: readonly string[]): string {
+  const noun = expired.length === 1 ? "flag" : "flags";
+  return `expired ${expired.length} stale session ${noun}`;
+}
+
 export async function listSessions(): Promise<SessionsResult> {
-  const { listings, swept } = await scan();
+  const { listings, swept, expired } = await scan();
 
   const table = listings.length === 0 ? "no pair-mode sessions" : formatTable(listings, Date.now());
-  const text = swept.length === 0 ? table : `${table}\n\n${sweptLine(swept)}`;
 
-  return { listings, swept, text, exitCode: 0 };
+  const notes = [
+    ...(swept.length === 0 ? [] : [sweptLine(swept)]),
+    ...(expired.length === 0 ? [] : [expiredLine(expired)]),
+  ];
+
+  const text = notes.length === 0 ? table : `${table}\n\n${notes.join("\n")}`;
+
+  return { listings, swept, expired, text, exitCode: 0 };
 }
 
 export async function sweepDeadSessions(): Promise<string[]> {

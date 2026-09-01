@@ -1,8 +1,8 @@
 import { mkdirSync, writeFileSync, existsSync, realpathSync } from "node:fs";
 import { dirname } from "node:path";
 import { test, expect, beforeEach } from "vitest";
-import { pairOn, pairOff, pairStatus, pairOnWeb } from "../src/cli/toggle";
-import { sessionUrlPath } from "../src/core/state";
+import { pairOn, pairOff, pairStatus, pairOnWeb, pairToggle } from "../src/cli/toggle";
+import { flagPath, sessionFlagState, sessionKeyUrlPath, sessionUrlPath } from "../src/core/state";
 import { runDoctor } from "../src/cli/doctor";
 import { sessionKey, sessionKeySocketPath, sessionSocketPath } from "../src/core/state";
 import { DEFAULT_CONFIG } from "../src/core/config";
@@ -168,4 +168,97 @@ test("doctor keeps a socket whose watcher connects but answers nothing", async (
 
   expect(session?.detail).toBe("a watcher is attached");
   expect(existsSync(socket)).toBe(true);
+});
+
+const AGENT_ID = "toggle-web-0000-1111-222222222222";
+
+function writeSessionLink(key: string, url: string, pid: number): string {
+  const path = sessionKeyUrlPath(key);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify({ url, pid }), "utf-8");
+  return path;
+}
+
+test("on --web inside a session writes the session flag, not the directory flag", async () => {
+  const key = sessionKey(AGENT_ID);
+  writeSessionLink(key, "http://127.0.0.1:9/r/session", DEAD_PID);
+
+  const message = await pairOnWeb(repoRoot, "/does/not/exist.js", key);
+
+  expect(message).toContain(`pair mode ON \u00b7 ${key}`);
+  expect(message).toContain("http://127.0.0.1:9/r/session");
+  expect(sessionFlagState(key)).toBe("on");
+  expect(existsSync(flagPath(repoRoot))).toBe(false);
+});
+
+test("on --web inside a session never reuses a directory watcher's link", async () => {
+  const key = sessionKey(AGENT_ID);
+  writeLink(repoRoot, "http://127.0.0.1:9/r/directory", DEAD_PID);
+  writeSessionLink(key, "http://127.0.0.1:9/r/session", DEAD_PID);
+
+  const message = await pairOnWeb(repoRoot, "/does/not/exist.js", key);
+
+  expect(message).toContain("http://127.0.0.1:9/r/session");
+  expect(message).not.toContain("http://127.0.0.1:9/r/directory");
+});
+
+test("off inside a session stops that session's web watcher and spares the directory link", () => {
+  const key = sessionKey(AGENT_ID);
+  const sessionPath = writeSessionLink(key, "http://127.0.0.1:9/r/session", DEAD_PID);
+  const directoryPath = writeLink(repoRoot, "http://127.0.0.1:9/r/directory", DEAD_PID);
+
+  const message = pairOff(repoRoot, key);
+
+  expect(message).toContain("web watcher stopped");
+  expect(existsSync(sessionPath)).toBe(false);
+  expect(existsSync(directoryPath)).toBe(true);
+});
+
+test("toggle inside a session reads the resolved state, so a directory flag turns it off", async () => {
+  const key = sessionKey(AGENT_ID);
+  pairOn(repoRoot);
+
+  const message = await pairToggle(repoRoot, "/does/not/exist.js", false, key);
+
+  expect(message).toContain(`pair mode OFF \u00b7 ${key}`);
+  expect(sessionFlagState(key)).toBe("off");
+  expect(existsSync(flagPath(repoRoot))).toBe(true);
+});
+
+test("toggle inside a session with no flag anywhere turns pair mode on for that session", async () => {
+  const key = sessionKey(AGENT_ID);
+
+  const message = await pairToggle(repoRoot, "/does/not/exist.js", false, key);
+
+  expect(message).toContain(`pair mode ON \u00b7 ${key}`);
+  expect(sessionFlagState(key)).toBe("on");
+});
+
+test("toggle --web inside a session honours the session key the plain path uses", async () => {
+  const key = sessionKey(AGENT_ID);
+  writeSessionLink(key, "http://127.0.0.1:9/r/session", DEAD_PID);
+
+  const message = await pairToggle(repoRoot, "/does/not/exist.js", true, key);
+
+  expect(message).toContain(`pair mode ON \u00b7 ${key}`);
+  expect(sessionFlagState(key)).toBe("on");
+  expect(existsSync(flagPath(repoRoot))).toBe(false);
+});
+
+test("doctor removes the sidecar with the stale socket, the way the sweep does", async () => {
+  const socketPath = sessionSocketPath(repoRoot);
+  const recordPath = socketPath.replace(/\.sock$/, ".json");
+
+  mkdirSync(dirname(socketPath), { recursive: true });
+  writeFileSync(socketPath, "", "utf-8");
+  writeFileSync(recordPath, "{}", "utf-8");
+
+  await runDoctor({
+    directory: repoRoot,
+    config: { ...DEFAULT_CONFIG, transport: "session" },
+    probeSession: async () => REFUSED,
+  });
+
+  expect(existsSync(socketPath)).toBe(false);
+  expect(existsSync(recordPath)).toBe(false);
 });
