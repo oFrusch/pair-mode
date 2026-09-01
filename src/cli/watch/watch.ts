@@ -1,8 +1,11 @@
 import { createConnection } from "node:net";
 import type { Socket } from "node:net";
+import { spawnSync } from "node:child_process";
+import { basename } from "node:path";
 import { paintLayout } from "../../core/config";
 import type { PairConfig } from "../../core/config";
 import { sessionKeySocketPath, sessionSocketPath } from "../../core/state";
+import type { SessionKind, SessionRecord } from "../../core/state";
 import { removeQuietly, resultFilePath, splitLines } from "../../helpers";
 import { startSessionServer } from "../../transports/session";
 import { createLineReader, decodeLine, encode } from "../../transports/session";
@@ -69,6 +72,42 @@ async function optionsFor(
   };
 }
 
+function currentBranch(directory: string): string | null {
+  const result = spawnSync("git", ["-C", directory, "rev-parse", "--abbrev-ref", "HEAD"], {
+    encoding: "utf-8",
+  });
+
+  if (result.status !== 0) {
+    return null;
+  }
+
+  const branch = result.stdout.trim();
+  return branch === "" ? null : branch;
+}
+
+// A person reads the label, not the id, so it names the checkout and the branch.
+function sessionLabel(directory: string, branch: string | null): string {
+  const name = basename(directory);
+  return branch === null ? name : `${name}@${branch}`;
+}
+
+function buildRecord(options: WatchOptions, socketPath: string): SessionRecord {
+  const branch = currentBranch(options.directory);
+  const kind: SessionKind = options.sessionKey === undefined ? "directory" : "session";
+
+  return {
+    id: options.sessionKey ?? basename(socketPath, ".sock"),
+    kind,
+    label: sessionLabel(options.directory, branch),
+    directory: options.directory,
+    branch,
+    agentSessionId: options.agentSessionId ?? null,
+    agentKind: options.agentKind ?? null,
+    createdAt: new Date().toISOString(),
+    pid: process.pid,
+  };
+}
+
 export async function runWatch(options: WatchOptions, config: PairConfig): Promise<number> {
   const socketPath =
     options.socketPath ??
@@ -80,6 +119,7 @@ export async function runWatch(options: WatchOptions, config: PairConfig): Promi
   // The TUI owns the screen for the whole run, so a session error waits for the screen to be released.
   const server = await startSessionServer({
     socketPath,
+    record: buildRecord(options, socketPath),
     onError: (error) => {
       errors = [...errors, error];
     },

@@ -18,5 +18,7 @@ export interface WatchOptions {
   directory: string;
   socketPath?: string;
   sessionKey?: SessionKey;
+  agentSessionId?: string;
+  agentKind?: string;
   io?: WatchIo;
 }

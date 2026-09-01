@@ -5,6 +5,8 @@ export interface WebWatchOptions {
   port: number;
   socketPath?: string;
   sessionKey?: SessionKey;
+  agentSessionId?: string;
+  agentKind?: string;
   token?: string;
 }
 

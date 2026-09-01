@@ -1,9 +1,10 @@
 import { createServer, createConnection } from "node:net";
 import type { Server, Socket } from "node:net";
 import { randomBytes } from "node:crypto";
-import { chmodSync, mkdirSync } from "node:fs";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { EditRequest } from "../transport.types";
+import type { SessionRecord } from "../../core/state";
 import type { QueueState } from "./queue.types";
 import {
   complete,
@@ -94,6 +95,19 @@ async function bindSocket(server: Server, path: string): Promise<void> {
   removeQuietly(path);
   await listenOn(server, path);
   restrictToOwner(path);
+}
+
+// The sidecar names a session for `pair-mode sessions`, so a person reads a label rather than a socket path.
+function recordPathFor(socketPath: string): string {
+  return socketPath.replace(/\.sock$/, ".json");
+}
+
+function writeRecord(socketPath: string, record: SessionRecord): void {
+  try {
+    writeFileSync(recordPathFor(socketPath), JSON.stringify(record, null, 2) + "\n", "utf-8");
+  } catch {
+    // A sidecar that fails to write must never stop a watcher from serving reviews.
+  }
 }
 
 export async function startSessionServer(options: SessionServerOptions): Promise<SessionServer> {
@@ -296,6 +310,10 @@ export async function startSessionServer(options: SessionServerOptions): Promise
   const server = createServer(handleConnection);
   await bindSocket(server, options.socketPath);
 
+  if (options.record !== undefined) {
+    writeRecord(options.socketPath, options.record);
+  }
+
   // listenOn drops its own error listener on success, so an accept error after bind would otherwise be uncaught.
   server.on("error", reportError);
 
@@ -325,6 +343,7 @@ export async function startSessionServer(options: SessionServerOptions): Promise
 
         server.close(() => {
           removeQuietly(options.socketPath);
+          removeQuietly(recordPathFor(options.socketPath));
           resolve();
         });
       });

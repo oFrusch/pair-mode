@@ -1,9 +1,11 @@
 import { createConnection } from "node:net";
 import type { Socket } from "node:net";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { basename, dirname } from "node:path";
 import type { PairConfig } from "../core/config";
 import { sessionKeySocketPath, sessionSocketPath, sessionUrlPath } from "../core/state";
+import type { SessionKind, SessionRecord } from "../core/state";
 import { startSessionServer } from "../transports/session";
 import { createLineReader, decodeLine, encode } from "../transports/session";
 import type { SessionServer } from "../transports/session";
@@ -17,6 +19,42 @@ import { removeQuietly } from "../helpers";
 function publishUrl(path: string, url: string): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, JSON.stringify({ url, pid: process.pid }) + "\n", "utf-8");
+}
+
+function currentBranch(directory: string): string | null {
+  const result = spawnSync("git", ["-C", directory, "rev-parse", "--abbrev-ref", "HEAD"], {
+    encoding: "utf-8",
+  });
+
+  if (result.status !== 0) {
+    return null;
+  }
+
+  const branch = result.stdout.trim();
+  return branch === "" ? null : branch;
+}
+
+// A person reads the label, not the id, so it names the checkout and the branch.
+function sessionLabel(directory: string, branch: string | null): string {
+  const name = basename(directory);
+  return branch === null ? name : `${name}@${branch}`;
+}
+
+function buildRecord(options: WebWatchOptions, socketPath: string): SessionRecord {
+  const branch = currentBranch(options.directory);
+  const kind: SessionKind = options.sessionKey === undefined ? "directory" : "session";
+
+  return {
+    id: options.sessionKey ?? basename(socketPath, ".sock"),
+    kind,
+    label: sessionLabel(options.directory, branch),
+    directory: options.directory,
+    branch,
+    agentSessionId: options.agentSessionId ?? null,
+    agentKind: options.agentKind ?? null,
+    createdAt: new Date().toISOString(),
+    pid: process.pid,
+  };
 }
 
 function connectSelf(socketPath: string): Promise<Socket> {
@@ -38,7 +76,10 @@ export async function startWebWatch(
     (options.sessionKey === undefined
       ? sessionSocketPath(options.directory)
       : sessionKeySocketPath(options.sessionKey));
-  const session: SessionServer = await startSessionServer({ socketPath });
+  const session: SessionServer = await startSessionServer({
+    socketPath,
+    record: buildRecord(options, socketPath),
+  });
   const client = await connectSelf(socketPath);
 
   // Rendering awaits shiki, so a cancel can land mid-render and the finished review must not be offered.
