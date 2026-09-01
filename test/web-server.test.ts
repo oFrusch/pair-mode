@@ -479,6 +479,67 @@ test("a withdrawn review reaches an open viewer as a cancel frame and stops acce
   expect(seen).toEqual([]);
 });
 
+test("a second review waits its turn and opens once the first verdict lands", async () => {
+  const seen: string[] = [];
+  web = await startPlain((id) => seen.push(id));
+
+  const viewer = await openViewer(`${web.url}/events`);
+  await viewer.until(": open");
+
+  web.offer(await toWebReview(review, config));
+  web.offer(await toWebReview({ ...review, id: "id2", path: "second.ts" }, config));
+
+  const opened = await viewer.until("event: review");
+
+  expect(opened).toContain('"id":"id1"');
+  expect(opened).not.toContain('"id":"id2"');
+
+  const answer = await fetch(`${web.url}/verdict`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: "id1", notes: [] }),
+  });
+
+  const advanced = await viewer.until('"id":"id2"');
+
+  viewer.cancel();
+
+  expect(answer.status).toBe(OK);
+  expect(advanced).toContain('"id":"id2"');
+  expect(seen).toEqual(["id1"]);
+});
+
+test("a viewer that joins while two reviews wait sees only the open one", async () => {
+  web = await startPlain(() => {});
+
+  web.offer(await toWebReview(review, config));
+  web.offer(await toWebReview({ ...review, id: "id2", path: "second.ts" }, config));
+
+  const stream = await readUntil(`${web.url}/events`, "event: review");
+
+  stream.cancel();
+
+  expect(stream.text).toContain('"id":"id1"');
+  expect(stream.text).not.toContain('"id":"id2"');
+});
+
+test("a verdict on the queued review is refused while the older one is open", async () => {
+  const seen: string[] = [];
+  web = await startPlain((id) => seen.push(id));
+
+  web.offer(await toWebReview(review, config));
+  web.offer(await toWebReview({ ...review, id: "id2", path: "second.ts" }, config));
+
+  const response = await fetch(`${web.url}/verdict`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: "id2", notes: [] }),
+  });
+
+  expect(response.status).toBe(CONFLICT);
+  expect(seen).toEqual([]);
+});
+
 test("a withdrawal naming an older review leaves the open one answerable", async () => {
   const seen: string[] = [];
   web = await startPlain((id) => seen.push(id));

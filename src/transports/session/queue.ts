@@ -14,6 +14,11 @@ export function findReview(state: QueueState, id: string): QueuedReview | null {
   return state.reviews.find((review) => review.id === id) ?? null;
 }
 
+// A client that attaches mid-review must see what the earlier clients already hold.
+export function offeredReviews(state: QueueState): QueuedReview[] {
+  return state.reviews.filter((review) => review.status === "offered");
+}
+
 export function waitingDepth(state: QueueState): number {
   return state.reviews.filter((review) => review.status === "waiting").length;
 }

@@ -11,6 +11,7 @@ import {
   enqueue,
   findReview,
   offerAll,
+  offeredReviews,
   release,
   waitingDepth,
 } from "./queue";
@@ -150,9 +151,27 @@ export async function startSessionServer(options: SessionServerOptions): Promise
     dispatch();
   }
 
+  // A review already offered never returns through offerAll, so a late client receives it straight from the queue.
   function handleAttach(socket: Socket): void {
     clients.add(socket);
     lastAttachAt = new Date().toISOString();
+
+    offeredReviews(queue).forEach((review) => {
+      const held = holders.get(review.id) ?? new Set<Socket>();
+
+      held.add(socket);
+      holders.set(review.id, held);
+
+      send(socket, {
+        type: "review",
+        id: review.id,
+        tool: review.request.tool,
+        path: review.request.filePath,
+        before: review.request.before,
+        after: review.request.after,
+      });
+    });
+
     dispatch();
   }
 

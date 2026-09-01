@@ -277,6 +277,31 @@ test("the server reports the waiting depth and the attached client count", async
   expect(started.waitingDepth()).toBe(0);
 });
 
+test("the server reports null until a client attaches, then the attach time", async () => {
+  const started = await startWithSequentialIds();
+
+  expect(started.lastAttachAt()).toBeNull();
+
+  const first = await connectPeer();
+  first.send({ type: "attach", client: "tui" });
+
+  await waitFor(() => started.lastAttachAt() !== null);
+
+  const firstAttach = started.lastAttachAt();
+
+  expect(firstAttach).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+  const second = await connectPeer();
+  second.send({ type: "attach", client: "web" });
+
+  await waitFor(() => started.clientCount() === 2);
+
+  const secondAttach = started.lastAttachAt();
+
+  expect(secondAttach).not.toBeNull();
+  expect(Date.parse(secondAttach ?? "")).toBeGreaterThanOrEqual(Date.parse(firstAttach ?? ""));
+});
+
 test("a change handler fires when a review arrives", async () => {
   const started = await startWithSequentialIds();
   let changes = 0;

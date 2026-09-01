@@ -5,6 +5,7 @@ export {
   emptyQueue,
   enqueue,
   findReview,
+  offeredReviews,
   waitingDepth,
   offerAll,
   complete,

@@ -223,4 +223,66 @@ describe("broadcast dispatch", () => {
 
     expect(verdict.type).toBe("verdict");
   });
+
+  test("a client that attaches during a review receives it and can answer it", async () => {
+    const socketPath = join(isolated.tempDir("pair-bcast4-"), "s.sock");
+    const server = await startServer(socketPath);
+
+    const first = await connectClient(socketPath);
+
+    const cancelledOnFirst: string[] = [];
+    let reviewId = "";
+
+    onMessage(first, (message) => {
+      if (message.type === "review") {
+        reviewId = message.id;
+      }
+
+      if (message.type === "cancel") {
+        cancelledOnFirst.push(message.id);
+      }
+    });
+
+    first.write(encode({ type: "attach", client: "tui" }));
+
+    await waitFor(() => server.clientCount() === 1);
+
+    const agent = await connectClient(socketPath);
+    const answered: string[] = [];
+
+    onMessage(agent, (message) => {
+      if (message.type === "verdict") {
+        answered.push(message.id);
+      }
+    });
+
+    agent.write(
+      encode({ type: "submit", tool: "edit", path: "/repo/d.ts", before: "a", after: "b" }),
+    );
+
+    await waitFor(() => reviewId !== "");
+
+    const second = await connectClient(socketPath);
+    const seenBySecond: string[] = [];
+
+    onMessage(second, (message) => {
+      if (message.type === "review") {
+        seenBySecond.push(message.id);
+      }
+    });
+
+    second.write(encode({ type: "attach", client: "web" }));
+
+    await waitFor(() => seenBySecond.length > 0);
+
+    expect(seenBySecond).toEqual([reviewId]);
+
+    second.write(encode({ type: "verdict", id: reviewId, questions: [] }));
+
+    await waitFor(() => cancelledOnFirst.length > 0 && answered.length > 0);
+
+    expect(cancelledOnFirst).toEqual([reviewId]);
+    expect(answered).toEqual([reviewId]);
+    expect(server.waitingDepth()).toBe(0);
+  });
 });
