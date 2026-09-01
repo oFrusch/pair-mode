@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { runSetup } from "./setup";
 import { runDoctor } from "./doctor";
@@ -7,6 +7,7 @@ import { runWatch } from "./watch";
 import { runConfig } from "./config";
 import { startWebWatch } from "../web";
 import { loadConfig } from "../core/config";
+import { sessionKeySocketPath } from "../core/state";
 import { installRoot } from "./install-root";
 import { isRecord } from "../helpers";
 
@@ -26,6 +27,7 @@ Commands:
   status [dir]         report pair mode status for a directory (default: cwd)
   watch [dir]          review edits in this terminal (default: cwd)
   watch --web [dir]    serve the review in a browser and print the link
+  watch <id>           review edits for one session (see: pair-mode sessions)
   --version            print the installed version
   --help               print this message
 `;
@@ -59,6 +61,22 @@ function parseDirectoryArgs(args: string[], allowedFlags: string[]) {
     directory: resolve(target ?? process.cwd()),
     web: flags.includes("--web"),
     unknownFlag: flags.find((flag) => !allowedFlags.includes(flag)) ?? null,
+  };
+}
+
+const SESSION_KEY_PATTERN = /^s-[0-9a-f]{8}$/;
+
+// A `watch` argument is either a session key or a directory, and only one of them starts with `s-`.
+function parseWatchArgs(args: string[]) {
+  const flags = args.filter(isFlag);
+  const target = args.find((entry) => !isFlag(entry));
+  const isKey = target !== undefined && SESSION_KEY_PATTERN.test(target);
+
+  return {
+    sessionKey: isKey ? target : undefined,
+    directory: isKey ? process.cwd() : resolve(target ?? process.cwd()),
+    web: flags.includes("--web"),
+    unknownFlag: flags.find((flag) => flag !== "--web") ?? null,
   };
 }
 
@@ -148,23 +166,30 @@ async function main(): Promise<number> {
   }
 
   if (command === "watch") {
-    const parsed = parseDirectoryArgs(process.argv.slice(3), ["--web"]);
+    const parsed = parseWatchArgs(process.argv.slice(3));
 
     if (parsed.unknownFlag !== null) {
       return reportUnknownFlag(command, parsed.unknownFlag);
     }
 
+    if (parsed.sessionKey !== undefined && !existsSync(sessionKeySocketPath(parsed.sessionKey))) {
+      console.error(`unknown session: ${parsed.sessionKey}`);
+      console.error("run pair-mode sessions to list the live ones");
+      return 1;
+    }
+
     const wantsWeb = parsed.web;
     const directory = parsed.directory;
+    const sessionKey = parsed.sessionKey;
     const { config, errors } = loadConfig();
 
     errors.forEach((error) => console.error(`config ${error.path}: ${error.message}`));
 
     if (!wantsWeb && !config.web.enabled) {
-      return runWatch({ directory }, config);
+      return runWatch({ directory, sessionKey }, config);
     }
 
-    const watcher = await startWebWatch({ directory, port: config.web.port }, config);
+    const watcher = await startWebWatch({ directory, sessionKey, port: config.web.port }, config);
 
     console.log(`pair mode is watching ${directory}`);
     console.log(watcher.url);
