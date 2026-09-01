@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { runSetup } from "./setup";
 import { runDoctor } from "./doctor";
-import { pairOn, pairOnWeb, pairOff, pairStatus } from "./toggle";
+import { pairOn, pairOnWeb, pairOff, pairStatus, pairToggle } from "./toggle";
 import { runWatch } from "./watch";
 import { runConfig } from "./config";
 import { startWebWatch } from "../web";
@@ -21,6 +21,8 @@ Commands:
   on [dir]             turn pair mode on for a directory (default: cwd)
   on --web [dir]       turn pair mode on and serve the review in a browser
   off [dir]            turn pair mode off for a directory (default: cwd)
+  toggle [dir]         flip pair mode for a directory (default: cwd)
+  toggle --web [dir]   flip pair mode, and serve the review in a browser when it turns on
   status [dir]         report pair mode status for a directory (default: cwd)
   watch [dir]          review edits in this terminal (default: cwd)
   watch --web [dir]    serve the review in a browser and print the link
@@ -120,6 +122,17 @@ async function main(): Promise<number> {
     }
 
     console.log(pairOff(parsed.directory));
+    return 0;
+  }
+
+  if (command === "toggle") {
+    const parsed = parseDirectoryArgs(process.argv.slice(3), ["--web"]);
+
+    if (parsed.unknownFlag !== null) {
+      return reportUnknownFlag(command, parsed.unknownFlag);
+    }
+
+    console.log(await pairToggle(parsed.directory, process.argv[1] ?? "", parsed.web));
     return 0;
   }
 

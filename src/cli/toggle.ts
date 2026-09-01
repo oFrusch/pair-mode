@@ -114,6 +114,19 @@ export function pairOff(directory: string): string {
     : `pair mode OFF for ${directory}`;
 }
 
+// A toggle reads the flag itself, so the caller needs no status check and no argument.
+export async function pairToggle(
+  directory: string,
+  cliPath: string,
+  web: boolean,
+): Promise<string> {
+  if (existsSync(flagPath(directory))) {
+    return pairOff(directory);
+  }
+
+  return web ? await pairOnWeb(directory, cliPath) : pairOn(directory);
+}
+
 export function pairStatus(directory: string): string {
   const on = existsSync(flagPath(directory));
   const link = readLink(directory);

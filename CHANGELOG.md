@@ -7,6 +7,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- `pair-mode toggle` reads the current state and moves to the other one.
+
+### Changed
+
+- The plugin ships one `toggle` skill. It replaces two entries that both registered as `pair`.
+
 ## [0.3.0] - 2026-08-26
 
 ### Changed
