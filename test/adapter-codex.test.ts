@@ -6,7 +6,7 @@ import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test, expect, beforeAll, afterAll } from "vitest";
 import { useIsolatedHome } from "./helpers/env";
-import { enable } from "../src/core/state";
+import { enable, enableSession, sessionKey } from "../src/core/state";
 import { parsePatch, extractPatchText } from "../src/adapters/codex";
 import { applyEdit } from "../src/core/simulate";
 
@@ -397,6 +397,59 @@ test("an editor that changes nothing allows and prints nothing on stdout", () =>
   const editorScript = writeEditorScript(harness.targetDir, null);
 
   const payload = JSON.stringify({
+    tool_name: "Write",
+    tool_input: { file_path: harness.filePath, content: "hello\nworld\n" },
+  });
+
+  const outcome = runAdapter(payload, harness, editorScript);
+
+  expect(outcome.status).toBe(0);
+  expect(outcome.stdout).toBe("");
+});
+
+const CODEX_SESSION_ID = "b7c1a2f4-3d5e-4a6b-8c9d-0e1f2a3b4c5d";
+
+// No directory flag here, so only the session flag derived from session_id can turn pair mode on.
+function setupSessionOnlyHarness(sessionId: string): Harness {
+  const stateHome = isolated.tempDir("pair-mode-state-");
+  const targetDir = isolated.tempDir("pair-mode-target-");
+  const filePath = join(targetDir, "example.ts");
+
+  const fakeBinDir = isolated.tempDir("pair-mode-bin-");
+  const tmuxPath = join(fakeBinDir, "tmux");
+  writeFileSync(tmuxPath, FAKE_TMUX, "utf-8");
+  chmodSync(tmuxPath, 0o755);
+
+  process.env["XDG_STATE_HOME"] = stateHome;
+  enableSession(sessionKey(sessionId));
+  process.env["XDG_STATE_HOME"] = isolated.stateHome;
+
+  return { stateHome, targetDir, filePath, fakeBinDir };
+}
+
+test("a payload session id enables the codex hook through the session flag alone", () => {
+  const harness = setupSessionOnlyHarness(CODEX_SESSION_ID);
+  const editorScript = writeEditorScript(harness.targetDir, "why does this work?");
+
+  const payload = JSON.stringify({
+    session_id: CODEX_SESSION_ID,
+    tool_name: "Write",
+    tool_input: { file_path: harness.filePath, content: "hello\nworld\n" },
+  });
+
+  const outcome = runAdapter(payload, harness, editorScript);
+
+  expect(outcome.status).toBe(0);
+  const parsed: unknown = JSON.parse(outcome.stdout);
+  expect(JSON.stringify(parsed)).toContain("why does this work?");
+});
+
+test("a payload with an unrelated session id leaves the codex hook off", () => {
+  const harness = setupSessionOnlyHarness(CODEX_SESSION_ID);
+  const editorScript = writeEditorScript(harness.targetDir, "why does this work?");
+
+  const payload = JSON.stringify({
+    session_id: "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0",
     tool_name: "Write",
     tool_input: { file_path: harness.filePath, content: "hello\nworld\n" },
   });

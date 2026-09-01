@@ -1,12 +1,16 @@
 import { createConnection } from "node:net";
 import type { Socket } from "node:net";
+import { existsSync } from "node:fs";
 import type { PairConfig } from "../../core/config";
-import { findSessionSocket } from "../../core/state";
+import { findSessionSocket, sessionKey, sessionKeySocketPath } from "../../core/state";
+import { removeQuietly } from "../../helpers";
 import type { EditRequest, ReviewOutcome, ReviewTransport } from "../transport.types";
 import { createLineReader, decodeLine, encode } from "./wire";
 import type { SessionClientOptions } from "./client.types";
 
 const MS_PER_SECOND = 1000;
+
+const NO_WATCHER = "no pair-mode watcher attached";
 
 function failOpen(detail: string): ReviewOutcome {
   return { reviewed: false, detail };
@@ -56,7 +60,7 @@ function requestReview(
     socket.on("error", (error: unknown) => {
       // bindSocket and doctor own stale-socket cleanup, so unlinking here could delete a restarted watcher's live socket.
       if (isConnectionRefused(error)) {
-        settle(failOpen("no pair-mode watcher attached"));
+        settle(failOpen(NO_WATCHER));
         return;
       }
 
@@ -92,21 +96,42 @@ function requestReview(
   });
 }
 
-function reviewInSession(
+async function reviewInSession(
   request: EditRequest,
   config: PairConfig,
   socketPath?: string,
 ): Promise<ReviewOutcome> {
-  const path = socketPath ?? findSessionSocket(request.filePath);
+  const timeoutMs = config.session.timeout * MS_PER_SECOND;
 
-  if (path === null) {
-    return Promise.resolve(failOpen("no pair-mode watcher attached"));
+  if (socketPath !== undefined) {
+    return await requestReview(request, { socketPath, timeoutMs });
   }
 
-  return requestReview(request, {
-    socketPath: path,
-    timeoutMs: config.session.timeout * MS_PER_SECOND,
-  });
+  const key = request.sessionId === undefined ? undefined : sessionKey(request.sessionId);
+  const sessionPath = key === undefined ? null : sessionKeySocketPath(key);
+
+  if (sessionPath !== null && existsSync(sessionPath)) {
+    const outcome = await requestReview(request, { socketPath: sessionPath, timeoutMs });
+
+    if (outcome.reviewed) {
+      return outcome;
+    }
+
+    // A refused session socket outlived its watcher, so it goes and the directory tier gets a turn.
+    if (outcome.detail === NO_WATCHER) {
+      removeQuietly(sessionPath);
+    } else {
+      return outcome;
+    }
+  }
+
+  const directoryPath = findSessionSocket(request.filePath);
+
+  if (directoryPath === null) {
+    return failOpen(NO_WATCHER);
+  }
+
+  return await requestReview(request, { socketPath: directoryPath, timeoutMs });
 }
 
 export function createSessionTransport(socketPath?: string): ReviewTransport {

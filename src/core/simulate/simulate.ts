@@ -65,6 +65,7 @@ export function simulate(
   tool: string,
   input: unknown,
   readFile: (path: string) => string,
+  sessionId?: string,
 ): EditRequest | null {
   if (!isRecord(input)) {
     return null;
@@ -81,7 +82,7 @@ export function simulate(
     const after = typeof content === "string" ? content : "";
     const before = readFile(filePath);
 
-    return { tool, filePath, before, after };
+    return { tool, filePath, before, after, sessionId };
   }
 
   if (tool === "Edit" || tool === "MultiEdit") {
@@ -101,7 +102,7 @@ export function simulate(
       return null;
     }
 
-    return { tool, filePath, before, after };
+    return { tool, filePath, before, after, sessionId };
   }
 
   return null;

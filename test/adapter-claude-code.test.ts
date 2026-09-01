@@ -6,7 +6,7 @@ import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test, expect, beforeAll, afterAll } from "vitest";
 import { useIsolatedHome } from "./helpers/env";
-import { enable } from "../src/core/state";
+import { enable, enableSession, sessionKey } from "../src/core/state";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
@@ -330,4 +330,75 @@ test("split layout: annotating the first (left, reference) buffer argument produ
   const outcome = runAdapter(payload, harness, editorScript, "split");
 
   expect(outcome.status).toBe(0);
+});
+
+const PARENT_SESSION_ID = "d95655de-eb7f-45e5-867d-9797a355353e";
+
+// No directory flag here, so only the session flag derived from session_id can turn pair mode on.
+function setupSessionOnlyHarness(sessionId: string): Harness {
+  const stateHome = isolated.tempDir("pair-mode-state-");
+  const targetDir = isolated.tempDir("pair-mode-target-");
+  const filePath = join(targetDir, "example.ts");
+
+  const fakeBinDir = isolated.tempDir("pair-mode-bin-");
+  const tmuxPath = join(fakeBinDir, "tmux");
+  writeFileSync(tmuxPath, FAKE_TMUX, "utf-8");
+  chmodSync(tmuxPath, 0o755);
+
+  process.env["XDG_STATE_HOME"] = stateHome;
+  enableSession(sessionKey(sessionId));
+  process.env["XDG_STATE_HOME"] = isolated.stateHome;
+
+  return { stateHome, targetDir, filePath, fakeBinDir };
+}
+
+test("a payload session id enables the hook through the session flag alone", () => {
+  const harness = setupSessionOnlyHarness(PARENT_SESSION_ID);
+  const editorScript = writeEditorScript(harness.targetDir, "why does this work?");
+
+  const payload = JSON.stringify({
+    session_id: PARENT_SESSION_ID,
+    tool_name: "Write",
+    tool_input: { file_path: harness.filePath, content: "hello\nworld\n" },
+  });
+
+  const outcome = runAdapter(payload, harness, editorScript);
+
+  expect(outcome.status).toBe(2);
+  expect(outcome.stderr).toContain("why does this work?");
+});
+
+// A subagent sends the parent's session_id plus agent_id and agent_type, and those extras must not shift the key.
+test("a subagent payload resolves the same session key as its parent", () => {
+  const harness = setupSessionOnlyHarness(PARENT_SESSION_ID);
+  const editorScript = writeEditorScript(harness.targetDir, "why does this work?");
+
+  const payload = JSON.stringify({
+    session_id: PARENT_SESSION_ID,
+    agent_id: "agent-7",
+    agent_type: "general-purpose",
+    tool_name: "Write",
+    tool_input: { file_path: harness.filePath, content: "hello\nworld\n" },
+  });
+
+  const outcome = runAdapter(payload, harness, editorScript);
+
+  expect(outcome.status).toBe(2);
+  expect(outcome.stderr).toContain("why does this work?");
+});
+
+test("a payload with an unrelated session id leaves the hook off", () => {
+  const harness = setupSessionOnlyHarness(PARENT_SESSION_ID);
+  const editorScript = writeEditorScript(harness.targetDir, "why does this work?");
+
+  const payload = JSON.stringify({
+    session_id: "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0",
+    tool_name: "Write",
+    tool_input: { file_path: harness.filePath, content: "hello\nworld\n" },
+  });
+
+  const outcome = runAdapter(payload, harness, editorScript);
+
+  expect(outcome.status).toBe(0);
+  expect(outcome.stdout).toBe("");
 });

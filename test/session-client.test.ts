@@ -1,9 +1,9 @@
 import { createServer, createConnection } from "node:net";
 import type { Server, Socket } from "node:net";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { test, expect, beforeEach, afterEach } from "vitest";
+import { join, dirname } from "node:path";
+import { test, describe, expect, beforeEach, afterEach } from "vitest";
 import {
   createSessionTransport,
   createLineReader,
@@ -15,6 +15,7 @@ import type { SessionServer } from "../src/transports/session";
 import { DEFAULT_CONFIG } from "../src/core/config";
 import type { PairConfig } from "../src/core/config";
 import type { EditRequest } from "../src/transports";
+import { sessionKey, sessionKeySocketPath, sessionSocketPath } from "../src/core/state";
 import { useIsolatedHome } from "./helpers/env";
 
 const isolated = useIsolatedHome();
@@ -199,5 +200,187 @@ test("a real session server round-trips a submit from the transport to an attach
   expect(outcome).toEqual({
     reviewed: true,
     questions: [{ line: 1, code: "/repo/one.ts", text: "seen it" }],
+  });
+});
+
+const PARENT_SESSION_ID = "d95655de-eb7f-45e5-867d-9797a355353e";
+
+// A socket path is capped at 104 bytes, and the isolated state home under /var/folders already spends more than that.
+function useShortStateHome(): () => string {
+  let dir = "";
+
+  beforeEach(() => {
+    dir = mkdtempSync(join("/tmp", "pm-"));
+    process.env["XDG_STATE_HOME"] = dir;
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  return () => dir;
+}
+
+function connectClient(path: string): Promise<Socket> {
+  const client = createConnection(path);
+  accepted.push(client);
+  client.setEncoding("utf-8");
+
+  return new Promise((resolve) => client.once("connect", () => resolve(client)));
+}
+
+// Answers every review the server pushes, so the transport under test gets a real verdict back.
+function onReview(client: Socket, handle: (review: { id: string; path: string }) => void): void {
+  const readLines = createLineReader();
+
+  client.on("data", (chunk: string) => {
+    readLines(chunk).forEach((line) => {
+      const message = decodeLine(line);
+
+      if (message?.type === "review") {
+        handle({ id: message.id, path: message.path });
+      }
+    });
+  });
+}
+
+function editRequest(filePath: string, sessionId?: string): EditRequest {
+  return { tool: "Write", filePath, before: "before\n", after: "after\n", sessionId };
+}
+
+describe("the resolution chain in the client", () => {
+  useShortStateHome();
+
+  test("a request with a session id reaches the session socket, not the directory socket", async () => {
+    const key = sessionKey(PARENT_SESSION_ID);
+    const sessionSocket = sessionKeySocketPath(key);
+
+    mkdirSync(dirname(sessionSocket), { recursive: true });
+    server = await startSessionServer({ socketPath: sessionSocket });
+
+    const seen: string[] = [];
+    const client = await connectClient(sessionSocket);
+
+    onReview(client, (review) => {
+      seen.push(review.path);
+      client.write(encode({ type: "verdict", id: review.id, questions: [] }));
+    });
+
+    client.write(encode({ type: "attach", client: "tui" }));
+
+    const directory = isolated.tempDir("pair-chain-");
+    const filePath = join(directory, "main.ts");
+    writeFileSync(filePath, "before\n", "utf-8");
+
+    const outcome = await createSessionTransport().review(
+      editRequest(filePath, PARENT_SESSION_ID),
+      configWithTimeout(5),
+    );
+
+    expect(outcome.reviewed).toBe(true);
+    expect(seen).toEqual([filePath]);
+  });
+
+  test("a request with no session id still resolves the directory socket", async () => {
+    const directory = isolated.tempDir("pair-chain-dir-");
+    const directorySocket = sessionSocketPath(directory);
+
+    mkdirSync(dirname(directorySocket), { recursive: true });
+    server = await startSessionServer({ socketPath: directorySocket });
+
+    const seen: string[] = [];
+    const client = await connectClient(directorySocket);
+
+    onReview(client, (review) => {
+      seen.push(review.path);
+      client.write(encode({ type: "verdict", id: review.id, questions: [] }));
+    });
+
+    client.write(encode({ type: "attach", client: "tui" }));
+
+    const filePath = join(directory, "main.ts");
+    writeFileSync(filePath, "before\n", "utf-8");
+
+    const outcome = await createSessionTransport().review(
+      editRequest(filePath),
+      configWithTimeout(5),
+    );
+
+    expect(outcome.reviewed).toBe(true);
+    expect(seen).toEqual([filePath]);
+  });
+
+  // A Claude Code subagent sends its parent's session_id, so its edits belong on the parent's watcher.
+  test("a subagent edit carrying the parent session id reaches the parent watcher", async () => {
+    const key = sessionKey(PARENT_SESSION_ID);
+    const sessionSocket = sessionKeySocketPath(key);
+
+    mkdirSync(dirname(sessionSocket), { recursive: true });
+    server = await startSessionServer({ socketPath: sessionSocket });
+
+    const seen: string[] = [];
+    const client = await connectClient(sessionSocket);
+
+    onReview(client, (review) => {
+      seen.push(review.path);
+      client.write(encode({ type: "verdict", id: review.id, questions: [] }));
+    });
+
+    client.write(encode({ type: "attach", client: "tui" }));
+
+    const directory = isolated.tempDir("pair-subagent-");
+    const parentFile = join(directory, "parent.ts");
+    const subagentFile = join(directory, "subagent.ts");
+    writeFileSync(parentFile, "before\n", "utf-8");
+    writeFileSync(subagentFile, "before\n", "utf-8");
+
+    const transport = createSessionTransport();
+
+    const parentOutcome = await transport.review(
+      editRequest(parentFile, PARENT_SESSION_ID),
+      configWithTimeout(5),
+    );
+
+    const subagentOutcome = await transport.review(
+      editRequest(subagentFile, PARENT_SESSION_ID),
+      configWithTimeout(5),
+    );
+
+    expect(parentOutcome.reviewed).toBe(true);
+    expect(subagentOutcome.reviewed).toBe(true);
+    expect(seen).toEqual([parentFile, subagentFile]);
+  });
+  // A crashed watcher leaves its socket file behind, so the chain must not post an edit into a dead socket.
+  test("a stale session socket is removed and the directory socket answers", async () => {
+    const stale = sessionKeySocketPath(sessionKey(PARENT_SESSION_ID));
+
+    mkdirSync(dirname(stale), { recursive: true });
+    writeFileSync(stale, "", "utf-8");
+
+    const directory = isolated.tempDir("pair-stale-");
+    const directorySocket = sessionSocketPath(directory);
+    server = await startSessionServer({ socketPath: directorySocket });
+
+    const seen: string[] = [];
+    const client = await connectClient(directorySocket);
+
+    onReview(client, (review) => {
+      seen.push(review.path);
+      client.write(encode({ type: "verdict", id: review.id, questions: [] }));
+    });
+
+    client.write(encode({ type: "attach", client: "tui" }));
+
+    const filePath = join(directory, "main.ts");
+    writeFileSync(filePath, "before\n", "utf-8");
+
+    const outcome = await createSessionTransport().review(
+      editRequest(filePath, PARENT_SESSION_ID),
+      configWithTimeout(5),
+    );
+
+    expect(outcome.reviewed).toBe(true);
+    expect(seen).toEqual([filePath]);
+    expect(existsSync(stale)).toBe(false);
   });
 });

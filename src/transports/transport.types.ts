@@ -6,6 +6,7 @@ export interface EditRequest {
   filePath: string;
   before: string;
   after: string;
+  sessionId?: string;
 }
 
 // reviewed distinguishes a review the user actually saw from one the transport could not present.
