@@ -1,11 +1,37 @@
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
-import { enable, disable, flagPath, sessionUrlPath } from "../core/state";
+import { join } from "node:path";
+import {
+  enable,
+  disable,
+  flagPath,
+  sessionUrlPath,
+  enableSession,
+  optOutSession,
+  sessionFlagState,
+  isEnabled,
+} from "../core/state";
+import type { SessionKey } from "../core/state";
 import { isRecord } from "../helpers";
 import type { SessionLink } from "./toggle.types";
 
 const POLL_MS = 100;
 const POLL_ATTEMPTS = 60;
+
+const SESSION_ENV_VARS = ["CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID"];
+
+// Only `pair-mode on` reads the environment, because it receives no hook payload to read instead.
+export function agentSessionId(env: NodeJS.ProcessEnv): string | null {
+  for (const name of SESSION_ENV_VARS) {
+    const value = env[name];
+
+    if (typeof value === "string" && value !== "") {
+      return value;
+    }
+  }
+
+  return null;
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((done) => setTimeout(done, ms));
@@ -74,7 +100,12 @@ function stopLink(directory: string): boolean {
   return true;
 }
 
-export function pairOn(directory: string): string {
+export function pairOn(directory: string, key?: SessionKey): string {
+  if (key !== undefined) {
+    enableSession(key);
+    return `pair mode ON · ${key} · ${directory}`;
+  }
+
   enable(directory);
   return `pair mode ON for ${directory}`;
 }
@@ -105,7 +136,12 @@ export async function pairOnWeb(directory: string, cliPath: string): Promise<str
   return `pair mode ON for ${directory}\n${link.url}`;
 }
 
-export function pairOff(directory: string): string {
+export function pairOff(directory: string, key?: SessionKey): string {
+  if (key !== undefined) {
+    optOutSession(key);
+    return `pair mode OFF · ${key}`;
+  }
+
   disable(directory);
   const stopped = stopLink(directory);
 
@@ -114,23 +150,32 @@ export function pairOff(directory: string): string {
     : `pair mode OFF for ${directory}`;
 }
 
-// A toggle reads the flag itself, so the caller needs no status check and no argument.
+// A toggle reads the resolved state itself, so the caller needs no status check and no argument.
 export async function pairToggle(
   directory: string,
   cliPath: string,
   web: boolean,
+  key?: SessionKey,
 ): Promise<string> {
-  if (existsSync(flagPath(directory))) {
-    return pairOff(directory);
+  const on = key === undefined ? existsSync(flagPath(directory)) : sessionFlagState(key) === "on";
+
+  if (on) {
+    return pairOff(directory, key);
   }
 
-  return web ? await pairOnWeb(directory, cliPath) : pairOn(directory);
+  if (web) {
+    return await pairOnWeb(directory, cliPath);
+  }
+
+  return pairOn(directory, key);
 }
 
-export function pairStatus(directory: string): string {
-  const on = existsSync(flagPath(directory));
+export function pairStatus(directory: string, key?: SessionKey): string {
+  const probe = join(directory, ".pair-mode-status-probe");
+  const on = isEnabled(probe, key);
   const link = readLink(directory);
-  const state = `pair mode ${on ? "ON" : "OFF"} for ${directory}`;
+  const scope = key === undefined ? directory : `${key} · ${directory}`;
+  const state = `pair mode ${on ? "ON" : "OFF"} for ${scope}`;
 
   return link === null ? state : `${state}\n${link.url}`;
 }

@@ -2,9 +2,9 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync, existsSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { test, expect, beforeAll, beforeEach } from "vitest";
-import { pairOn, pairOff, pairToggle } from "../src/cli/toggle";
-import { flagPath, sessionUrlPath } from "../src/core/state";
+import { test, expect, beforeAll, beforeEach, describe } from "vitest";
+import { pairOn, pairOff, pairToggle, pairStatus, agentSessionId } from "../src/cli/toggle";
+import { flagPath, sessionUrlPath, sessionKey, sessionFlagState, enable } from "../src/core/state";
 import { useIsolatedHome } from "./helpers/env";
 
 const isolated = useIsolatedHome();
@@ -180,4 +180,74 @@ test("the usage text names both toggle forms", () => {
   expect(report.status).toBe(0);
   expect(report.stdout).toContain("toggle [dir]");
   expect(report.stdout).toContain("toggle --web [dir]");
+});
+
+describe("session-scoped toggling", () => {
+  const agentId = "d95655de-eb7f-45e5-867d-9797a355353e";
+
+  test("agentSessionId reads the Claude Code variable", () => {
+    expect(agentSessionId({ CLAUDE_CODE_SESSION_ID: agentId })).toBe(agentId);
+  });
+
+  test("agentSessionId falls back to the Codex variables", () => {
+    expect(agentSessionId({ CODEX_SESSION_ID: agentId })).toBe(agentId);
+    expect(agentSessionId({ CODEX_THREAD_ID: agentId })).toBe(agentId);
+  });
+
+  test("agentSessionId returns null in a plain terminal", () => {
+    expect(agentSessionId({})).toBeNull();
+  });
+
+  test("on with a key writes the session flag, not the directory flag", () => {
+    const directory = isolated.tempDir("pair-scope-");
+    const key = sessionKey(agentId);
+
+    pairOn(directory, key);
+
+    expect(sessionFlagState(key)).toBe("on");
+    expect(existsSync(flagPath(directory))).toBe(false);
+  });
+
+  test("a bare off writes the session opt-out and spares the directory flag", () => {
+    const directory = isolated.tempDir("pair-scope-off-");
+    const key = sessionKey(agentId);
+
+    enable(directory);
+    pairOff(directory, key);
+
+    expect(sessionFlagState(key)).toBe("off");
+    expect(existsSync(flagPath(directory))).toBe(true);
+  });
+
+  test("off with no key clears the directory flag", () => {
+    const directory = isolated.tempDir("pair-scope-dir-off-");
+
+    enable(directory);
+    pairOff(directory);
+
+    expect(existsSync(flagPath(directory))).toBe(false);
+  });
+
+  test("toggle with a key flips the session tier only", async () => {
+    const directory = isolated.tempDir("pair-scope-toggle-");
+    const key = sessionKey(agentId);
+
+    await pairToggle(directory, "", false, key);
+    expect(sessionFlagState(key)).toBe("on");
+
+    await pairToggle(directory, "", false, key);
+    expect(sessionFlagState(key)).toBe("off");
+  });
+
+  test("status with a key reports the resolved state and names the key", () => {
+    const directory = isolated.tempDir("pair-scope-status-");
+    const key = sessionKey(agentId);
+
+    pairOn(directory, key);
+
+    const text = pairStatus(directory, key);
+
+    expect(text).toContain("ON");
+    expect(text).toContain(key);
+  });
 });
