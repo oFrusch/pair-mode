@@ -101,9 +101,12 @@ export async function startSessionServer(options: SessionServerOptions): Promise
 
   let queue: QueueState = emptyQueue();
   const agents = new Map<string, Socket>();
-  const clients = new Map<Socket, string | null>();
+  const clients = new Set<Socket>();
+  const holders = new Map<string, Set<Socket>>();
   const connections = new Set<Socket>();
   const changeHandlers: Array<() => void> = [];
+
+  let lastAttachAt: string | null = null;
 
   function announce(): void {
     changeHandlers.forEach((handler) => handler());
@@ -115,47 +118,27 @@ export async function startSessionServer(options: SessionServerOptions): Promise
     }
   }
 
-  function idleClient(): Socket | null {
-    const entry = [...clients.entries()].find(([, held]) => held === null);
-    return entry === undefined ? null : entry[0];
-  }
-
-  function clientHolding(id: string): Socket | null {
-    const entry = [...clients.entries()].find(([, held]) => held === id);
-    return entry === undefined ? null : entry[0];
-  }
-
-  // Every idle client takes a waiting review, so a burst of submits spreads across whoever is attached.
+  // Every attached client is a view of one review, so all of them see it and the first verdict ends it.
   function dispatch(): void {
-    const offer = offerAll(queue);
-    queue = offer.state;
+    if (clients.size > 0) {
+      const result = offerAll(queue);
+      queue = result.state;
 
-    let client = idleClient();
-    const unassigned: string[] = [];
+      result.reviews.forEach((review) => {
+        holders.set(review.id, new Set(clients));
 
-    for (const review of offer.reviews) {
-      if (client === null) {
-        unassigned.push(review.id);
-        continue;
-      }
-
-      clients.set(client, review.id);
-
-      send(client, {
-        type: "review",
-        id: review.id,
-        tool: review.request.tool,
-        path: review.request.filePath,
-        before: review.request.before,
-        after: review.request.after,
+        clients.forEach((client) => {
+          send(client, {
+            type: "review",
+            id: review.id,
+            tool: review.request.tool,
+            path: review.request.filePath,
+            before: review.request.before,
+            after: review.request.after,
+          });
+        });
       });
-
-      client = idleClient();
     }
-
-    unassigned.forEach((id) => {
-      queue = release(queue, id);
-    });
 
     announce();
   }
@@ -168,11 +151,19 @@ export async function startSessionServer(options: SessionServerOptions): Promise
   }
 
   function handleAttach(socket: Socket): void {
-    clients.set(socket, null);
+    clients.add(socket);
+    lastAttachAt = new Date().toISOString();
     dispatch();
   }
 
+  // The first verdict wins. Every other client holding the same review hears cancel instead.
   function handleVerdict(socket: Socket, message: VerdictMessage): void {
+    const held = holders.get(message.id);
+
+    if (held === undefined) {
+      return;
+    }
+
     const agent = agents.get(message.id);
 
     if (agent !== undefined) {
@@ -180,28 +171,27 @@ export async function startSessionServer(options: SessionServerOptions): Promise
       agents.delete(message.id);
     }
 
-    queue = complete(queue, message.id);
+    held.forEach((client) => {
+      if (client !== socket) {
+        send(client, { type: "cancel", id: message.id });
+      }
+    });
 
-    if (clients.get(socket) === message.id) {
-      clients.set(socket, null);
-    }
+    holders.delete(message.id);
+    queue = complete(queue, message.id);
 
     dispatch();
   }
 
-  // A hook that dies waiting leaves a review nobody can answer, so the client holding it hears cancel.
+  // A hook that dies waiting leaves a review nobody can answer, so every client holding it hears cancel.
   function dropAgent(socket: Socket): void {
     const owned = [...agents.entries()].filter(([, agentSocket]) => agentSocket === socket);
 
     owned.forEach(([id]) => {
       agents.delete(id);
 
-      const holder = clientHolding(id);
-
-      if (holder !== null) {
-        send(holder, { type: "cancel", id });
-        clients.set(holder, null);
-      }
+      holders.get(id)?.forEach((client) => send(client, { type: "cancel", id }));
+      holders.delete(id);
 
       queue = complete(queue, id);
     });
@@ -211,18 +201,20 @@ export async function startSessionServer(options: SessionServerOptions): Promise
     }
   }
 
+  // The last client to drop hands its reviews back, so a fresh attach picks them up.
   function dropClient(socket: Socket): void {
-    const held = clients.get(socket);
-
-    if (held === undefined) {
+    if (!clients.delete(socket)) {
       return;
     }
 
-    clients.delete(socket);
+    holders.forEach((held, id) => {
+      held.delete(socket);
 
-    if (held !== null && findReview(queue, held) !== null) {
-      queue = release(queue, held);
-    }
+      if (held.size === 0 && findReview(queue, id) !== null) {
+        queue = release(queue, id);
+        holders.delete(id);
+      }
+    });
 
     dispatch();
   }
@@ -283,6 +275,10 @@ export async function startSessionServer(options: SessionServerOptions): Promise
 
     clientCount(): number {
       return clients.size;
+    },
+
+    lastAttachAt(): string | null {
+      return lastAttachAt;
     },
 
     waitingDepth(): number {

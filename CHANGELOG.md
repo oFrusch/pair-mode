@@ -21,6 +21,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Shiki now colours every language it bundles, not only the 22 that ship a micro asset.
 - The repo ships 54 micro syntax assets, up from 22.
 - The hook resolves a socket by session id first, then by walking up for a directory socket.
+- Every attached client receives every review. The first verdict completes it, and the other clients receive a cancel.
 
 ### Fixed
 
