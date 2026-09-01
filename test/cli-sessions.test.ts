@@ -127,6 +127,35 @@ describe("listSessions", () => {
     expect(existsSync(recordPath)).toBe(false);
   });
 
+  test("the text names how many sessions the sweep removed", async () => {
+    mkdirSync(sessionsDir(), { recursive: true });
+
+    const id = "s-77777771";
+    writeRecord(id, "dead@main", "/repo");
+    writeFileSync(join(sessionsDir(), `${id}.sock`), "", "utf-8");
+
+    const result = await listSessions();
+
+    expect(result.text).toContain("swept 1 dead session");
+  });
+
+  test("the text says nothing about a sweep when nothing was swept", async () => {
+    mkdirSync(sessionsDir(), { recursive: true });
+
+    const id = "s-77777772";
+    const socketPath = join(sessionsDir(), `${id}.sock`);
+
+    writeRecord(id, "live@main", "/repo");
+    const server = await startSessionServer({ socketPath });
+
+    const result = await listSessions();
+
+    expect(result.swept).toEqual([]);
+    expect(result.text).not.toContain("swept");
+
+    await server.close();
+  });
+
   test("spares a live socket during a sweep", async () => {
     mkdirSync(sessionsDir(), { recursive: true });
 

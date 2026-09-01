@@ -4,11 +4,13 @@ import { test, expect, beforeEach } from "vitest";
 import { pairOn, pairOff, pairStatus, pairOnWeb } from "../src/cli/toggle";
 import { sessionUrlPath } from "../src/core/state";
 import { runDoctor } from "../src/cli/doctor";
-import { sessionSocketPath } from "../src/core/state";
+import { sessionKey, sessionKeySocketPath, sessionSocketPath } from "../src/core/state";
 import { DEFAULT_CONFIG } from "../src/core/config";
 import { useIsolatedHome } from "./helpers/env";
 
-const isolated = useIsolatedHome();
+const isolated = useIsolatedHome({
+  clear: ["CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID"],
+});
 
 let repoRoot: string;
 
@@ -102,4 +104,37 @@ test("doctor removes a stale socket rather than naming rm", async () => {
   expect(report.text).toContain("removed a stale socket");
   expect(report.text).not.toContain("rm ");
   expect(existsSync(socketPath)).toBe(false);
+});
+
+test("doctor reports the session socket when the environment names an agent session", async () => {
+  process.env["CLAUDE_CODE_SESSION_ID"] = "doctor-session";
+
+  const sessionPath = sessionKeySocketPath(sessionKey("doctor-session"));
+  mkdirSync(dirname(sessionPath), { recursive: true });
+  writeFileSync(sessionPath, "", "utf-8");
+
+  const report = await runDoctor({
+    directory: repoRoot,
+    probeSocket: () => Promise.resolve(true),
+  });
+  const session = report.checks.find((check) => check.name.startsWith("session:"));
+
+  expect(session?.name).toBe(`session: ${sessionPath}`);
+});
+
+test("doctor reports the directory socket when no session id is in the environment", async () => {
+  const sessionPath = sessionKeySocketPath(sessionKey("doctor-session"));
+  const directoryPath = sessionSocketPath(repoRoot);
+
+  mkdirSync(dirname(sessionPath), { recursive: true });
+  writeFileSync(sessionPath, "", "utf-8");
+  writeFileSync(directoryPath, "", "utf-8");
+
+  const report = await runDoctor({
+    directory: repoRoot,
+    probeSocket: () => Promise.resolve(true),
+  });
+  const session = report.checks.find((check) => check.name.startsWith("session:"));
+
+  expect(session?.name).toBe(`session: ${directoryPath}`);
 });

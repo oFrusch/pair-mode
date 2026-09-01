@@ -244,10 +244,17 @@ function formatTable(listings: SessionListing[], now: number): string {
   return [line(header), ...rows.map(line)].join("\n");
 }
 
+// A sweep deletes files from the state directory, so the count is always named rather than done quietly.
+function sweptLine(swept: readonly string[]): string {
+  const noun = swept.length === 1 ? "session" : "sessions";
+  return `swept ${swept.length} dead ${noun}`;
+}
+
 export async function listSessions(): Promise<SessionsResult> {
   const { listings, swept } = await scan();
 
-  const text = listings.length === 0 ? "no pair-mode sessions" : formatTable(listings, Date.now());
+  const table = listings.length === 0 ? "no pair-mode sessions" : formatTable(listings, Date.now());
+  const text = swept.length === 0 ? table : `${table}\n\n${sweptLine(swept)}`;
 
   return { listings, swept, text, exitCode: 0 };
 }

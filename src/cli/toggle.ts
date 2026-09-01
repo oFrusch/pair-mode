@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import {
+  sessionKey,
   enable,
   disable,
   flagPath,
@@ -31,6 +32,12 @@ export function agentSessionId(env: NodeJS.ProcessEnv): string | null {
   }
 
   return null;
+}
+
+// A plain terminal has no session id, so the caller keeps the directory scope and behaves as it always has.
+export function currentSessionKey(): SessionKey | undefined {
+  const id = agentSessionId(process.env);
+  return id === null ? undefined : sessionKey(id);
 }
 
 function sleep(ms: number): Promise<void> {

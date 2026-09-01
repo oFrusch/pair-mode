@@ -5,6 +5,7 @@ import { loadConfig, configPath } from "../../core/config";
 import type { ConfigResult, PairConfig } from "../../core/config";
 import { stateDir, sessionSocketPath, resolveSocketPath } from "../../core/state";
 import { probeSocket } from "../../transports/session";
+import { currentSessionKey } from "../toggle";
 import { resolve as resolveEditor } from "../../editors/index";
 import { detect as detectMultiplexer } from "../../multiplexers/index";
 import { installRoot } from "../install-root";
@@ -276,7 +277,8 @@ async function checkSession(
   directory: string,
   probe: DoctorOptions["probeSocket"],
 ): Promise<DoctorCheck> {
-  const path = resolveSocketPath(join(directory, PROBE_NAME)) ?? sessionSocketPath(directory);
+  const probeFile = join(directory, PROBE_NAME);
+  const path = resolveSocketPath(probeFile, currentSessionKey()) ?? sessionSocketPath(directory);
   const name = `session: ${path}`;
   const wanted = config.transport === "session";
 
