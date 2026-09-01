@@ -111,6 +111,22 @@ async function startWithSequentialIds(): Promise<SessionServer> {
   return started;
 }
 
+// Writes a status frame and resolves on the state frame that comes back.
+async function requestState(peer: Peer): Promise<WireMessage & { type: "state" }> {
+  const before = peer.received.length;
+  peer.send({ type: "status" });
+
+  await waitFor(() => peer.received.length > before);
+
+  const reply = peer.received[peer.received.length - 1];
+
+  if (reply === undefined || reply.type !== "state") {
+    throw new Error("expected a state frame in reply to status");
+  }
+
+  return reply;
+}
+
 test("a client that attaches after a submit receives the queued review", async () => {
   await startWithSequentialIds();
 
@@ -362,6 +378,21 @@ test("close removes the socket file", async () => {
   server = null;
 
   expect(existsSync(socketPath)).toBe(false);
+});
+
+test("a status request answers with the live state", async () => {
+  const started = await startWithSequentialIds();
+
+  const client = await connectPeer();
+  client.send({ type: "attach", client: "tui" });
+  await waitFor(() => started.clientCount() === 1);
+
+  const asker = await connectPeer();
+  const state = await requestState(asker);
+
+  expect(state.clientCount).toBe(1);
+  expect(state.waitingDepth).toBe(0);
+  expect(typeof state.lastAttachAt).toBe("string");
 });
 
 test("close resolves promptly with a bare connection that never identifies itself", async () => {

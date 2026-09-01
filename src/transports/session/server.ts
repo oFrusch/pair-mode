@@ -260,6 +260,16 @@ export async function startSessionServer(options: SessionServerOptions): Promise
       return;
     }
 
+    if (message.type === "status") {
+      send(socket, {
+        type: "state",
+        clientCount: clients.size,
+        waitingDepth: waitingDepth(queue),
+        lastAttachAt,
+      });
+      return;
+    }
+
     if (message.type === "verdict") {
       handleVerdict(socket, message);
     }

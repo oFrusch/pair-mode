@@ -91,3 +91,40 @@ test("a line reader drops blank lines between messages", () => {
 
   expect(read("one\n\n\ntwo\n")).toEqual(["one", "two"]);
 });
+
+test("a status frame round trips", () => {
+  expect(roundTrip({ type: "status" })).toEqual({ type: "status" });
+});
+
+test("a state frame round trips", () => {
+  const message: WireMessage = {
+    type: "state",
+    clientCount: 2,
+    waitingDepth: 1,
+    lastAttachAt: "2026-09-01T10:00:00.000Z",
+  };
+
+  expect(roundTrip(message)).toEqual(message);
+});
+
+test("a state frame with a null lastAttachAt round trips", () => {
+  const message: WireMessage = {
+    type: "state",
+    clientCount: 0,
+    waitingDepth: 0,
+    lastAttachAt: null,
+  };
+
+  expect(roundTrip(message)).toEqual(message);
+});
+
+test("decodeLine rejects a state frame with a non-numeric count", () => {
+  const line = JSON.stringify({
+    type: "state",
+    clientCount: "two",
+    waitingDepth: 0,
+    lastAttachAt: null,
+  });
+
+  expect(decodeLine(line)).toBeNull();
+});
