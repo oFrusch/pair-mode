@@ -49,7 +49,8 @@
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "lint": "oxlint",
-    "lint:fix": "oxlint --fix"
+    "lint:fix": "oxlint --fix",
+    "syntax": "node scripts/fetch-syntax.mjs"
   },
   "dependencies": {
     "diff": "^9.0.0",

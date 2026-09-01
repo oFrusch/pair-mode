@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { parse, stringify } from "yaml";
 import type { Editor, EditorContext, EditorLaunch, PathResolver } from "./editor.types";
 import type { BandRule, MicroSyntaxFile, MicroSyntaxSource } from "./micro.types";
-import { syntaxName } from "./languages";
+import { microSyntaxName } from "./languages";
 import { syntaxSource } from "./syntax-cache";
 import { defaultResolvesOnPath } from "../helpers/resolvesOnPath";
 import { isRecord } from "../helpers/isRecord";
@@ -75,7 +75,7 @@ export function syntaxText(lang: string, source: string): string | null {
 }
 
 function writeSyntax(configDir: string, sourcePath: string): void {
-  const lang = syntaxName(sourcePath);
+  const lang = microSyntaxName(sourcePath);
 
   if (lang === null) {
     return;
@@ -113,7 +113,7 @@ export function createMicroEditor(resolvesOnPath: PathResolver = defaultResolves
     },
 
     bufferSuffix(sourcePath: string): string {
-      const lang = syntaxName(sourcePath);
+      const lang = microSyntaxName(sourcePath);
 
       if (lang === null) {
         return ".diff";

@@ -22,9 +22,9 @@ describe("shikiLanguage", () => {
     expect(shikiLanguage("script.py")).toBe("python");
   });
 
-  test(".sh and .zsh both return shellscript", () => {
+  test(".sh returns shellscript and .zsh returns zsh", () => {
     expect(shikiLanguage("run.sh")).toBe("shellscript");
-    expect(shikiLanguage("run.zsh")).toBe("shellscript");
+    expect(shikiLanguage("run.zsh")).toBe("zsh");
   });
 
   test(".dockerfile returns docker", () => {
