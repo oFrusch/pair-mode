@@ -16,12 +16,10 @@ When enabled, your agent will push diffs to your editing interface of choice (yo
 
 ## Install
 
-```
-npm install -g pair-mode
-pair-mode setup
-```
+Pick one of two paths. A plugin covers one CLI and needs no setup step. The npm install
+covers every CLI on your machine and gives you the `pair-mode` command.
 
-### Or install it as a plugin
+### As a plugin
 
 A plugin resolves its own path at runtime, so it needs no global install and no setup step.
 
@@ -29,7 +27,7 @@ Claude Code:
 
 ```
 /plugin marketplace add oFrusch/pair-mode
-/plugin install pair-mode
+/plugin install pair-mode@pair-mode
 ```
 
 Codex:
@@ -39,9 +37,16 @@ codex plugin marketplace add oFrusch/pair-mode
 codex plugin add pair-mode@pair-mode
 ```
 
-The plugin registers the hook and the `/pair` command for that one CLI. Run
-`npm install -g pair-mode` as well if you want the `pair-mode` command on your PATH, which
-`pair-mode watch` and `pair-mode config` need.
+The plugin registers the hook and the `pair` command for that one CLI. Add the npm install
+below if you also want `pair-mode watch` or `pair-mode config`, because both need the
+`pair-mode` command on your PATH.
+
+### From npm
+
+```
+npm install -g pair-mode
+pair-mode setup
+```
 
 Install pair-mode globally before you run setup. Setup writes the install path into each CLI's config as an absolute path. `npx pair-mode setup` runs from a package cache that npm later prunes, which would leave every hook pointing at a deleted file. Setup detects that case and stops.
 
