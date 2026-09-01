@@ -1,6 +1,6 @@
 import { createServer, createConnection } from "node:net";
 import type { Server, Socket } from "node:net";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { test, describe, expect, beforeEach, afterEach } from "vitest";
@@ -16,7 +16,7 @@ import { DEFAULT_CONFIG } from "../src/core/config";
 import type { PairConfig } from "../src/core/config";
 import type { EditRequest } from "../src/transports";
 import { sessionKey, sessionKeySocketPath, sessionSocketPath } from "../src/core/state";
-import { useIsolatedHome } from "./helpers/env";
+import { useIsolatedHome, useShortStateHome } from "./helpers/env";
 
 const isolated = useIsolatedHome();
 
@@ -204,21 +204,6 @@ test("a real session server round-trips a submit from the transport to an attach
 });
 
 const PARENT_SESSION_ID = "d95655de-eb7f-45e5-867d-9797a355353e";
-
-// A socket path is capped at 104 bytes, and the isolated state home under /var/folders already spends more than that.
-function useShortStateHome(): void {
-  let dir = "";
-
-  beforeEach(() => {
-    // The private TMPDIR sits under /var/folders, which is already too long, so this block leaves it.
-    dir = mkdtempSync(join("/tmp", "pm-"));
-    process.env["XDG_STATE_HOME"] = dir;
-  });
-
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
-  });
-}
 
 function connectClient(path: string): Promise<Socket> {
   const client = createConnection(path);

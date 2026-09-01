@@ -1,6 +1,6 @@
 import { createConnection } from "node:net";
 import type { Socket } from "node:net";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, expect, describe, beforeEach, afterEach } from "vitest";
@@ -19,7 +19,7 @@ import type { WebWatcher } from "../src/web";
 import { createLineReader, decodeLine, encode } from "../src/transports/session";
 import type { WireMessage } from "../src/transports/session";
 import { isRecord } from "../src/helpers";
-import { useIsolatedHome } from "./helpers/env";
+import { useIsolatedHome, useShortStateHome } from "./helpers/env";
 
 const isolated = useIsolatedHome();
 
@@ -430,17 +430,7 @@ describe("startWebWatch", () => {
 });
 
 describe("watching one session", () => {
-  let shortStateHome = "";
-
-  beforeEach(() => {
-    // The private TMPDIR sits under /var/folders, which is already too long for a socket path, so this block leaves it.
-    shortStateHome = mkdtempSync(join("/tmp", "pm-"));
-    process.env["XDG_STATE_HOME"] = shortStateHome;
-  });
-
-  afterEach(() => {
-    rmSync(shortStateHome, { recursive: true, force: true });
-  });
+  useShortStateHome();
 
   test("a session key decides the socket path", async () => {
     const key = sessionKey("d95655de-eb7f-45e5-867d-9797a355353e");

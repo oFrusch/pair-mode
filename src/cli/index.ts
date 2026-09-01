@@ -2,12 +2,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { runSetup } from "./setup";
 import { runDoctor } from "./doctor";
-import { pairOn, pairOnWeb, pairOff, pairStatus, pairToggle } from "./toggle";
+import { pairOn, pairOnWeb, pairOff, pairStatus, pairToggle, agentSessionId } from "./toggle";
 import { runWatch } from "./watch";
 import { runConfig } from "./config";
 import { startWebWatch } from "../web";
 import { loadConfig } from "../core/config";
-import { sessionKeySocketPath } from "../core/state";
+import { sessionKeySocketPath, sessionKey } from "../core/state";
 import { installRoot } from "./install-root";
 import { isRecord } from "../helpers";
 
@@ -62,6 +62,12 @@ function parseDirectoryArgs(args: string[], allowedFlags: string[]) {
     web: flags.includes("--web"),
     unknownFlag: flags.find((flag) => !allowedFlags.includes(flag)) ?? null,
   };
+}
+
+// An agent session keys its own socket. A plain terminal has no session id and keeps the directory scope.
+function currentSessionKey(): string | undefined {
+  const id = agentSessionId(process.env);
+  return id === null ? undefined : sessionKey(id);
 }
 
 const SESSION_KEY_PATTERN = /^s-[0-9a-f]{8}$/;
@@ -128,7 +134,7 @@ async function main(): Promise<number> {
       return 0;
     }
 
-    console.log(pairOn(parsed.directory));
+    console.log(pairOn(parsed.directory, currentSessionKey()));
     return 0;
   }
 
@@ -139,7 +145,7 @@ async function main(): Promise<number> {
       return reportUnknownFlag(command, parsed.unknownFlag);
     }
 
-    console.log(pairOff(parsed.directory));
+    console.log(pairOff(parsed.directory, currentSessionKey()));
     return 0;
   }
 
@@ -150,7 +156,9 @@ async function main(): Promise<number> {
       return reportUnknownFlag(command, parsed.unknownFlag);
     }
 
-    console.log(await pairToggle(parsed.directory, process.argv[1] ?? "", parsed.web));
+    console.log(
+      await pairToggle(parsed.directory, process.argv[1] ?? "", parsed.web, currentSessionKey()),
+    );
     return 0;
   }
 
@@ -161,7 +169,7 @@ async function main(): Promise<number> {
       return reportUnknownFlag(command, parsed.unknownFlag);
     }
 
-    console.log(pairStatus(parsed.directory));
+    console.log(pairStatus(parsed.directory, currentSessionKey()));
     return 0;
   }
 

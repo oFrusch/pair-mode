@@ -132,6 +132,19 @@ If you want to do all your development in one terminal pane while using either C
 Session mode moves the review out of the agent's process. The hook posts to a Unix
 socket and waits. A client you start (another terminal tab or the web view) renders the review and allows you to provide your annotations.
 
+### One socket per agent session
+
+`pair-mode on` inside an agent session reads that session's id and mints a socket for it
+alone. It prints the socket id. Another session in the same checkout gets its own socket
+and never sees the first session's diffs.
+
+`pair-mode on <dir>` from a plain terminal keeps the old behaviour. It writes a directory
+flag, and its socket catches every session that has no socket of its own.
+
+A bare `pair-mode off` inside a session turns pair mode off for that session only. It never
+clears a directory flag, so it never silences another session. `pair-mode off <dir>` names
+its target and clears the directory flag.
+
 ### Session mode config
 
 Set `transport` to `"session"`, then pick a client.

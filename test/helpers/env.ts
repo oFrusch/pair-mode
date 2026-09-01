@@ -4,6 +4,20 @@ import { join } from "node:path";
 import { beforeEach, afterEach } from "vitest";
 import type { IsolatedHome, IsolatedHomeOptions } from "./env.types";
 
+// macOS caps sun_path at 104 bytes, and the isolated state home under /var/folders already overruns it for a socket.
+export function useShortStateHome(): void {
+  let dir = "";
+
+  beforeEach(() => {
+    dir = mkdtempSync(join("/tmp", "pm-"));
+    process.env["XDG_STATE_HOME"] = dir;
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+}
+
 const HOME_VARS = ["HOME", "XDG_STATE_HOME", "XDG_CONFIG_HOME", "TMPDIR"];
 
 // Every test gets a private home, so nothing reads the developer's real config or state.

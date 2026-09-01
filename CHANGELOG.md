@@ -12,12 +12,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - `pair-mode toggle` reads the current state and moves to the other one.
 - Language detection reads the extension, then the exact filename, then the shebang. `Gemfile`, `Dockerfile`, `Makefile`, and an extensionless script now get colour.
 - `pnpm run syntax` fetches the micro syntax assets.
+- Each agent coding session gets its own review socket, so concurrent sessions in one repository stop sharing diffs.
+- A session can opt out of a directory flag, and the opt-out never silences another session.
 
 ### Changed
 
 - The plugin ships one `toggle` skill. It replaces two entries that both registered as `pair`.
 - Shiki now colours every language it bundles, not only the 22 that ship a micro asset.
 - The repo ships 54 micro syntax assets, up from 22.
+- The hook resolves a socket by session id first, then by walking up for a directory socket.
 
 ### Fixed
 

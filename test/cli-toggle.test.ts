@@ -29,11 +29,17 @@ beforeAll(() => {
   expect(result.status).toBe(0);
 });
 
+// These tests exercise the plain-terminal, directory-scoped dispatch, so the child must not inherit this process's own agent session id.
+const SESSION_ENV_VARS = ["CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID"];
+
 function runCli(args: string[]) {
+  const env = { ...process.env };
+  SESSION_ENV_VARS.forEach((name) => delete env[name]);
+
   return spawnSync("node", [cliBundle, ...args], {
     cwd: repoRoot,
     encoding: "utf-8",
-    env: process.env,
+    env,
   });
 }
 
@@ -249,5 +255,35 @@ describe("session-scoped toggling", () => {
 
     expect(text).toContain("ON");
     expect(text).toContain(key);
+  });
+
+  test("the CLI reads the session id from the environment and scopes on, status, and off to it", () => {
+    const directory = isolated.tempDir("pair-scope-cli-");
+    const key = sessionKey(agentId);
+    const env = { ...process.env, CLAUDE_CODE_SESSION_ID: agentId };
+
+    const on = spawnSync("node", [cliBundle, "on", directory], {
+      cwd: repoRoot,
+      encoding: "utf-8",
+      env,
+    });
+    expect(on.stdout).toContain(key);
+    expect(existsSync(flagPath(directory))).toBe(false);
+
+    const status = spawnSync("node", [cliBundle, "status", directory], {
+      cwd: repoRoot,
+      encoding: "utf-8",
+      env,
+    });
+    expect(status.stdout).toContain("ON");
+    expect(status.stdout).toContain(key);
+
+    const off = spawnSync("node", [cliBundle, "off", directory], {
+      cwd: repoRoot,
+      encoding: "utf-8",
+      env,
+    });
+    expect(off.stdout).toContain(key);
+    expect(sessionFlagState(key)).toBe("off");
   });
 });
