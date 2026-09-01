@@ -8,4 +8,12 @@ export {
   sessionSocketPath,
   sessionUrlPath,
   findSessionSocket,
+  sessionKey,
+  sessionKeySocketPath,
+  sessionKeyFlagPath,
+  sessionKeyOptOutPath,
+  sessionKeyRecordPath,
+  sessionKeyUrlPath,
 } from "./state";
+
+export type { SessionKey, SessionKind, FlagState, SessionRecord } from "./state.types";

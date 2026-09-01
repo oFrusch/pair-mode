@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { join, dirname, basename } from "node:path";
 import { existsSync, realpathSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
+import type { SessionKey } from "./state.types";
 
 export function stateDir(): string {
   const base = process.env["XDG_STATE_HOME"] || join(homedir(), ".local", "state");
@@ -102,4 +103,37 @@ export function disable(directory: string): boolean {
 
   unlinkSync(path);
   return true;
+}
+
+const SESSION_KEY_LENGTH = 8;
+
+// Eight hex characters stay short enough to type after `watch` and wide enough for the sessions one person opens.
+export function sessionKey(agentSessionId: string): SessionKey {
+  const digest = createHash("sha1").update(agentSessionId).digest("hex");
+  return `s-${digest.slice(0, SESSION_KEY_LENGTH)}`;
+}
+
+function sessionKeyPath(key: SessionKey, extension: string): string {
+  return join(sessionsDir(), `${key}${extension}`);
+}
+
+export function sessionKeySocketPath(key: SessionKey): string {
+  return sessionKeyPath(key, ".sock");
+}
+
+export function sessionKeyFlagPath(key: SessionKey): string {
+  return sessionKeyPath(key, ".on");
+}
+
+// A bare `pair-mode off` writes this, so a session opts out of a directory flag without clearing it for anyone else.
+export function sessionKeyOptOutPath(key: SessionKey): string {
+  return sessionKeyPath(key, ".off");
+}
+
+export function sessionKeyRecordPath(key: SessionKey): string {
+  return sessionKeyPath(key, ".json");
+}
+
+export function sessionKeyUrlPath(key: SessionKey): string {
+  return sessionKeyPath(key, ".url");
 }
