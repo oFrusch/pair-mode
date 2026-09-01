@@ -163,8 +163,9 @@ watches the session under the cursor. `q` quits.
 
 `pair-mode watch <id>` attaches directly when you already know the id.
 
-Several clients can watch one session at once. A terminal watcher and a browser tab both
-receive every diff, and the first answer wins. The other client sees the review withdraw.
+Several terminal watchers can watch one session at once. The first one to watch a session
+owns its socket. Every later one attaches to that socket as a viewer. Each attached client
+receives every diff, and the first answer wins. The others see the review withdraw.
 
 ### Session mode config
 

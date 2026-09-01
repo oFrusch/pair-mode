@@ -149,7 +149,10 @@ async function waitFor(label: string, ready: () => boolean): Promise<void> {
   }
 }
 
-function connectAgent(order: string[], name: string): Promise<Agent> {
+// The watcher probes the socket before it binds, so an agent waits for the listener rather than racing it.
+async function connectAgent(order: string[], name: string): Promise<Agent> {
+  await waitFor("the watcher socket", () => existsSync(socketPath));
+
   return new Promise((resolve, reject) => {
     const socket = createConnection(socketPath);
     const received: WireMessage[] = [];
@@ -253,6 +256,11 @@ async function openViewer(url: string): Promise<{
 
     cancel: () => void reader?.cancel(),
   };
+}
+
+// The server names the sidecar from the socket, so a test that checks ownership derives it the same way.
+function recordPathFor(path: string): string {
+  return path.replace(/\.sock$/, ".json");
 }
 
 function resultFilesInTmp(): string[] {
@@ -430,6 +438,64 @@ describe("startWebWatch", () => {
     } finally {
       viewer.cancel();
     }
+  });
+});
+
+describe("a second watcher on one session", () => {
+  test("a watcher on a free socket binds it and writes the sidecar", async () => {
+    const owner = startWatcher();
+
+    await waitFor("the idle screen", () => owner.writes.length > 0);
+
+    expect(existsSync(socketPath)).toBe(true);
+    expect(existsSync(recordPathFor(socketPath))).toBe(true);
+
+    await finish(owner);
+  });
+
+  test("a watcher on an owned socket attaches, and both watchers see the same review", async () => {
+    const owner = startWatcher();
+
+    await waitFor("the owner socket", () => existsSync(socketPath));
+
+    const viewer = startWatcher();
+
+    await waitFor("the viewer idle screen", () => viewer.writes.length > 0);
+
+    const order: string[] = [];
+    const agent = await connectAgent(order, "a");
+
+    agent.submit("a.ts");
+
+    await waitFor("the owner TUI", () => altScreenCount(owner.writes) === 1);
+    await waitFor("the viewer TUI", () => altScreenCount(viewer.writes) === 1);
+
+    owner.feed(QUIT_KEY);
+
+    await waitFor("the verdict", () => order.length === 1);
+    await waitFor("the viewer back at idle", () => viewer.cleanupCalls() === 1);
+
+    await finish(viewer);
+    await finish(owner);
+  });
+
+  test("a viewer leaves the socket and the sidecar behind when it quits", async () => {
+    const owner = startWatcher();
+
+    await waitFor("the owner socket", () => existsSync(socketPath));
+
+    const viewer = startWatcher();
+
+    await waitFor("the viewer idle screen", () => viewer.writes.length > 0);
+    await finish(viewer);
+
+    expect(existsSync(socketPath)).toBe(true);
+    expect(existsSync(recordPathFor(socketPath))).toBe(true);
+
+    await finish(owner);
+
+    expect(existsSync(socketPath)).toBe(false);
+    expect(existsSync(recordPathFor(socketPath))).toBe(false);
   });
 });
 

@@ -27,6 +27,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Every attached client receives every review. The first verdict completes it, and the other clients receive a cancel.
 - A client that attaches during an outstanding review receives it right away, instead of waiting for the next edit.
 - The web review page queues every pending review in order. It shows one review at a time, so a second edit never replaces the first before the reviewer answers it.
+- A second `pair-mode watch` on a live session attaches to it as a viewer. It no longer fails because another watcher owns the socket.
 - `pair-mode doctor` removes a stale socket rather than printing an `rm` command.
 
 ### Fixed

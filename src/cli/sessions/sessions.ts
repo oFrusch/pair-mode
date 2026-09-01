@@ -17,7 +17,7 @@ const SESSION_KINDS: string[] = ["session", "directory"];
 const ABANDONED_CODES: string[] = ["ECONNREFUSED", "ENOENT", "ENOTSOCK", "ENOTDIR"];
 
 // A watcher blocked past the timeout is still alive, so only a failed connect proves the socket is abandoned.
-function probeSession(socketPath: string): Promise<SessionProbe> {
+export function probeSession(socketPath: string): Promise<SessionProbe> {
   return new Promise((resolve) => {
     let settled = false;
     let connected = false;

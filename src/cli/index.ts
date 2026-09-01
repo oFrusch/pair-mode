@@ -116,6 +116,23 @@ async function watchSession(
   return 0;
 }
 
+// `sessions` and `connect` name no target, so anything after the command is a mistake worth reporting.
+function reportExtraArgs(command: string, args: string[]): number | null {
+  const extra = args[0];
+
+  if (extra === undefined) {
+    return null;
+  }
+
+  if (isFlag(extra)) {
+    return reportUnknownFlag(command, extra);
+  }
+
+  console.error(`unexpected argument for ${command}: ${extra}`);
+  console.error(USAGE);
+  return 1;
+}
+
 function reportUnknownFlag(command: string, flag: string): number {
   console.error(`unknown option for ${command}: ${flag}`);
   console.error(USAGE);
@@ -223,12 +240,24 @@ async function main(): Promise<number> {
   }
 
   if (command === "sessions") {
+    const rejected = reportExtraArgs(command, process.argv.slice(3));
+
+    if (rejected !== null) {
+      return rejected;
+    }
+
     const result = await listSessions();
     console.log(result.text);
     return result.exitCode;
   }
 
   if (command === "connect") {
+    const rejected = reportExtraArgs(command, process.argv.slice(3));
+
+    if (rejected !== null) {
+      return rejected;
+    }
+
     const result = await runConnect(createWatchIo());
 
     if (result.selected === null) {

@@ -7,6 +7,7 @@ import { runDoctor } from "../src/cli/doctor";
 import { sessionKey, sessionKeySocketPath, sessionSocketPath } from "../src/core/state";
 import { DEFAULT_CONFIG } from "../src/core/config";
 import { useIsolatedHome } from "./helpers/env";
+import type { SessionProbe } from "../src/cli/sessions";
 
 const isolated = useIsolatedHome({
   clear: ["CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID"],
@@ -17,6 +18,15 @@ let repoRoot: string;
 beforeEach(() => {
   repoRoot = realpathSync(isolated.tempDir("pair-mode-repo-"));
 });
+
+const ANSWERED: SessionProbe = {
+  status: "answered",
+  state: { type: "state", clientCount: 1, waitingDepth: 0, lastAttachAt: null },
+};
+
+const REFUSED: SessionProbe = { status: "refused" };
+
+const SILENT: SessionProbe = { status: "silent" };
 
 // Signalling this process would kill the test worker, so every link file names a pid that cannot exist.
 const DEAD_PID = 2_147_483_600;
@@ -81,7 +91,10 @@ test("doctor reports a live watcher when the socket accepts a connection", async
   mkdirSync(dirname(socket), { recursive: true });
   writeFileSync(socket, "");
 
-  const report = await runDoctor({ directory: repoRoot, probeSocket: () => Promise.resolve(true) });
+  const report = await runDoctor({
+    directory: repoRoot,
+    probeSession: () => Promise.resolve(ANSWERED),
+  });
   const session = report.checks.find((check) => check.name.startsWith("session:"));
 
   expect(session?.passed).toBe(true);
@@ -98,11 +111,13 @@ test("doctor removes a stale socket rather than naming rm", async () => {
   const report = await runDoctor({
     directory,
     config: { ...DEFAULT_CONFIG, transport: "session" },
-    probeSocket: async () => false,
+    probeSession: async () => REFUSED,
   });
 
-  expect(report.text).toContain("removed a stale socket");
-  expect(report.text).not.toContain("rm ");
+  const session = report.checks.find((check) => check.name.startsWith("session:"));
+
+  expect(session?.detail).toBe("removed a stale socket");
+  expect(session?.detail).not.toContain("rm ");
   expect(existsSync(socketPath)).toBe(false);
 });
 
@@ -115,7 +130,7 @@ test("doctor reports the session socket when the environment names an agent sess
 
   const report = await runDoctor({
     directory: repoRoot,
-    probeSocket: () => Promise.resolve(true),
+    probeSession: () => Promise.resolve(ANSWERED),
   });
   const session = report.checks.find((check) => check.name.startsWith("session:"));
 
@@ -132,9 +147,25 @@ test("doctor reports the directory socket when no session id is in the environme
 
   const report = await runDoctor({
     directory: repoRoot,
-    probeSocket: () => Promise.resolve(true),
+    probeSession: () => Promise.resolve(ANSWERED),
   });
   const session = report.checks.find((check) => check.name.startsWith("session:"));
 
   expect(session?.name).toBe(`session: ${directoryPath}`);
+});
+
+test("doctor keeps a socket whose watcher connects but answers nothing", async () => {
+  const socket = sessionSocketPath(repoRoot);
+  mkdirSync(dirname(socket), { recursive: true });
+  writeFileSync(socket, "");
+
+  const report = await runDoctor({
+    directory: repoRoot,
+    config: { ...DEFAULT_CONFIG, transport: "session" },
+    probeSession: async () => SILENT,
+  });
+  const session = report.checks.find((check) => check.name.startsWith("session:"));
+
+  expect(session?.detail).toBe("a watcher is attached");
+  expect(existsSync(socket)).toBe(true);
 });

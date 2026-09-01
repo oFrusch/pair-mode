@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { loadConfig, configPath } from "../../core/config";
 import type { ConfigResult, PairConfig } from "../../core/config";
 import { stateDir, sessionSocketPath, resolveSocketPath } from "../../core/state";
-import { probeSocket } from "../../transports/session";
+import { probeSession } from "../sessions";
 import { currentSessionKey } from "../toggle";
 import { resolve as resolveEditor } from "../../editors/index";
 import { detect as detectMultiplexer } from "../../multiplexers/index";
@@ -275,7 +275,7 @@ const PROBE_NAME = ".pair-mode-doctor-probe";
 async function checkSession(
   config: PairConfig,
   directory: string,
-  probe: DoctorOptions["probeSocket"],
+  probe: DoctorOptions["probeSession"],
 ): Promise<DoctorCheck> {
   const probeFile = join(directory, PROBE_NAME);
   const path = resolveSocketPath(probeFile, currentSessionKey()) ?? sessionSocketPath(directory);
@@ -293,9 +293,10 @@ async function checkSession(
     };
   }
 
-  const alive = await (probe ?? probeSocket)(path);
+  // A watcher blocked on a render answers nothing yet is alive, so only a refused connect justifies the unlink.
+  const result = await (probe ?? probeSession)(path);
 
-  if (alive) {
+  if (result.status !== "refused") {
     return { name, passed: true, detail: "a watcher is attached" };
   }
 
@@ -322,7 +323,7 @@ export async function runDoctor(options: DoctorOptions = {}): Promise<DoctorRepo
     ...checkClis(home, root),
     checkEntryPoints(root),
     checkShiki(options.resolvesShiki),
-    await checkSession(config, options.directory ?? process.cwd(), options.probeSocket),
+    await checkSession(config, options.directory ?? process.cwd(), options.probeSession),
   ];
 
   const traceCheck = checkTrace(config);
