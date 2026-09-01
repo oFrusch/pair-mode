@@ -206,10 +206,11 @@ test("a real session server round-trips a submit from the transport to an attach
 const PARENT_SESSION_ID = "d95655de-eb7f-45e5-867d-9797a355353e";
 
 // A socket path is capped at 104 bytes, and the isolated state home under /var/folders already spends more than that.
-function useShortStateHome(): () => string {
+function useShortStateHome(): void {
   let dir = "";
 
   beforeEach(() => {
+    // The private TMPDIR sits under /var/folders, which is already too long, so this block leaves it.
     dir = mkdtempSync(join("/tmp", "pm-"));
     process.env["XDG_STATE_HOME"] = dir;
   });
@@ -217,8 +218,6 @@ function useShortStateHome(): () => string {
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
   });
-
-  return () => dir;
 }
 
 function connectClient(path: string): Promise<Socket> {
@@ -350,8 +349,9 @@ describe("the resolution chain in the client", () => {
     expect(subagentOutcome.reviewed).toBe(true);
     expect(seen).toEqual([parentFile, subagentFile]);
   });
-  // A crashed watcher leaves its socket file behind, so the chain must not post an edit into a dead socket.
-  test("a stale session socket is removed and the directory socket answers", async () => {
+
+  // bindSocket and doctor own stale-socket cleanup, so the client falls through and leaves the file alone.
+  test("a stale session socket falls through to the directory socket and stays on disk", async () => {
     const stale = sessionKeySocketPath(sessionKey(PARENT_SESSION_ID));
 
     mkdirSync(dirname(stale), { recursive: true });
@@ -381,6 +381,6 @@ describe("the resolution chain in the client", () => {
 
     expect(outcome.reviewed).toBe(true);
     expect(seen).toEqual([filePath]);
-    expect(existsSync(stale)).toBe(false);
+    expect(existsSync(stale)).toBe(true);
   });
 });

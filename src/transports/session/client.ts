@@ -3,7 +3,6 @@ import type { Socket } from "node:net";
 import { existsSync } from "node:fs";
 import type { PairConfig } from "../../core/config";
 import { findSessionSocket, sessionKey, sessionKeySocketPath } from "../../core/state";
-import { removeQuietly } from "../../helpers";
 import type { EditRequest, ReviewOutcome, ReviewTransport } from "../transport.types";
 import { createLineReader, decodeLine, encode } from "./wire";
 import type { SessionClientOptions } from "./client.types";
@@ -117,10 +116,8 @@ async function reviewInSession(
       return outcome;
     }
 
-    // A refused session socket outlived its watcher, so it goes and the directory tier gets a turn.
-    if (outcome.detail === NO_WATCHER) {
-      removeQuietly(sessionPath);
-    } else {
+    // A refused session socket outlived its watcher, so the directory tier gets a turn.
+    if (outcome.detail !== NO_WATCHER) {
       return outcome;
     }
   }
