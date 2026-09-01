@@ -55,6 +55,10 @@ function makeFakeIo(): FakeWatchIo {
   const counts = { shutdown: 0, cleanup: 0 };
 
   const io: WatchIo = {
+    isTty() {
+      return true;
+    },
+
     onKey(handler) {
       keyHandler = handler;
     },

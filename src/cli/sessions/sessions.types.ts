@@ -24,3 +24,8 @@ export interface SessionsResult {
   text: string;
   exitCode: number;
 }
+
+export interface ConnectResult {
+  selected: string | null;
+  exitCode: number;
+}

@@ -4,7 +4,8 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect, describe } from "vitest";
 import { useIsolatedHome, useShortStateHome } from "./helpers/env";
-import { listSessions, sweepDeadSessions } from "../src/cli/sessions";
+import { listSessions, sweepDeadSessions, runConnect } from "../src/cli/sessions";
+import type { WatchIo } from "../src/cli/watch";
 import { startSessionServer, encode } from "../src/transports/session";
 import { sessionsDir } from "../src/core/state";
 
@@ -317,5 +318,184 @@ describe("listSessions", () => {
     expect(result.text).toContain("-");
 
     await server.close();
+  });
+});
+
+describe("runConnect", () => {
+  useShortStateHome();
+
+  function fakeIo(tty: boolean) {
+    const written: string[] = [];
+    const counts = { shutdown: 0 };
+    let handler: ((key: string) => void) | null = null;
+
+    const io: WatchIo = {
+      isTty: () => tty,
+      onKey: (next: (key: string) => void) => {
+        handler = next;
+      },
+      onResize: () => {},
+      write: (text: string) => {
+        written.push(text);
+      },
+      size: () => ({ width: 80, height: 24 }),
+      cleanup: () => {},
+      shutdown: () => {
+        counts.shutdown += 1;
+      },
+    };
+
+    return {
+      written,
+      counts,
+      io,
+      pressKey(key: string) {
+        handler?.(key);
+      },
+      async waitForPaint() {
+        await waitFor(() => written.length > 0);
+      },
+    };
+  }
+
+  test("with no TTY it exits 1, names the sessions command, and restores the terminal", async () => {
+    const fake = fakeIo(false);
+    const result = await runConnect(fake.io);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.selected).toBeNull();
+    expect(fake.written.join("")).toContain("pair-mode sessions");
+    expect(fake.counts.shutdown).toBe(1);
+  });
+
+  test("Enter selects the session under the cursor", async () => {
+    const id = "s-77777777";
+
+    writeRecord(id, "picked@main", "/repo");
+    const server = await startSessionServer({ socketPath: join(sessionsDir(), `${id}.sock`) });
+
+    const fake = fakeIo(true);
+    const run = runConnect(fake.io);
+
+    await fake.waitForPaint();
+    fake.pressKey("\r");
+
+    const result = await run;
+
+    expect(result.selected).toBe(id);
+    expect(result.exitCode).toBe(0);
+    expect(fake.counts.shutdown).toBe(1);
+
+    await server.close();
+  });
+
+  test("j moves the cursor down before Enter selects", async () => {
+    const first = "s-88888888";
+    const second = "s-99999999";
+
+    writeRecord(first, "one@main", "/repo");
+    writeRecord(second, "two@main", "/repo");
+
+    const serverOne = await startSessionServer({
+      socketPath: join(sessionsDir(), `${first}.sock`),
+    });
+    const serverTwo = await startSessionServer({
+      socketPath: join(sessionsDir(), `${second}.sock`),
+    });
+
+    const fake = fakeIo(true);
+    const run = runConnect(fake.io);
+
+    await fake.waitForPaint();
+    fake.pressKey("j");
+    fake.pressKey("\r");
+
+    const result = await run;
+
+    expect(result.selected).toBe(second);
+
+    await serverOne.close();
+    await serverTwo.close();
+  });
+
+  test("k never moves the cursor above the first row", async () => {
+    const first = "s-88888888";
+    const second = "s-99999999";
+
+    writeRecord(first, "one@main", "/repo");
+    writeRecord(second, "two@main", "/repo");
+
+    const serverOne = await startSessionServer({
+      socketPath: join(sessionsDir(), `${first}.sock`),
+    });
+    const serverTwo = await startSessionServer({
+      socketPath: join(sessionsDir(), `${second}.sock`),
+    });
+
+    const fake = fakeIo(true);
+    const run = runConnect(fake.io);
+
+    await fake.waitForPaint();
+    fake.pressKey("k");
+    fake.pressKey("\r");
+
+    const result = await run;
+
+    expect(result.selected).toBe(first);
+
+    await serverOne.close();
+    await serverTwo.close();
+  });
+
+  test("j never moves the cursor past the last row", async () => {
+    const only = "s-88888888";
+
+    writeRecord(only, "one@main", "/repo");
+    const server = await startSessionServer({ socketPath: join(sessionsDir(), `${only}.sock`) });
+
+    const fake = fakeIo(true);
+    const run = runConnect(fake.io);
+
+    await fake.waitForPaint();
+    fake.pressKey("j");
+    fake.pressKey("j");
+    fake.pressKey("\r");
+
+    const result = await run;
+
+    expect(result.selected).toBe(only);
+
+    await server.close();
+  });
+
+  test("q quits without selecting", async () => {
+    const id = "s-aaaaaaaa";
+
+    writeRecord(id, "quit@main", "/repo");
+    const server = await startSessionServer({ socketPath: join(sessionsDir(), `${id}.sock`) });
+
+    const fake = fakeIo(true);
+    const run = runConnect(fake.io);
+
+    await fake.waitForPaint();
+    fake.pressKey("q");
+
+    const result = await run;
+
+    expect(result.selected).toBeNull();
+    expect(result.exitCode).toBe(0);
+    expect(fake.counts.shutdown).toBe(1);
+
+    await server.close();
+  });
+
+  test("with a TTY and no sessions it exits 0, says so, and restores the terminal", async () => {
+    const fake = fakeIo(true);
+    const result = await runConnect(fake.io);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.selected).toBeNull();
+    expect(fake.written.join("")).toContain("no pair-mode sessions");
+    expect(fake.counts.shutdown).toBe(1);
   });
 });
