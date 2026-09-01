@@ -8,6 +8,7 @@ export {
   sessionSocketPath,
   sessionUrlPath,
   findSessionSocket,
+  resolveSocketPath,
   sessionKey,
   sessionKeySocketPath,
   sessionKeyFlagPath,

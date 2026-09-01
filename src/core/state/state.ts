@@ -70,6 +70,19 @@ export function findSessionSocket(filePath: string): string | null {
   }
 }
 
+// The session socket wins, then a directory socket found by walking up. Neither one means the hook fails open.
+export function resolveSocketPath(filePath: string, key?: SessionKey): string | null {
+  if (key !== undefined) {
+    const candidate = sessionKeySocketPath(key);
+
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return findSessionSocket(filePath);
+}
+
 export function sessionFlagState(key: SessionKey): FlagState {
   if (existsSync(sessionKeyOptOutPath(key))) {
     return "off";

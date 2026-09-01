@@ -69,13 +69,15 @@ describe("session key paths", () => {
 });
 
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import {
   isEnabled,
   enable,
   enableSession,
   optOutSession,
   sessionFlagState,
+  sessionSocketPath,
+  resolveSocketPath,
 } from "../src/core/state";
 
 describe("the three-state flag", () => {
@@ -161,5 +163,72 @@ describe("the three-state flag", () => {
     enable(directory);
 
     expect(isEnabled(path)).toBe(true);
+  });
+});
+
+describe("resolveSocketPath", () => {
+  const agentId = "d95655de-eb7f-45e5-867d-9797a355353e";
+
+  function touch(path: string): void {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, "", "utf-8");
+  }
+
+  function fileIn(directory: string): string {
+    mkdirSync(directory, { recursive: true });
+    const path = join(directory, "main.ts");
+    writeFileSync(path, "", "utf-8");
+    return path;
+  }
+
+  test("prefers the session socket when it exists", () => {
+    const key = sessionKey(agentId);
+    const socket = sessionKeySocketPath(key);
+    touch(socket);
+
+    const directory = join(process.env["XDG_STATE_HOME"] ?? "", "chain1");
+    const path = fileIn(directory);
+    touch(sessionSocketPath(directory));
+
+    expect(resolveSocketPath(path, key)).toBe(socket);
+  });
+
+  test("falls to the directory socket when the session has none", () => {
+    const directory = join(process.env["XDG_STATE_HOME"] ?? "", "chain2");
+    const path = fileIn(directory);
+    const socket = sessionSocketPath(directory);
+    touch(socket);
+
+    expect(resolveSocketPath(path, sessionKey(agentId))).toBe(socket);
+  });
+
+  test("finds a directory socket at an ancestor of the edited file", () => {
+    const root = join(process.env["XDG_STATE_HOME"] ?? "", "chain3");
+    const nested = join(root, "src", "deep");
+    const path = fileIn(nested);
+    const socket = sessionSocketPath(root);
+    touch(socket);
+
+    expect(resolveSocketPath(path, sessionKey(agentId))).toBe(socket);
+  });
+
+  test("returns null when neither tier has a socket", () => {
+    const directory = join(process.env["XDG_STATE_HOME"] ?? "", "chain4");
+    const path = fileIn(directory);
+
+    expect(resolveSocketPath(path, sessionKey(agentId))).toBeNull();
+  });
+
+  test("with no key it resolves the directory tier only", () => {
+    const directory = join(process.env["XDG_STATE_HOME"] ?? "", "chain5");
+    const path = fileIn(directory);
+    touch(sessionKeySocketPath(sessionKey(agentId)));
+
+    expect(resolveSocketPath(path)).toBeNull();
+
+    const socket = sessionSocketPath(directory);
+    touch(socket);
+
+    expect(resolveSocketPath(path)).toBe(socket);
   });
 });
