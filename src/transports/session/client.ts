@@ -2,7 +2,7 @@ import { createConnection } from "node:net";
 import type { Socket } from "node:net";
 import { existsSync } from "node:fs";
 import type { PairConfig } from "../../core/config";
-import { findSessionSocket, sessionKey, sessionKeySocketPath } from "../../core/state";
+import { findSessionSocket, keyFor, sessionKeySocketPath } from "../../core/state";
 import type { EditRequest, ReviewOutcome, ReviewTransport } from "../transport.types";
 import { createLineReader, decodeLine, encode } from "./wire";
 import type { SessionClientOptions } from "./client.types";
@@ -106,7 +106,7 @@ async function reviewInSession(
     return await requestReview(request, { socketPath, timeoutMs });
   }
 
-  const key = request.sessionId === undefined ? undefined : sessionKey(request.sessionId);
+  const key = keyFor(request.sessionId);
   const sessionPath = key === undefined ? null : sessionKeySocketPath(key);
 
   if (sessionPath !== null && existsSync(sessionPath)) {

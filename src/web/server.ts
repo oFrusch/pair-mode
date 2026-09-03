@@ -163,9 +163,11 @@ export function startWebServer(options: WebServerOptions): Promise<WebServer> {
     const open = pending[0];
 
     // A viewer that joins mid-review sees it at once rather than waiting for the next one.
-    if (open !== undefined) {
-      sendEvent(response, "review", JSON.stringify(open));
+    if (!open) {
+      return;
     }
+
+    sendEvent(response, "review", JSON.stringify(open));
   }
 
   function broadcastCancel(id: string): void {
@@ -187,9 +189,11 @@ export function startWebServer(options: WebServerOptions): Promise<WebServer> {
 
     const next = pending[0];
 
-    if (wasOpen && next !== undefined) {
-      broadcastReview(next);
+    if (!wasOpen || !next) {
+      return;
     }
+
+    broadcastReview(next);
   }
 
   async function handleVerdict(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -216,7 +220,7 @@ export function startWebServer(options: WebServerOptions): Promise<WebServer> {
     const answered = pending[0];
 
     // A verdict naming any other review would strand the open one, so a stale page click is refused.
-    if (answered === undefined || answered.id !== verdict.id) {
+    if (!answered || answered.id !== verdict.id) {
       response.writeHead(CONFLICT, { "content-type": "application/json" }).end("{}");
       return;
     }
@@ -238,7 +242,7 @@ export function startWebServer(options: WebServerOptions): Promise<WebServer> {
 
     const image = url.startsWith(`${base}/`) ? IMAGES[url.slice(base.length + 1)] : undefined;
 
-    if (image !== undefined && request.method === "GET") {
+    if (image && request.method === "GET") {
       response.writeHead(OK, { "content-type": "image/png" });
       response.end(image);
       return;

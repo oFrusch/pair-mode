@@ -1,4 +1,4 @@
-import { isEnabled, sessionKey } from "../../core/state";
+import { isEnabled, keyFor } from "../../core/state";
 import { simulate } from "../../core/simulate";
 import { runPair as defaultRunPair } from "../../core/run";
 import { loadConfig } from "../../core/config";
@@ -68,7 +68,7 @@ async function evaluate(
 
   // opencode names the session on every tool call, so pair mode keys off it exactly as the hook adapters do.
   const sessionId = input.sessionID === "" ? undefined : input.sessionID;
-  const key = sessionId === undefined ? undefined : sessionKey(sessionId);
+  const key = keyFor(sessionId);
 
   if (!isEnabled(call.filePath, key)) {
     return null;

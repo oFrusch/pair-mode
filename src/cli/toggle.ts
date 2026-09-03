@@ -2,11 +2,10 @@ import { spawn } from "node:child_process";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import {
-  sessionKey,
+  keyFor,
   enable,
   disable,
-  sessionUrlPath,
-  sessionKeyUrlPath,
+  watchUrlPath,
   enableSession,
   optOutSession,
   isEnabled,
@@ -23,21 +22,16 @@ const SESSION_ENV_VARS = ["CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_T
 
 // Only `pair-mode on` reads the environment, because it receives no hook payload to read instead.
 export function agentSessionId(env: NodeJS.ProcessEnv): string | null {
-  for (const name of SESSION_ENV_VARS) {
-    const value = env[name];
+  const found = SESSION_ENV_VARS.map((name) => env[name]).find(
+    (value) => typeof value === "string" && value !== "",
+  );
 
-    if (typeof value === "string" && value !== "") {
-      return value;
-    }
-  }
-
-  return null;
+  return found ?? null;
 }
 
 // A plain terminal has no session id, so the caller keeps the directory scope and behaves as it always has.
 export function currentSessionKey(): SessionKey | undefined {
-  const id = agentSessionId(process.env);
-  return id === null ? undefined : sessionKey(id);
+  return keyFor(agentSessionId(process.env) ?? undefined);
 }
 
 // isEnabled walks up from a file, so both the status and the toggle name a file inside the directory they mean.
@@ -50,12 +44,8 @@ function sleep(ms: number): Promise<void> {
 }
 
 // A session-scoped web watcher publishes its link beside its own socket, not beside the directory socket.
-function linkPath(directory: string, key?: SessionKey): string {
-  return key === undefined ? sessionUrlPath(directory) : sessionKeyUrlPath(key);
-}
-
 function readLink(directory: string, key?: SessionKey): SessionLink | null {
-  const path = linkPath(directory, key);
+  const path = watchUrlPath(directory, key);
 
   if (!existsSync(path)) {
     return null;
@@ -109,7 +99,7 @@ function stopLink(directory: string, key?: SessionKey): boolean {
   }
 
   try {
-    unlinkSync(linkPath(directory, key));
+    unlinkSync(watchUrlPath(directory, key));
   } catch {
     // Best-effort cleanup only.
   }
@@ -119,13 +109,11 @@ function stopLink(directory: string, key?: SessionKey): boolean {
 
 // The web path is the same command as the plain one, so both report the scope they turned on the same way.
 function onHeadline(directory: string, key?: SessionKey): string {
-  return key === undefined
-    ? `pair mode ON for ${directory}`
-    : `pair mode ON · ${key} · ${directory}`;
+  return key ? `pair mode ON · ${key} · ${directory}` : `pair mode ON for ${directory}`;
 }
 
 export function pairOn(directory: string, key?: SessionKey): string {
-  if (key !== undefined) {
+  if (key) {
     enableSession(key);
   } else {
     enable(directory);
@@ -142,10 +130,10 @@ export async function pairOnWeb(
 ): Promise<string> {
   const headline = onHeadline(directory, key);
 
-  if (key === undefined) {
-    enable(directory);
-  } else {
+  if (key) {
     enableSession(key);
+  } else {
+    enable(directory);
   }
 
   const existing = readLink(directory, key);
@@ -174,7 +162,7 @@ export async function pairOnWeb(
 }
 
 export function pairOff(directory: string, key?: SessionKey): string {
-  if (key !== undefined) {
+  if (key) {
     optOutSession(key);
     const stopped = stopLink(directory, key);
 
@@ -197,8 +185,7 @@ export async function pairToggle(
   key?: SessionKey,
 ): Promise<string> {
   // A session with no flag of its own still sees a directory flag; a plain directory toggle checks only its own path.
-  const on =
-    key === undefined ? existsSync(flagPath(directory)) : isEnabled(statusProbe(directory), key);
+  const on = key ? isEnabled(statusProbe(directory), key) : existsSync(flagPath(directory));
 
   if (on) {
     return pairOff(directory, key);
@@ -214,7 +201,7 @@ export async function pairToggle(
 export function pairStatus(directory: string, key?: SessionKey): string {
   const on = isEnabled(statusProbe(directory), key);
   const link = readLink(directory, key);
-  const scope = key === undefined ? directory : `${key} · ${directory}`;
+  const scope = key ? `${key} · ${directory}` : directory;
   const state = `pair mode ${on ? "ON" : "OFF"} for ${scope}`;
 
   return link === null ? state : `${state}\n${link.url}`;

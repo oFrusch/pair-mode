@@ -5,7 +5,7 @@ import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { EditRequest } from "../transport.types";
 import type { SessionRecord } from "../../core/state";
-import type { QueueState } from "./queue.types";
+import type { QueuedReview, QueueState } from "./queue.types";
 import {
   complete,
   emptyQueue,
@@ -18,7 +18,13 @@ import {
 } from "./queue";
 import { createLineReader, decodeLine, encode } from "./wire";
 import type { ServerMessage, VerdictMessage } from "./wire.types";
-import type { SessionServer, SessionServerOptions } from "./server.types";
+import type {
+  Client,
+  Clients,
+  ReviewId,
+  SessionServer,
+  SessionServerOptions,
+} from "./server.types";
 import { removeQuietly } from "../../helpers";
 
 const ID_BYTES = 8;
@@ -119,13 +125,15 @@ export async function startSessionServer(options: SessionServerOptions): Promise
   const reportError = options.onError ?? defaultReportError;
 
   let queue: QueueState = emptyQueue();
-  const agents = new Map<string, Socket>();
-  const clients = new Set<Socket>();
-  const holders = new Map<string, Set<Socket>>();
+  const agentByReview = new Map<ReviewId, Socket>();
+  const clients: Clients = new Map();
+  const clientBySocket = new Map<Socket, Client>();
+  const clientsByReview = new Map<ReviewId, Clients>();
   const connections = new Set<Socket>();
   const changeHandlers: Array<() => void> = [];
 
   let lastAttachAt: string | null = null;
+  let nextClientId = 0;
 
   function announce(): void {
     changeHandlers.forEach((handler) => handler());
@@ -137,27 +145,31 @@ export async function startSessionServer(options: SessionServerOptions): Promise
     }
   }
 
+  function reviewMessage(review: QueuedReview): ServerMessage {
+    return {
+      type: "review",
+      id: review.id,
+      tool: review.request.tool,
+      path: review.request.filePath,
+      before: review.request.before,
+      after: review.request.after,
+    };
+  }
+
   // Every attached client is a view of one review, so all of them see it and the first verdict ends it.
   function dispatch(): void {
-    if (clients.size > 0) {
-      const result = offerAll(queue);
-      queue = result.state;
-
-      result.reviews.forEach((review) => {
-        holders.set(review.id, new Set(clients));
-
-        clients.forEach((client) => {
-          send(client, {
-            type: "review",
-            id: review.id,
-            tool: review.request.tool,
-            path: review.request.filePath,
-            before: review.request.before,
-            after: review.request.after,
-          });
-        });
-      });
+    if (clients.size === 0) {
+      announce();
+      return;
     }
+
+    const result = offerAll(queue);
+    queue = result.state;
+
+    result.reviews.forEach((review) => {
+      clientsByReview.set(review.id, new Map(clients));
+      clients.forEach((client) => send(client.socket, reviewMessage(review)));
+    });
 
     announce();
   }
@@ -165,91 +177,106 @@ export async function startSessionServer(options: SessionServerOptions): Promise
   function handleSubmit(socket: Socket, request: EditRequest): void {
     const id = generateId();
     queue = enqueue(queue, id, request);
-    agents.set(id, socket);
+    agentByReview.set(id, socket);
     dispatch();
   }
 
   // A review already offered never returns through offerAll, so a late client receives it straight from the queue.
   function handleAttach(socket: Socket): void {
-    clients.add(socket);
+    // A second attach on one connection would orphan the first client id, so the repeat is ignored.
+    if (clientBySocket.has(socket)) {
+      return;
+    }
+
+    nextClientId += 1;
+    const client: Client = { id: `c${nextClientId}`, socket };
+
+    clients.set(client.id, client);
+    clientBySocket.set(socket, client);
     lastAttachAt = new Date().toISOString();
 
     offeredReviews(queue).forEach((review) => {
-      const held = holders.get(review.id) ?? new Set<Socket>();
+      const viewers = clientsByReview.get(review.id) ?? new Map();
 
-      held.add(socket);
-      holders.set(review.id, held);
+      viewers.set(client.id, client);
+      clientsByReview.set(review.id, viewers);
 
-      send(socket, {
-        type: "review",
-        id: review.id,
-        tool: review.request.tool,
-        path: review.request.filePath,
-        before: review.request.before,
-        after: review.request.after,
-      });
+      send(socket, reviewMessage(review));
     });
 
     dispatch();
   }
 
-  // The first verdict wins. Every other client holding the same review hears cancel instead.
+  // The first verdict wins. Every other client viewing the same review hears cancel instead.
   function handleVerdict(socket: Socket, message: VerdictMessage): void {
-    const held = holders.get(message.id);
+    const answering = clientBySocket.get(socket);
 
-    if (held === undefined || !held.has(socket)) {
+    if (!answering) {
       return;
     }
 
-    const agent = agents.get(message.id);
+    const viewers = clientsByReview.get(message.id);
 
-    if (agent !== undefined) {
-      send(agent, message);
-      agents.delete(message.id);
+    if (!viewers?.has(answering.id)) {
+      return;
     }
 
-    held.forEach((client) => {
-      if (client !== socket) {
-        send(client, { type: "cancel", id: message.id });
+    const agent = agentByReview.get(message.id);
+
+    if (agent) {
+      send(agent, message);
+      agentByReview.delete(message.id);
+    }
+
+    viewers.forEach((viewer) => {
+      if (viewer.id !== answering.id) {
+        send(viewer.socket, { type: "cancel", id: message.id });
       }
     });
 
-    holders.delete(message.id);
+    clientsByReview.delete(message.id);
     queue = complete(queue, message.id);
 
     dispatch();
   }
 
-  // A hook that dies waiting leaves a review nobody can answer, so every client holding it hears cancel.
+  // A hook that dies waiting leaves a review nobody can answer, so every client viewing it hears cancel.
   function dropAgent(socket: Socket): void {
-    const owned = [...agents.entries()].filter(([, agentSocket]) => agentSocket === socket);
+    const owned = [...agentByReview.entries()].filter(([, agentSocket]) => agentSocket === socket);
+
+    if (owned.length === 0) {
+      return;
+    }
 
     owned.forEach(([id]) => {
-      agents.delete(id);
+      agentByReview.delete(id);
 
-      holders.get(id)?.forEach((client) => send(client, { type: "cancel", id }));
-      holders.delete(id);
+      clientsByReview.get(id)?.forEach((viewer) => send(viewer.socket, { type: "cancel", id }));
+      clientsByReview.delete(id);
 
       queue = complete(queue, id);
     });
 
-    if (owned.length > 0) {
-      dispatch();
-    }
+    dispatch();
   }
 
   // The last client to drop hands its reviews back, so a fresh attach picks them up.
   function dropClient(socket: Socket): void {
-    if (!clients.delete(socket)) {
+    const leaving = clientBySocket.get(socket);
+
+    if (!leaving) {
       return;
     }
 
-    holders.forEach((held, id) => {
-      held.delete(socket);
+    clientBySocket.delete(socket);
+    clients.delete(leaving.id);
 
-      if (held.size === 0 && findReview(queue, id) !== null) {
+    clientsByReview.forEach((viewers, id) => {
+      viewers.delete(leaving.id);
+
+      if (viewers.size === 0 && findReview(queue, id) !== null) {
         queue = release(queue, id);
-        holders.delete(id);
+        clientsByReview.delete(id);
       }
     });
 

@@ -1,4 +1,4 @@
-import { isEnabled, sessionKey } from "../../core/state";
+import { isEnabled, keyFor } from "../../core/state";
 import { simulate } from "../../core/simulate";
 import { runPair } from "../../core/run";
 import { loadConfig, DEFAULT_CONFIG } from "../../core/config";
@@ -32,7 +32,7 @@ async function main(config: PairConfig): Promise<number> {
     return 0;
   }
 
-  const key = sessionId === undefined ? undefined : sessionKey(sessionId);
+  const key = keyFor(sessionId);
 
   if (!isEnabled(filePath, key)) {
     return 0;

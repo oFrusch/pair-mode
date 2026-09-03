@@ -1,13 +1,10 @@
-import { createConnection } from "node:net";
-import type { Socket } from "node:net";
 import { paintLayout } from "../../core/config";
 import type { PairConfig } from "../../core/config";
-import { buildSessionRecord, sessionKeySocketPath, sessionSocketPath } from "../../core/state";
+import { buildSessionRecord, watchSocketPath } from "../../core/state";
 import { removeQuietly, resultFilePath, splitLines } from "../../helpers";
-import { startSessionServer } from "../../transports/session";
-import type { SessionServer } from "../../transports/session";
-import { createLineReader, decodeLine, encode } from "../../transports/session";
-import type { ReviewMessage, StateMessage } from "../../transports/session";
+import { ownerHost, viewerHost } from "../../transports/session";
+import type { SessionHost } from "../../transports/session";
+import type { ReviewMessage } from "../../transports/session";
 import { supportsTruecolor } from "../../tui/paint";
 import { createTokenProvider } from "../../tui/syntax";
 import { runTui } from "../../tui";
@@ -28,15 +25,6 @@ function reportErrors(errors: readonly Error[]): void {
 function paintIdle(io: WatchIo, status: IdleStatus, truecolor: boolean): void {
   const { width } = io.size();
   io.write(CLEAR_SCREEN + renderIdle(status, width, truecolor).join("\r\n") + "\r\n");
-}
-
-function connectSelf(socketPath: string): Promise<Socket> {
-  return new Promise((resolve, reject) => {
-    const socket = createConnection(socketPath);
-    socket.setEncoding("utf-8");
-    socket.once("error", reject);
-    socket.once("connect", () => resolve(socket));
-  });
 }
 
 async function optionsFor(
@@ -72,26 +60,23 @@ async function optionsFor(
 }
 
 export async function runWatch(options: WatchOptions, config: PairConfig): Promise<number> {
-  const socketPath =
-    options.socketPath ??
-    (options.sessionKey === undefined
-      ? sessionSocketPath(options.directory)
-      : sessionKeySocketPath(options.sessionKey));
+  const socketPath = watchSocketPath(options.directory, options.sessionKey, options.socketPath);
   let errors: readonly Error[] = [];
 
   // Only a refused connect proves no watcher owns this socket, so anything else means this run is a second viewer.
   const owns = (await probeSession(socketPath)).status === "refused";
 
   // The TUI owns the screen for the whole run, so a session error waits for the screen to be released.
-  const server: SessionServer | null = owns
-    ? await startSessionServer({
+  const host: SessionHost = owns
+    ? await ownerHost({
         socketPath,
+        client: "tui",
         record: buildSessionRecord(options, socketPath),
         onError: (error) => {
           errors = [...errors, error];
         },
       })
-    : null;
+    : await viewerHost({ socketPath, client: "tui" });
 
   // This socket is listening by now, so the sweep can only clear the sockets other watchers abandoned.
   await sweepDeadSessions();
@@ -99,18 +84,16 @@ export async function runWatch(options: WatchOptions, config: PairConfig): Promi
   const truecolor = supportsTruecolor(process.env);
   const io = options.io ?? createWatchIo();
 
-  // A viewer holds no queue of its own, so it renders the counts the owner reports over the wire.
-  let remote: StateMessage | null = null;
+  const status = (): IdleStatus => {
+    const counts = host.counts();
+    return {
+      directory: options.directory,
+      socketPath,
+      clients: counts.clients,
+      waiting: counts.waiting,
+    };
+  };
 
-  const status = (): IdleStatus => ({
-    directory: options.directory,
-    socketPath,
-    clients: server === null ? (remote?.clientCount ?? 0) : server.clientCount(),
-    waiting: server === null ? (remote?.waitingDepth ?? 0) : server.waitingDepth(),
-  });
-
-  const client = await connectSelf(socketPath);
-  const readLines = createLineReader();
   const pending: ReviewMessage[] = [];
   const cancelled = new Set<string>();
   const aborts = new Map<string, AbortController>();
@@ -137,49 +120,28 @@ export async function runWatch(options: WatchOptions, config: PairConfig): Promi
     io.onResize(() => paintIdle(io, status(), truecolor));
   };
 
-  client.on("data", (chunk: string) => {
-    readLines(chunk).forEach((line) => {
-      const message = decodeLine(line);
-
-      if (message?.type === "review") {
-        pending.push(message);
-        nudge();
-        return;
-      }
-
-      if (message?.type === "cancel") {
-        cancelled.add(message.id);
-        aborts.get(message.id)?.abort();
-        nudge();
-        return;
-      }
-
-      if (message?.type === "state") {
-        remote = message;
-
-        if (!busy && !quitting) {
-          paintIdle(io, status(), truecolor);
-        }
-      }
-    });
+  host.onReview((review) => {
+    pending.push(review);
+    nudge();
   });
 
-  server?.onChange(() => {
+  host.onCancel((id) => {
+    cancelled.add(id);
+    aborts.get(id)?.abort();
+    nudge();
+  });
+
+  host.onChange(() => {
     if (!busy && !quitting) {
       paintIdle(io, status(), truecolor);
     }
   });
 
-  client.write(encode({ type: "attach", client: "tui" }));
-
   while (!quitting) {
     const review = pending.shift();
 
     if (review === undefined) {
-      if (server === null) {
-        client.write(encode({ type: "status" }));
-      }
-
+      host.refreshCounts();
       listenIdle();
       paintIdle(io, status(), truecolor);
       await new Promise<void>((resolve) => {
@@ -199,8 +161,7 @@ export async function runWatch(options: WatchOptions, config: PairConfig): Promi
 
       // A cancelled review has no hook left to answer, so the verdict goes nowhere.
       if (!cancelled.has(review.id)) {
-        const questions = result.quit === "send" ? result.questions : [];
-        client.write(encode({ type: "verdict", id: review.id, questions }));
+        host.verdict(review.id, result.quit === "send" ? result.questions : []);
       }
     } finally {
       aborts.delete(review.id);
@@ -212,10 +173,9 @@ export async function runWatch(options: WatchOptions, config: PairConfig): Promi
 
   io.write(CLEAR_SCREEN);
   io.shutdown();
-  client.destroy();
 
   // A viewer owns neither the socket nor the sidecar, so only the watcher that bound them takes them down.
-  await server?.close();
+  await host.close();
 
   reportErrors(errors);
 
