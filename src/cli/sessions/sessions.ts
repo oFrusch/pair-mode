@@ -4,7 +4,7 @@ import { basename, join } from "node:path";
 import { sessionsDir } from "../../core/state";
 import type { SessionKind, SessionRecord } from "../../core/state";
 import { createLineReader, decodeLine, encode } from "../../transports/session";
-import { removeQuietly, isRecord } from "../../helpers";
+import { isNullableString, isRecord, isString, removeQuietly } from "../../helpers";
 import type { SessionListing, SessionProbe, SessionScan, SessionsResult } from "./sessions.types";
 
 const STATUS_TIMEOUT_MS = 250;
@@ -58,9 +58,11 @@ export function probeSession(socketPath: string): Promise<SessionProbe> {
       readLines(chunk).forEach((line) => {
         const message = decodeLine(line);
 
-        if (message?.type === "state") {
-          settle({ status: "answered", state: message });
+        if (message?.type !== "state") {
+          return;
         }
+
+        settle({ status: "answered", state: message });
       });
     });
 
@@ -69,14 +71,6 @@ export function probeSession(socketPath: string): Promise<SessionProbe> {
       socket.write(encode({ type: "status" }));
     });
   });
-}
-
-function isString(value: unknown): value is string {
-  return typeof value === "string";
-}
-
-function isNullableString(value: unknown): value is string | null {
-  return value === null || isString(value);
 }
 
 function isSessionKind(value: unknown): value is SessionKind {

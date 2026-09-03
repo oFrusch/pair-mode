@@ -183,6 +183,11 @@ export function watchSocketPath(directory: string, key?: SessionKey, override?: 
   return key ? sessionKeySocketPath(key) : sessionSocketPath(directory);
 }
 
+// A watcher publishes its link beside its own socket, so pair-mode on and off find the link they started.
+export function watchUrlPath(directory: string, key?: SessionKey): string {
+  return key ? sessionKeyUrlPath(key) : sessionUrlPath(directory);
+}
+
 // A plain terminal sends no session id, so the caller keeps the directory scope.
 export function keyFor(agentSessionId?: string): SessionKey | undefined {
   return agentSessionId === undefined || agentSessionId === ""

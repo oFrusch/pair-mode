@@ -12,6 +12,7 @@ export {
   sessionKey,
   keyFor,
   watchSocketPath,
+  watchUrlPath,
   sessionKeySocketPath,
   sessionKeyFlagPath,
   sessionKeyOptOutPath,

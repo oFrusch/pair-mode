@@ -1,12 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { PairConfig } from "../core/config";
-import {
-  buildSessionRecord,
-  watchSocketPath,
-  sessionUrlPath,
-  sessionKeyUrlPath,
-} from "../core/state";
+import { buildSessionRecord, watchSocketPath, watchUrlPath } from "../core/state";
 import { ownerHost } from "../transports/session";
 import type { SessionHost } from "../transports/session";
 import { toWebReview } from "./review";
@@ -75,11 +70,7 @@ export async function startWebWatch(
     web.withdraw(id);
   });
 
-  // A session-scoped watcher publishes beside its own socket, so pair-mode on and off find the link they started.
-  const urlPath =
-    options.sessionKey === undefined
-      ? sessionUrlPath(options.directory)
-      : sessionKeyUrlPath(options.sessionKey);
+  const urlPath = watchUrlPath(options.directory, options.sessionKey);
   publishUrl(urlPath, web.url);
 
   return {

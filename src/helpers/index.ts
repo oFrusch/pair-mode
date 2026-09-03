@@ -1,3 +1,4 @@
+import { isNullableString, isString } from "./guards";
 import { isRecord } from "./isRecord";
 import { readFileOrEmpty } from "./readFileOrEmpty";
 import { readPayload } from "./readPayload";
@@ -8,6 +9,8 @@ import { defaultSpawn } from "./spawn";
 import { splitLines } from "./splitLines";
 
 export {
+  isNullableString,
+  isString,
   isRecord,
   readFileOrEmpty,
   readPayload,
