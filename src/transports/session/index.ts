@@ -5,14 +5,15 @@ export {
   emptyQueue,
   enqueue,
   findReview,
+  offeredReviews,
   waitingDepth,
-  takeNext,
+  offerAll,
   complete,
   release,
 } from "./queue";
 export type { SessionServer, SessionServerOptions } from "./server.types";
 export type { SessionClientOptions } from "./client.types";
-export type { QueuedReview, QueueState, ReviewStatus, TakeResult } from "./queue.types";
+export type { QueuedReview, QueueState, ReviewStatus, OfferResult } from "./queue.types";
 export type {
   AttachMessage,
   CancelMessage,

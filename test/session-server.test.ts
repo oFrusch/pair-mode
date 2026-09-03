@@ -191,14 +191,8 @@ test("one client answering twice receives two reviews in submit order", async ()
   expect(paths).toEqual(["/repo/one.ts", "/repo/two.ts"]);
 });
 
-test("two attached clients each take one of two queued reviews", async () => {
-  await startWithSequentialIds();
-
-  const firstAgent = await connectPeer();
-  firstAgent.send(submitFor("one"));
-
-  const secondAgent = await connectPeer();
-  secondAgent.send(submitFor("two"));
+test("two attached clients each receive both queued reviews", async () => {
+  const started = await startWithSequentialIds();
 
   const firstClient = await connectPeer();
   firstClient.send({ type: "attach", client: "tui" });
@@ -206,10 +200,19 @@ test("two attached clients each take one of two queued reviews", async () => {
   const secondClient = await connectPeer();
   secondClient.send({ type: "attach", client: "web" });
 
-  await waitFor(() => firstClient.received.length > 0 && secondClient.received.length > 0);
+  await waitFor(() => started.clientCount() === 2);
 
-  expect(firstClient.received).toHaveLength(1);
-  expect(secondClient.received).toHaveLength(1);
+  const firstAgent = await connectPeer();
+  firstAgent.send(submitFor("one"));
+
+  const secondAgent = await connectPeer();
+  secondAgent.send(submitFor("two"));
+
+  await waitFor(() => firstClient.received.length > 1 && secondClient.received.length > 1);
+
+  expect(firstClient.received).toHaveLength(2);
+  expect(secondClient.received).toHaveLength(2);
+  expect(firstClient.received).toEqual(secondClient.received);
 });
 
 test("an agent that disconnects while waiting cancels the review on the client holding it", async () => {
@@ -272,6 +275,31 @@ test("the server reports the waiting depth and the attached client count", async
 
   await waitFor(() => started.clientCount() === 1);
   expect(started.waitingDepth()).toBe(0);
+});
+
+test("the server reports null until a client attaches, then the attach time", async () => {
+  const started = await startWithSequentialIds();
+
+  expect(started.lastAttachAt()).toBeNull();
+
+  const first = await connectPeer();
+  first.send({ type: "attach", client: "tui" });
+
+  await waitFor(() => started.lastAttachAt() !== null);
+
+  const firstAttach = started.lastAttachAt();
+
+  expect(firstAttach).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+  const second = await connectPeer();
+  second.send({ type: "attach", client: "web" });
+
+  await waitFor(() => started.clientCount() === 2);
+
+  const secondAttach = started.lastAttachAt();
+
+  expect(secondAttach).not.toBeNull();
+  expect(Date.parse(secondAttach ?? "")).toBeGreaterThanOrEqual(Date.parse(firstAttach ?? ""));
 });
 
 test("a change handler fires when a review arrives", async () => {

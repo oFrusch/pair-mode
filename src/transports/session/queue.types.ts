@@ -1,6 +1,6 @@
 import type { EditRequest } from "../transport.types";
 
-export type ReviewStatus = "waiting" | "inFlight";
+export type ReviewStatus = "waiting" | "offered";
 
 export interface QueuedReview {
   id: string;
@@ -12,7 +12,7 @@ export interface QueueState {
   reviews: QueuedReview[];
 }
 
-export interface TakeResult {
+export interface OfferResult {
   state: QueueState;
-  review: QueuedReview | null;
+  reviews: QueuedReview[];
 }

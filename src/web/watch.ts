@@ -41,19 +41,20 @@ export async function startWebWatch(
   const session: SessionServer = await startSessionServer({ socketPath });
   const client = await connectSelf(socketPath);
 
+  // Rendering awaits shiki, so a cancel can land mid-render and the finished review must not be offered.
+  const ownedIds = new Set<string>();
+
   const web: WebServer = await startWebServer({
     port: options.port,
     token: options.token,
     layout: config.layout,
     onVerdict(id, questions) {
+      ownedIds.delete(id);
       client.write(encode({ type: "verdict", id, questions }));
     },
   });
 
   const readLines = createLineReader();
-
-  // Rendering awaits shiki, so a cancel can land mid-render and the finished review must not be offered.
-  let ownedId: string | null = null;
 
   client.on("data", (chunk: string) => {
     readLines(chunk).forEach((line) => {
@@ -61,17 +62,17 @@ export async function startWebWatch(
 
       if (message?.type === "review") {
         const id = message.id;
-        ownedId = id;
+        ownedIds.add(id);
 
         // A render that throws would otherwise become an unhandled rejection and kill the watcher.
         void toWebReview(message, config)
           .then((review) => {
-            if (ownedId === id) {
+            if (ownedIds.has(id)) {
               web.offer(review);
             }
           })
           .catch(() => {
-            if (ownedId === id) {
+            if (ownedIds.delete(id)) {
               client.write(encode({ type: "verdict", id, questions: [] }));
             }
           });
@@ -79,10 +80,7 @@ export async function startWebWatch(
       }
 
       if (message?.type === "cancel") {
-        if (ownedId === message.id) {
-          ownedId = null;
-        }
-
+        ownedIds.delete(message.id);
         web.withdraw(message.id);
       }
     });

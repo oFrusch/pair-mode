@@ -1,5 +1,5 @@
 import type { EditRequest } from "../transport.types";
-import type { QueuedReview, QueueState, TakeResult } from "./queue.types";
+import type { OfferResult, QueuedReview, QueueState } from "./queue.types";
 
 export function emptyQueue(): QueueState {
   return { reviews: [] };
@@ -14,22 +14,29 @@ export function findReview(state: QueueState, id: string): QueuedReview | null {
   return state.reviews.find((review) => review.id === id) ?? null;
 }
 
+// A client that attaches mid-review must see what the earlier clients already hold.
+export function offeredReviews(state: QueueState): QueuedReview[] {
+  return state.reviews.filter((review) => review.status === "offered");
+}
+
 export function waitingDepth(state: QueueState): number {
   return state.reviews.filter((review) => review.status === "waiting").length;
 }
 
-// The head waiting review becomes inFlight. A queue with nothing waiting returns the same state.
-export function takeNext(state: QueueState): TakeResult {
-  const next = state.reviews.find((review) => review.status === "waiting");
+// Every attached client sees every review, so the queue offers them all at once rather than handing one to one client.
+export function offerAll(state: QueueState): OfferResult {
+  const waiting = state.reviews.filter((review) => review.status === "waiting");
 
-  if (next === undefined) {
-    return { state, review: null };
+  if (waiting.length === 0) {
+    return { state, reviews: [] };
   }
 
-  const taken: QueuedReview = { ...next, status: "inFlight" };
-  const reviews = state.reviews.map((review) => (review.id === next.id ? taken : review));
+  const offered = waiting.map((review): QueuedReview => ({ ...review, status: "offered" }));
+  const byId = new Map(offered.map((review) => [review.id, review]));
 
-  return { state: { reviews }, review: taken };
+  const reviews = state.reviews.map((review) => byId.get(review.id) ?? review);
+
+  return { state: { reviews }, reviews: offered };
 }
 
 export function complete(state: QueueState, id: string): QueueState {

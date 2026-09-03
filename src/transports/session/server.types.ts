@@ -7,6 +7,7 @@ export interface SessionServerOptions {
 export interface SessionServer {
   socketPath: string;
   clientCount(): number;
+  lastAttachAt(): string | null;
   waitingDepth(): number;
   onChange(handler: () => void): void;
   close(): Promise<void>;

@@ -1,3 +1,4 @@
+import { createConnection } from "node:net";
 import { join } from "node:path";
 import { test, expect, beforeEach, afterEach } from "vitest";
 import { startWebServer, startWebWatch, toWebReview, renderPage } from "../src/web";
@@ -8,7 +9,7 @@ import { DEFAULT_CONFIG } from "../src/core/config";
 import type { PairConfig } from "../src/core/config";
 import type { Question } from "../src/core/collect";
 import type { ReviewMessage } from "../src/transports/session";
-import { createSessionTransport } from "../src/transports/session";
+import { createSessionTransport, encode } from "../src/transports/session";
 import { isRecord } from "../src/helpers";
 import { useIsolatedHome } from "./helpers/env";
 
@@ -452,6 +453,46 @@ test("a browser verdict travels back to the hook through the session socket", as
   });
 });
 
+function idOf(text: string): string {
+  const line = text.split("\n").find((entry) => entry.startsWith("data: ")) ?? "";
+  const payload: unknown = JSON.parse(line.slice("data: ".length));
+  return isRecord(payload) && typeof payload["id"] === "string" ? payload["id"] : "";
+}
+
+function submitFrame(path: string): string {
+  return encode({ type: "submit", tool: "edit", path, before: review.before, after: review.after });
+}
+
+// Both frames land in one chunk, so the watcher owns two ids at once and a single owned id would drop the first.
+test("two reviews arriving in one chunk both reach the browser", async () => {
+  watcher = await startWebWatch({ directory: "/repo", port: 0, socketPath, token: TOKEN }, config);
+
+  const agent = createConnection(socketPath);
+  await new Promise<void>((resolve) => agent.once("connect", () => resolve()));
+
+  agent.write(submitFrame("first.ts") + submitFrame("second.ts"));
+
+  const viewer = await openViewer(`${watcher.url}/events`);
+  const opened = await viewer.until("event: review");
+
+  expect(opened).toContain('"path":"first.ts"');
+  expect(opened).not.toContain('"path":"second.ts"');
+
+  const answer = await fetch(`${watcher.url}/verdict`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: idOf(opened), notes: [] }),
+  });
+
+  const advanced = await viewer.until('"path":"second.ts"');
+
+  viewer.cancel();
+  agent.destroy();
+
+  expect(answer.status).toBe(OK);
+  expect(advanced).toContain('"path":"second.ts"');
+});
+
 test("a withdrawn review reaches an open viewer as a cancel frame and stops accepting a verdict", async () => {
   const seen: string[] = [];
   web = await startPlain((id) => seen.push(id));
@@ -475,6 +516,67 @@ test("a withdrawn review reaches an open viewer as a cancel frame and stops acce
 
   expect(text).toContain("event: cancel");
   expect(text).toContain('{"id":"id1"}');
+  expect(response.status).toBe(CONFLICT);
+  expect(seen).toEqual([]);
+});
+
+test("a second review waits its turn and opens once the first verdict lands", async () => {
+  const seen: string[] = [];
+  web = await startPlain((id) => seen.push(id));
+
+  const viewer = await openViewer(`${web.url}/events`);
+  await viewer.until(": open");
+
+  web.offer(await toWebReview(review, config));
+  web.offer(await toWebReview({ ...review, id: "id2", path: "second.ts" }, config));
+
+  const opened = await viewer.until("event: review");
+
+  expect(opened).toContain('"id":"id1"');
+  expect(opened).not.toContain('"id":"id2"');
+
+  const answer = await fetch(`${web.url}/verdict`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: "id1", notes: [] }),
+  });
+
+  const advanced = await viewer.until('"id":"id2"');
+
+  viewer.cancel();
+
+  expect(answer.status).toBe(OK);
+  expect(advanced).toContain('"id":"id2"');
+  expect(seen).toEqual(["id1"]);
+});
+
+test("a viewer that joins while two reviews wait sees only the open one", async () => {
+  web = await startPlain(() => {});
+
+  web.offer(await toWebReview(review, config));
+  web.offer(await toWebReview({ ...review, id: "id2", path: "second.ts" }, config));
+
+  const stream = await readUntil(`${web.url}/events`, "event: review");
+
+  stream.cancel();
+
+  expect(stream.text).toContain('"id":"id1"');
+  expect(stream.text).not.toContain('"id":"id2"');
+});
+
+test("a verdict on the queued review is refused while the older one is open", async () => {
+  const seen: string[] = [];
+  web = await startPlain((id) => seen.push(id));
+
+  web.offer(await toWebReview(review, config));
+  web.offer(await toWebReview({ ...review, id: "id2", path: "second.ts" }, config));
+
+  const response = await fetch(`${web.url}/verdict`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: "id2", notes: [] }),
+  });
+
   expect(response.status).toBe(CONFLICT);
   expect(seen).toEqual([]);
 });

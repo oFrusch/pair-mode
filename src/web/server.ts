@@ -139,7 +139,8 @@ export function startWebServer(options: WebServerOptions): Promise<WebServer> {
   const base = `/r/${token}`;
   const viewers = new Set<ServerResponse>();
 
-  let current: WebReview | null = null;
+  // Broadcast can queue two edits before either verdict, so the pending reviews wait in order.
+  let pending: WebReview[] = [];
 
   function sendEvent(response: ServerResponse, event: string, data: string): void {
     response.write(`event: ${event}\ndata: ${data}\n\n`);
@@ -159,15 +160,36 @@ export function startWebServer(options: WebServerOptions): Promise<WebServer> {
     viewers.add(response);
     response.on("close", () => viewers.delete(response));
 
+    const open = pending[0];
+
     // A viewer that joins mid-review sees it at once rather than waiting for the next one.
-    if (current !== null) {
-      sendEvent(response, "review", JSON.stringify(current));
+    if (open !== undefined) {
+      sendEvent(response, "review", JSON.stringify(open));
     }
   }
 
   function broadcastCancel(id: string): void {
     const data = JSON.stringify({ id });
     viewers.forEach((viewer) => sendEvent(viewer, "cancel", data));
+  }
+
+  function broadcastReview(review: WebReview): void {
+    const data = JSON.stringify(review);
+    viewers.forEach((viewer) => sendEvent(viewer, "review", data));
+  }
+
+  // The browser shows one review at a time, so the next pending review opens only once this one ends.
+  function retire(id: string): void {
+    const wasOpen = pending[0]?.id === id;
+
+    pending = pending.filter((review) => review.id !== id);
+    broadcastCancel(id);
+
+    const next = pending[0];
+
+    if (wasOpen && next !== undefined) {
+      broadcastReview(next);
+    }
   }
 
   async function handleVerdict(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -191,18 +213,16 @@ export function startWebServer(options: WebServerOptions): Promise<WebServer> {
       return;
     }
 
-    const answered = current;
+    const answered = pending[0];
 
     // A verdict naming any other review would strand the open one, so a stale page click is refused.
-    if (answered === null || answered.id !== verdict.id) {
+    if (answered === undefined || answered.id !== verdict.id) {
       response.writeHead(CONFLICT, { "content-type": "application/json" }).end("{}");
       return;
     }
 
-    current = null;
-
     // A second tab still shows this review, so it learns the answer landed before its own notes are lost.
-    broadcastCancel(verdict.id);
+    retire(verdict.id);
     options.onVerdict(verdict.id, webNotesToQuestions(answered, verdict.notes));
     response.writeHead(OK, { "content-type": "application/json" }).end("{}");
   }
@@ -257,24 +277,23 @@ export function startWebServer(options: WebServerOptions): Promise<WebServer> {
         },
 
         offer(review: WebReview): void {
-          current = review;
-          const data = JSON.stringify(review);
-          viewers.forEach((viewer) => sendEvent(viewer, "review", data));
+          pending = [...pending, review];
+
+          if (pending.length === 1) {
+            broadcastReview(review);
+          }
         },
 
         // A withdrawal for an older review must leave the one now open alone.
         withdraw(id: string): void {
-          if (current?.id === id) {
-            current = null;
-          }
-
-          broadcastCancel(id);
+          retire(id);
         },
 
         close(): Promise<void> {
           return new Promise((done) => {
             viewers.forEach((viewer) => viewer.end());
             viewers.clear();
+            pending = [];
             server.close(() => done());
           });
         },
