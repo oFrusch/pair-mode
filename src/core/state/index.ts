@@ -10,6 +10,7 @@ export {
   findSessionSocket,
   resolveSocketPath,
   sessionKey,
+  keyFor,
   sessionKeySocketPath,
   sessionKeyFlagPath,
   sessionKeyOptOutPath,

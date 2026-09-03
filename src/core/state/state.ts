@@ -174,6 +174,13 @@ export function sessionKey(agentSessionId: string): SessionKey {
   return `s-${digest.slice(0, SESSION_KEY_LENGTH)}`;
 }
 
+// A plain terminal sends no session id, so the caller keeps the directory scope.
+export function keyFor(agentSessionId?: string): SessionKey | undefined {
+  return agentSessionId === undefined || agentSessionId === ""
+    ? undefined
+    : sessionKey(agentSessionId);
+}
+
 function sessionKeyPath(key: SessionKey, extension: string): string {
   return join(sessionsDir(), `${key}${extension}`);
 }

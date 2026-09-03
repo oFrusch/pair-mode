@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import {
-  sessionKey,
+  keyFor,
   enable,
   disable,
   sessionUrlPath,
@@ -23,21 +23,16 @@ const SESSION_ENV_VARS = ["CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_T
 
 // Only `pair-mode on` reads the environment, because it receives no hook payload to read instead.
 export function agentSessionId(env: NodeJS.ProcessEnv): string | null {
-  for (const name of SESSION_ENV_VARS) {
-    const value = env[name];
+  const found = SESSION_ENV_VARS.map((name) => env[name]).find(
+    (value) => typeof value === "string" && value !== "",
+  );
 
-    if (typeof value === "string" && value !== "") {
-      return value;
-    }
-  }
-
-  return null;
+  return found ?? null;
 }
 
 // A plain terminal has no session id, so the caller keeps the directory scope and behaves as it always has.
 export function currentSessionKey(): SessionKey | undefined {
-  const id = agentSessionId(process.env);
-  return id === null ? undefined : sessionKey(id);
+  return keyFor(agentSessionId(process.env) ?? undefined);
 }
 
 // isEnabled walks up from a file, so both the status and the toggle name a file inside the directory they mean.

@@ -1,6 +1,6 @@
 import type { PairConfig } from "../config";
 import type { EditRequest, RunDeps, RunVerdict } from "./types";
-import { isEnabled, sessionKey } from "../state";
+import { isEnabled, keyFor } from "../state";
 import { formatQuestions } from "../collect";
 import { resolveTransport } from "../../transports";
 
@@ -13,7 +13,7 @@ export async function runPair(
     return { decision: "allow", reviewed: false };
   }
 
-  const key = request.sessionId === undefined ? undefined : sessionKey(request.sessionId);
+  const key = keyFor(request.sessionId);
 
   if (!isEnabled(request.filePath, key)) {
     return { decision: "allow", reviewed: false };
