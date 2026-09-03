@@ -5,8 +5,7 @@ import { dirname } from "node:path";
 import type { PairConfig } from "../core/config";
 import {
   buildSessionRecord,
-  sessionKeySocketPath,
-  sessionSocketPath,
+  watchSocketPath,
   sessionUrlPath,
   sessionKeyUrlPath,
 } from "../core/state";
@@ -45,11 +44,7 @@ export async function startWebWatch(
   options: WebWatchOptions,
   config: PairConfig,
 ): Promise<WebWatcher> {
-  const socketPath =
-    options.socketPath ??
-    (options.sessionKey === undefined
-      ? sessionSocketPath(options.directory)
-      : sessionKeySocketPath(options.sessionKey));
+  const socketPath = watchSocketPath(options.directory, options.sessionKey, options.socketPath);
   const session: SessionServer = await startSessionServer({
     socketPath,
     record: buildSessionRecord(options, socketPath),

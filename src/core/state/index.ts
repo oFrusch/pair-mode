@@ -11,6 +11,7 @@ export {
   resolveSocketPath,
   sessionKey,
   keyFor,
+  watchSocketPath,
   sessionKeySocketPath,
   sessionKeyFlagPath,
   sessionKeyOptOutPath,

@@ -2,7 +2,7 @@ import { createConnection } from "node:net";
 import type { Socket } from "node:net";
 import { paintLayout } from "../../core/config";
 import type { PairConfig } from "../../core/config";
-import { buildSessionRecord, sessionKeySocketPath, sessionSocketPath } from "../../core/state";
+import { buildSessionRecord, watchSocketPath } from "../../core/state";
 import { removeQuietly, resultFilePath, splitLines } from "../../helpers";
 import { startSessionServer } from "../../transports/session";
 import type { SessionServer } from "../../transports/session";
@@ -72,11 +72,7 @@ async function optionsFor(
 }
 
 export async function runWatch(options: WatchOptions, config: PairConfig): Promise<number> {
-  const socketPath =
-    options.socketPath ??
-    (options.sessionKey === undefined
-      ? sessionSocketPath(options.directory)
-      : sessionKeySocketPath(options.sessionKey));
+  const socketPath = watchSocketPath(options.directory, options.sessionKey, options.socketPath);
   let errors: readonly Error[] = [];
 
   // Only a refused connect proves no watcher owns this socket, so anything else means this run is a second viewer.
