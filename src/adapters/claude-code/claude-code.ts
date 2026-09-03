@@ -1,4 +1,4 @@
-import { isEnabled } from "../../core/state";
+import { isEnabled, sessionKey } from "../../core/state";
 import { simulate } from "../../core/simulate";
 import { runPair } from "../../core/run";
 import { loadConfig, DEFAULT_CONFIG } from "../../core/config";
@@ -22,6 +22,9 @@ async function main(config: PairConfig): Promise<number> {
     return 0;
   }
 
+  const rawSessionId = payload["session_id"];
+  const sessionId = typeof rawSessionId === "string" ? rawSessionId : undefined;
+
   const filePathValue = toolInput["file_path"];
   const filePath = typeof filePathValue === "string" ? filePathValue : "";
 
@@ -29,11 +32,13 @@ async function main(config: PairConfig): Promise<number> {
     return 0;
   }
 
-  if (!isEnabled(filePath)) {
+  const key = sessionId === undefined ? undefined : sessionKey(sessionId);
+
+  if (!isEnabled(filePath, key)) {
     return 0;
   }
 
-  const request = simulate(tool, toolInput, readFileOrEmpty);
+  const request = simulate(tool, toolInput, readFileOrEmpty, sessionId);
 
   if (request === null) {
     trace("exit: could not simulate", config);

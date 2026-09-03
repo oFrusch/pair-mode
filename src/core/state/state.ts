@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { join, dirname, basename } from "node:path";
 import { existsSync, realpathSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
+import type { SessionKey, FlagState } from "./state.types";
+import { removeQuietly } from "../../helpers";
 
 export function stateDir(): string {
   const base = process.env["XDG_STATE_HOME"] || join(homedir(), ".local", "state");
@@ -68,7 +70,28 @@ export function findSessionSocket(filePath: string): string | null {
   }
 }
 
-export function isEnabled(filePath: string): boolean {
+// The session socket wins, then a directory socket found by walking up. Neither one means the hook fails open.
+export function resolveSocketPath(filePath: string, key?: SessionKey): string | null {
+  if (key !== undefined) {
+    const candidate = sessionKeySocketPath(key);
+
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return findSessionSocket(filePath);
+}
+
+export function sessionFlagState(key: SessionKey): FlagState {
+  if (existsSync(sessionKeyOptOutPath(key))) {
+    return "off";
+  }
+
+  return existsSync(sessionKeyFlagPath(key)) ? "on" : "unset";
+}
+
+function directoryEnabled(filePath: string): boolean {
   let current = dirname(realpathLenient(filePath));
 
   while (true) {
@@ -84,6 +107,35 @@ export function isEnabled(filePath: string): boolean {
 
     current = parent;
   }
+}
+
+// A session opt-out beats a directory flag, so one session goes quiet without silencing its neighbours.
+export function isEnabled(filePath: string, key?: SessionKey): boolean {
+  if (key !== undefined) {
+    const state = sessionFlagState(key);
+
+    if (state !== "unset") {
+      return state === "on";
+    }
+  }
+
+  return directoryEnabled(filePath);
+}
+
+export function enableSession(key: SessionKey): string {
+  const path = sessionKeyFlagPath(key);
+  mkdirSync(dirname(path), { recursive: true });
+  removeQuietly(sessionKeyOptOutPath(key));
+  writeFileSync(path, "");
+  return path;
+}
+
+export function optOutSession(key: SessionKey): string {
+  const path = sessionKeyOptOutPath(key);
+  mkdirSync(dirname(path), { recursive: true });
+  removeQuietly(sessionKeyFlagPath(key));
+  writeFileSync(path, "");
+  return path;
 }
 
 export function enable(directory: string): string {
@@ -102,4 +154,37 @@ export function disable(directory: string): boolean {
 
   unlinkSync(path);
   return true;
+}
+
+const SESSION_KEY_LENGTH = 8;
+
+// Eight hex characters stay short enough to type after `watch` and wide enough for the sessions one person opens.
+export function sessionKey(agentSessionId: string): SessionKey {
+  const digest = createHash("sha1").update(agentSessionId).digest("hex");
+  return `s-${digest.slice(0, SESSION_KEY_LENGTH)}`;
+}
+
+function sessionKeyPath(key: SessionKey, extension: string): string {
+  return join(sessionsDir(), `${key}${extension}`);
+}
+
+export function sessionKeySocketPath(key: SessionKey): string {
+  return sessionKeyPath(key, ".sock");
+}
+
+export function sessionKeyFlagPath(key: SessionKey): string {
+  return sessionKeyPath(key, ".on");
+}
+
+// A bare `pair-mode off` writes this, so a session opts out of a directory flag without clearing it for anyone else.
+export function sessionKeyOptOutPath(key: SessionKey): string {
+  return sessionKeyPath(key, ".off");
+}
+
+export function sessionKeyRecordPath(key: SessionKey): string {
+  return sessionKeyPath(key, ".json");
+}
+
+export function sessionKeyUrlPath(key: SessionKey): string {
+  return sessionKeyPath(key, ".url");
 }

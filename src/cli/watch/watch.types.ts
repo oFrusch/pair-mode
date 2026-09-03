@@ -1,4 +1,5 @@
 import type { TuiIo } from "../../tui";
+import type { SessionKey } from "../../core/state";
 
 export interface IdleStatus {
   directory: string;
@@ -16,5 +17,6 @@ export interface WatchIo extends TuiIo {
 export interface WatchOptions {
   directory: string;
   socketPath?: string;
+  sessionKey?: SessionKey;
   io?: WatchIo;
 }

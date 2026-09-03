@@ -2,7 +2,7 @@ import { createConnection } from "node:net";
 import type { Socket } from "node:net";
 import { paintLayout } from "../../core/config";
 import type { PairConfig } from "../../core/config";
-import { sessionSocketPath } from "../../core/state";
+import { sessionKeySocketPath, sessionSocketPath } from "../../core/state";
 import { removeQuietly, resultFilePath, splitLines } from "../../helpers";
 import { startSessionServer } from "../../transports/session";
 import { createLineReader, decodeLine, encode } from "../../transports/session";
@@ -70,7 +70,11 @@ async function optionsFor(
 }
 
 export async function runWatch(options: WatchOptions, config: PairConfig): Promise<number> {
-  const socketPath = options.socketPath ?? sessionSocketPath(options.directory);
+  const socketPath =
+    options.socketPath ??
+    (options.sessionKey === undefined
+      ? sessionSocketPath(options.directory)
+      : sessionKeySocketPath(options.sessionKey));
   let errors: readonly Error[] = [];
 
   // The TUI owns the screen for the whole run, so a session error waits for the screen to be released.

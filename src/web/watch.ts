@@ -3,7 +3,7 @@ import type { Socket } from "node:net";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { PairConfig } from "../core/config";
-import { sessionSocketPath, sessionUrlPath } from "../core/state";
+import { sessionKeySocketPath, sessionSocketPath, sessionUrlPath } from "../core/state";
 import { startSessionServer } from "../transports/session";
 import { createLineReader, decodeLine, encode } from "../transports/session";
 import type { SessionServer } from "../transports/session";
@@ -33,7 +33,11 @@ export async function startWebWatch(
   options: WebWatchOptions,
   config: PairConfig,
 ): Promise<WebWatcher> {
-  const socketPath = options.socketPath ?? sessionSocketPath(options.directory);
+  const socketPath =
+    options.socketPath ??
+    (options.sessionKey === undefined
+      ? sessionSocketPath(options.directory)
+      : sessionKeySocketPath(options.sessionKey));
   const session: SessionServer = await startSessionServer({ socketPath });
   const client = await connectSelf(socketPath);
 

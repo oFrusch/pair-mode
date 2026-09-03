@@ -8,13 +8,18 @@ import { runWatch } from "../src/cli/watch";
 import type { WatchIo } from "../src/cli/watch";
 import { DEFAULT_CONFIG } from "../src/core/config";
 import type { PairConfig } from "../src/core/config";
-import { sessionUrlPath } from "../src/core/state";
+import {
+  sessionKey,
+  sessionKeySocketPath,
+  sessionSocketPath,
+  sessionUrlPath,
+} from "../src/core/state";
 import { startWebWatch } from "../src/web";
 import type { WebWatcher } from "../src/web";
 import { createLineReader, decodeLine, encode } from "../src/transports/session";
 import type { WireMessage } from "../src/transports/session";
 import { isRecord } from "../src/helpers";
-import { useIsolatedHome } from "./helpers/env";
+import { useIsolatedHome, useShortStateHome } from "./helpers/env";
 
 const isolated = useIsolatedHome();
 
@@ -421,5 +426,23 @@ describe("startWebWatch", () => {
     } finally {
       viewer.cancel();
     }
+  });
+});
+
+describe("watching one session", () => {
+  useShortStateHome();
+
+  test("a session key decides the socket path", async () => {
+    const key = sessionKey("d95655de-eb7f-45e5-867d-9797a355353e");
+    const fake = makeFakeIo();
+
+    running.set(fake, runWatch({ directory, sessionKey: key, io: fake.io }, config));
+
+    await waitFor("the idle screen", () => fake.writes.length > 0);
+
+    expect(existsSync(sessionKeySocketPath(key))).toBe(true);
+    expect(existsSync(sessionSocketPath(directory))).toBe(false);
+
+    await finish(fake);
   });
 });
