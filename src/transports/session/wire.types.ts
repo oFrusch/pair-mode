@@ -37,15 +37,28 @@ export interface CancelMessage {
   id: string;
 }
 
-export type ClientMessage = AttachMessage | VerdictMessage;
+export interface StatusMessage {
+  type: "status";
+}
+
+export interface StateMessage {
+  type: "state";
+  clientCount: number;
+  waitingDepth: number;
+  lastAttachAt: string | null;
+}
+
+export type ClientMessage = AttachMessage | VerdictMessage | StatusMessage;
 export type AgentMessage = SubmitMessage;
-export type ServerMessage = ReviewMessage | CancelMessage | VerdictMessage;
+export type ServerMessage = ReviewMessage | CancelMessage | VerdictMessage | StateMessage;
 
 export type WireMessage =
   | SubmitMessage
   | AttachMessage
   | ReviewMessage
   | VerdictMessage
-  | CancelMessage;
+  | CancelMessage
+  | StatusMessage
+  | StateMessage;
 
 export type LineReader = (chunk: string) => string[];

@@ -1,5 +1,6 @@
 import type { DetectAdapters } from "../../multiplexers/multiplexer.types";
 import type { PairConfig } from "../../core/config";
+import type { SessionProbe } from "../sessions";
 
 export interface DoctorCheck {
   name: string;
@@ -17,7 +18,7 @@ export interface DoctorOptions {
   multiplexerAdapters?: DetectAdapters;
   resolvesShiki?: () => boolean;
   directory?: string;
-  probeSocket?: (path: string) => Promise<boolean>;
+  probeSession?: (path: string) => Promise<SessionProbe>;
   // An explicit config replaces the file read, so a test states the transport it is asserting about.
   config?: PairConfig;
 }

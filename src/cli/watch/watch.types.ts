@@ -10,6 +10,7 @@ export interface IdleStatus {
 
 // runTui calls onKey and cleanup once per review, so a watcher IO replaces its handler instead of stacking one.
 export interface WatchIo extends TuiIo {
+  isTty(): boolean;
   onResize(handler: () => void): void;
   shutdown(): void;
 }
@@ -18,5 +19,7 @@ export interface WatchOptions {
   directory: string;
   socketPath?: string;
   sessionKey?: SessionKey;
+  agentSessionId?: string;
+  agentKind?: string;
   io?: WatchIo;
 }

@@ -108,6 +108,24 @@ test("toggling one directory leaves a sibling directory alone", async () => {
   expect(isOn(sibling)).toBe(false);
 });
 
+test("toggling a child directory tracks its own flag, not an enabled parent's", async () => {
+  const childPath = join(repoDir, "child");
+  mkdirSync(childPath, { recursive: true });
+  const child = realpathSync(childPath);
+  pairOn(repoDir);
+
+  const message = await pairToggle(child, MISSING_CLI, false);
+
+  expect(message).toBe(`pair mode ON for ${child}`);
+  expect(isOn(child)).toBe(true);
+  expect(isOn(repoDir)).toBe(true);
+
+  await pairToggle(child, MISSING_CLI, false);
+
+  expect(isOn(child)).toBe(false);
+  expect(isOn(repoDir)).toBe(true);
+});
+
 test("toggle --web takes the web path when pair mode is off, and reuses a published link", async () => {
   writeLink(repoDir, "http://127.0.0.1:9/r/existing", DEAD_PID);
 

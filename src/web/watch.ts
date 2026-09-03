@@ -3,7 +3,13 @@ import type { Socket } from "node:net";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { PairConfig } from "../core/config";
-import { sessionKeySocketPath, sessionSocketPath, sessionUrlPath } from "../core/state";
+import {
+  buildSessionRecord,
+  sessionKeySocketPath,
+  sessionSocketPath,
+  sessionUrlPath,
+  sessionKeyUrlPath,
+} from "../core/state";
 import { startSessionServer } from "../transports/session";
 import { createLineReader, decodeLine, encode } from "../transports/session";
 import type { SessionServer } from "../transports/session";
@@ -13,10 +19,16 @@ import type { WebServer } from "./server.types";
 import type { WebWatchOptions, WebWatcher } from "./watch.types";
 import { removeQuietly } from "../helpers";
 
+const OWNER_ONLY_DIR = 0o700;
+const OWNER_ONLY_FILE = 0o600;
+
 // pair-mode on spawns this watcher detached, so the link and the process id reach the parent through a file.
 function publishUrl(path: string, url: string): void {
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify({ url, pid: process.pid }) + "\n", "utf-8");
+  mkdirSync(dirname(path), { recursive: true, mode: OWNER_ONLY_DIR });
+  writeFileSync(path, JSON.stringify({ url, pid: process.pid }) + "\n", {
+    encoding: "utf-8",
+    mode: OWNER_ONLY_FILE,
+  });
 }
 
 function connectSelf(socketPath: string): Promise<Socket> {
@@ -38,7 +50,10 @@ export async function startWebWatch(
     (options.sessionKey === undefined
       ? sessionSocketPath(options.directory)
       : sessionKeySocketPath(options.sessionKey));
-  const session: SessionServer = await startSessionServer({ socketPath });
+  const session: SessionServer = await startSessionServer({
+    socketPath,
+    record: buildSessionRecord(options, socketPath),
+  });
   const client = await connectSelf(socketPath);
 
   // Rendering awaits shiki, so a cancel can land mid-render and the finished review must not be offered.
@@ -86,7 +101,11 @@ export async function startWebWatch(
     });
   });
 
-  const urlPath = sessionUrlPath(options.directory);
+  // A session-scoped watcher publishes beside its own socket, so pair-mode on and off find the link they started.
+  const urlPath =
+    options.sessionKey === undefined
+      ? sessionUrlPath(options.directory)
+      : sessionKeyUrlPath(options.sessionKey);
   publishUrl(urlPath, web.url);
 
   client.write(encode({ type: "attach", client: "web" }));

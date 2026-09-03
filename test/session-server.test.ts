@@ -1,6 +1,6 @@
 import { createConnection, createServer } from "node:net";
 import type { Socket } from "node:net";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, expect, beforeEach, afterEach } from "vitest";
 import {
@@ -109,6 +109,22 @@ async function startWithSequentialIds(): Promise<SessionServer> {
   const started = await startSessionServer({ socketPath, generateId: sequentialIds() });
   server = started;
   return started;
+}
+
+// Writes a status frame and resolves on the state frame that comes back.
+async function requestState(peer: Peer): Promise<WireMessage & { type: "state" }> {
+  const before = peer.received.length;
+  peer.send({ type: "status" });
+
+  await waitFor(() => peer.received.length > before);
+
+  const reply = peer.received[peer.received.length - 1];
+
+  if (reply === undefined || reply.type !== "state") {
+    throw new Error("expected a state frame in reply to status");
+  }
+
+  return reply;
 }
 
 test("a client that attaches after a submit receives the queued review", async () => {
@@ -362,6 +378,63 @@ test("close removes the socket file", async () => {
   server = null;
 
   expect(existsSync(socketPath)).toBe(false);
+});
+
+test("a status request answers with the live state", async () => {
+  const started = await startWithSequentialIds();
+
+  const client = await connectPeer();
+  client.send({ type: "attach", client: "tui" });
+  await waitFor(() => started.clientCount() === 1);
+
+  const asker = await connectPeer();
+  const state = await requestState(asker);
+
+  expect(state.clientCount).toBe(1);
+  expect(state.waitingDepth).toBe(0);
+  expect(typeof state.lastAttachAt).toBe("string");
+});
+
+test("the server writes its record beside the socket and removes it on close", async () => {
+  const directory = isolated.tempDir("pair-rec-");
+  const path = join(directory, "s-abcdef12.sock");
+  const recordPath = join(directory, "s-abcdef12.json");
+
+  const record = {
+    id: "s-abcdef12",
+    kind: "session" as const,
+    label: "pair-mode@main",
+    directory: "/repo",
+    branch: "main",
+    agentSessionId: "abc",
+    agentKind: "claude-code",
+    createdAt: "2026-09-01T10:00:00.000Z",
+    pid: 1234,
+  };
+
+  const started = await startSessionServer({ socketPath: path, record });
+  server = started;
+
+  expect(existsSync(recordPath)).toBe(true);
+  expect(JSON.parse(readFileSync(recordPath, "utf-8"))).toEqual(record);
+
+  await started.close();
+  server = null;
+
+  expect(existsSync(recordPath)).toBe(false);
+});
+
+test("a server with no record writes no sidecar", async () => {
+  const directory = isolated.tempDir("pair-rec2-");
+  const path = join(directory, "s-abcdef34.sock");
+
+  const started = await startSessionServer({ socketPath: path });
+  server = started;
+
+  expect(existsSync(join(directory, "s-abcdef34.json"))).toBe(false);
+
+  await started.close();
+  server = null;
 });
 
 test("close resolves promptly with a bare connection that never identifies itself", async () => {

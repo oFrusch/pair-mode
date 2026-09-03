@@ -1,10 +1,11 @@
 import { existsSync, openSync, closeSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { loadConfig, configPath } from "../../core/config";
 import type { ConfigResult, PairConfig } from "../../core/config";
-import { stateDir, sessionSocketPath } from "../../core/state";
-import { probeSocket } from "../../transports/session";
+import { stateDir, sessionSocketPath, resolveSocketPath } from "../../core/state";
+import { probeSession, removeSession } from "../sessions";
+import { currentSessionKey } from "../toggle";
 import { resolve as resolveEditor } from "../../editors/index";
 import { detect as detectMultiplexer } from "../../multiplexers/index";
 import { installRoot } from "../install-root";
@@ -266,13 +267,17 @@ function checkTrace(config: PairConfig): DoctorCheck | null {
 
 const defaultOpenTty = (): number => openSync("/dev/tty", "r+");
 
+// The hook resolves the socket from an edited file, so doctor names a file in the directory to resolve the same one.
+const PROBE_NAME = ".pair-mode-doctor-probe";
+
 // A watcher that crashed leaves its socket file behind, so the probe distinguishes a live one from a stale one.
 async function checkSession(
   config: PairConfig,
   directory: string,
-  probe: DoctorOptions["probeSocket"],
+  probe: DoctorOptions["probeSession"],
 ): Promise<DoctorCheck> {
-  const path = sessionSocketPath(directory);
+  const probeFile = join(directory, PROBE_NAME);
+  const path = resolveSocketPath(probeFile, currentSessionKey()) ?? sessionSocketPath(directory);
   const name = `session: ${path}`;
   const wanted = config.transport === "session";
 
@@ -287,13 +292,17 @@ async function checkSession(
     };
   }
 
-  const alive = await (probe ?? probeSocket)(path);
+  // A watcher blocked on a render answers nothing yet is alive, so only a refused connect justifies the unlink.
+  const result = await (probe ?? probeSession)(path);
 
-  if (alive) {
+  if (result.status !== "refused") {
     return { name, passed: true, detail: "a watcher is attached" };
   }
 
-  return { name, passed: false, detail: `stale socket, remove it with: rm ${path}` };
+  // The sweep and doctor must agree, so doctor removes the sidecar and the link file with the socket.
+  removeSession(basename(path, ".sock"));
+
+  return { name, passed: true, detail: "removed a stale socket", warnOnly: true };
 }
 
 export async function runDoctor(options: DoctorOptions = {}): Promise<DoctorReport> {
@@ -314,7 +323,7 @@ export async function runDoctor(options: DoctorOptions = {}): Promise<DoctorRepo
     ...checkClis(home, root),
     checkEntryPoints(root),
     checkShiki(options.resolvesShiki),
-    await checkSession(config, options.directory ?? process.cwd(), options.probeSocket),
+    await checkSession(config, options.directory ?? process.cwd(), options.probeSession),
   ];
 
   const traceCheck = checkTrace(config);

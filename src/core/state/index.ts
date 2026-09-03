@@ -20,4 +20,12 @@ export {
   sessionFlagState,
 } from "./state";
 
-export type { SessionKey, SessionKind, FlagState, SessionRecord } from "./state.types";
+export { buildSessionRecord } from "./record";
+
+export type {
+  SessionKey,
+  SessionKind,
+  FlagState,
+  SessionRecord,
+  SessionRecordOptions,
+} from "./state.types";

@@ -6,6 +6,7 @@ import type {
   ClientKind,
   LineReader,
   ReviewMessage,
+  StateMessage,
   SubmitMessage,
   VerdictMessage,
   WireMessage,
@@ -102,6 +103,29 @@ function toCancel(raw: Record<string, unknown>): CancelMessage | null {
   return isString(raw["id"]) ? { type: "cancel", id: raw["id"] } : null;
 }
 
+function isNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function toState(raw: Record<string, unknown>): StateMessage | null {
+  const lastAttachAt = raw["lastAttachAt"];
+
+  if (lastAttachAt !== null && !isString(lastAttachAt)) {
+    return null;
+  }
+
+  if (!isNumber(raw["clientCount"]) || !isNumber(raw["waitingDepth"])) {
+    return null;
+  }
+
+  return {
+    type: "state",
+    clientCount: raw["clientCount"],
+    waitingDepth: raw["waitingDepth"],
+    lastAttachAt,
+  };
+}
+
 // A malformed line yields null rather than throwing, so one bad write never kills the socket.
 export function decodeLine(line: string): WireMessage | null {
   let parsed: unknown;
@@ -136,6 +160,14 @@ export function decodeLine(line: string): WireMessage | null {
 
   if (type === "cancel") {
     return toCancel(parsed);
+  }
+
+  if (type === "status") {
+    return { type: "status" };
+  }
+
+  if (type === "state") {
+    return toState(parsed);
   }
 
   return null;

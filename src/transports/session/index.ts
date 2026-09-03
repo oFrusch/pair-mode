@@ -20,6 +20,8 @@ export type {
   ClientKind,
   LineReader,
   ReviewMessage,
+  StateMessage,
+  StatusMessage,
   SubmitMessage,
   VerdictMessage,
   WireMessage,

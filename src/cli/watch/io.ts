@@ -24,6 +24,10 @@ export function createWatchIo(): WatchIo {
   process.stdout.on("resize", () => resizeHandler?.());
 
   return {
+    isTty(): boolean {
+      return process.stdin.isTTY === true;
+    },
+
     onKey(handler) {
       keyHandler = handler;
     },

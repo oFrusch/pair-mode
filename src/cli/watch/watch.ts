@@ -2,15 +2,17 @@ import { createConnection } from "node:net";
 import type { Socket } from "node:net";
 import { paintLayout } from "../../core/config";
 import type { PairConfig } from "../../core/config";
-import { sessionKeySocketPath, sessionSocketPath } from "../../core/state";
+import { buildSessionRecord, sessionKeySocketPath, sessionSocketPath } from "../../core/state";
 import { removeQuietly, resultFilePath, splitLines } from "../../helpers";
 import { startSessionServer } from "../../transports/session";
+import type { SessionServer } from "../../transports/session";
 import { createLineReader, decodeLine, encode } from "../../transports/session";
-import type { ReviewMessage } from "../../transports/session";
+import type { ReviewMessage, StateMessage } from "../../transports/session";
 import { supportsTruecolor } from "../../tui/paint";
 import { createTokenProvider } from "../../tui/syntax";
 import { runTui } from "../../tui";
 import type { TuiOptions } from "../../tui";
+import { probeSession, sweepDeadSessions } from "../sessions";
 import { renderIdle } from "./idle";
 import { createWatchIo } from "./io";
 import type { IdleStatus, WatchIo, WatchOptions } from "./watch.types";
@@ -77,22 +79,34 @@ export async function runWatch(options: WatchOptions, config: PairConfig): Promi
       : sessionKeySocketPath(options.sessionKey));
   let errors: readonly Error[] = [];
 
+  // Only a refused connect proves no watcher owns this socket, so anything else means this run is a second viewer.
+  const owns = (await probeSession(socketPath)).status === "refused";
+
   // The TUI owns the screen for the whole run, so a session error waits for the screen to be released.
-  const server = await startSessionServer({
-    socketPath,
-    onError: (error) => {
-      errors = [...errors, error];
-    },
-  });
+  const server: SessionServer | null = owns
+    ? await startSessionServer({
+        socketPath,
+        record: buildSessionRecord(options, socketPath),
+        onError: (error) => {
+          errors = [...errors, error];
+        },
+      })
+    : null;
+
+  // This socket is listening by now, so the sweep can only clear the sockets other watchers abandoned.
+  await sweepDeadSessions();
 
   const truecolor = supportsTruecolor(process.env);
   const io = options.io ?? createWatchIo();
 
+  // A viewer holds no queue of its own, so it renders the counts the owner reports over the wire.
+  let remote: StateMessage | null = null;
+
   const status = (): IdleStatus => ({
     directory: options.directory,
     socketPath,
-    clients: server.clientCount(),
-    waiting: server.waitingDepth(),
+    clients: server === null ? (remote?.clientCount ?? 0) : server.clientCount(),
+    waiting: server === null ? (remote?.waitingDepth ?? 0) : server.waitingDepth(),
   });
 
   const client = await connectSelf(socketPath);
@@ -137,11 +151,20 @@ export async function runWatch(options: WatchOptions, config: PairConfig): Promi
         cancelled.add(message.id);
         aborts.get(message.id)?.abort();
         nudge();
+        return;
+      }
+
+      if (message?.type === "state") {
+        remote = message;
+
+        if (!busy && !quitting) {
+          paintIdle(io, status(), truecolor);
+        }
       }
     });
   });
 
-  server.onChange(() => {
+  server?.onChange(() => {
     if (!busy && !quitting) {
       paintIdle(io, status(), truecolor);
     }
@@ -153,6 +176,10 @@ export async function runWatch(options: WatchOptions, config: PairConfig): Promi
     const review = pending.shift();
 
     if (review === undefined) {
+      if (server === null) {
+        client.write(encode({ type: "status" }));
+      }
+
       listenIdle();
       paintIdle(io, status(), truecolor);
       await new Promise<void>((resolve) => {
@@ -186,7 +213,9 @@ export async function runWatch(options: WatchOptions, config: PairConfig): Promi
   io.write(CLEAR_SCREEN);
   io.shutdown();
   client.destroy();
-  await server.close();
+
+  // A viewer owns neither the socket nor the sidecar, so only the watcher that bound them takes them down.
+  await server?.close();
 
   reportErrors(errors);
 

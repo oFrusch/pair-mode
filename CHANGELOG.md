@@ -14,6 +14,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - `pnpm run syntax` fetches the micro syntax assets.
 - Each agent coding session gets its own review socket, so concurrent sessions in one repository stop sharing diffs.
 - A session can opt out of a directory flag, and the opt-out never silences another session.
+- `pair-mode sessions` lists every live session and removes the dead ones.
+- `pair-mode connect` picks a session from a list and watches it.
+- `pair-mode watch <id>` attaches to one session. It mints that session's socket when nothing owns it yet.
+- `pair-mode sessions` expires a session flag and a session opt-out once the session has had no socket for fourteen days.
 
 ### Changed
 
@@ -24,6 +28,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Every attached client receives every review. The first verdict completes it, and the other clients receive a cancel.
 - A client that attaches during an outstanding review receives it right away, instead of waiting for the next edit.
 - The web review page queues every pending review in order. It shows one review at a time, so a second edit never replaces the first before the reviewer answers it.
+- A second `pair-mode watch` on a live session attaches to it as a viewer. It no longer fails because another watcher owns the socket.
+- `pair-mode doctor` removes a stale socket rather than printing an `rm` command. It removes the sidecar and the link file with it, the way the sweep does.
+- `pair-mode on --web` and `pair-mode toggle --web` honour the agent session id, so the browser path scopes exactly as the terminal path does.
+- `pair-mode toggle` reads the resolved state, so a session under a live directory flag turns pair mode off first rather than on.
+- `pair-mode connect` joins the session you pick rather than trying to bind its socket, and it names that session's own directory.
+- The opencode and pi adapters read the session id their harness supplies, so `pair-mode on` inside those agents holds their edits.
+- The sessions state directory is created 0700, and a session flag and a session sidecar are written 0600.
 
 ### Fixed
 

@@ -1,15 +1,15 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { runSetup } from "./setup";
 import { runDoctor } from "./doctor";
-import { pairOn, pairOnWeb, pairOff, pairStatus, pairToggle, agentSessionId } from "./toggle";
-import { runWatch } from "./watch";
+import { pairOn, pairOnWeb, pairOff, pairStatus, pairToggle, currentSessionKey } from "./toggle";
+import { createWatchIo } from "./watch";
 import { runConfig } from "./config";
-import { startWebWatch } from "../web";
-import { loadConfig } from "../core/config";
-import { sessionKeySocketPath, sessionKey } from "../core/state";
+import { listSessions, runConnect, sweepDeadSessions } from "./sessions";
+import { sessionsDir } from "../core/state";
 import { installRoot } from "./install-root";
 import { isRecord } from "../helpers";
+import { watchSession } from "./watch-target";
 
 const USAGE = `pair-mode <command> [directory]
 
@@ -28,6 +28,8 @@ Commands:
   watch [dir]          review edits in this terminal (default: cwd)
   watch --web [dir]    serve the review in a browser and print the link
   watch <id>           review edits for one session (see: pair-mode sessions)
+  sessions             list every live pair mode session
+  connect              pick a session from a list and watch it
   --version            print the installed version
   --help               print this message
 `;
@@ -64,26 +66,40 @@ function parseDirectoryArgs(args: string[], allowedFlags: string[]) {
   };
 }
 
-// An agent session keys its own socket. A plain terminal has no session id and keeps the directory scope.
-function currentSessionKey(): string | undefined {
-  const id = agentSessionId(process.env);
-  return id === null ? undefined : sessionKey(id);
-}
-
 const SESSION_KEY_PATTERN = /^s-[0-9a-f]{8}$/;
+const SESSION_KEY_PREFIX = "s-";
 
 // A `watch` argument is either a session key or a directory, and only one of them starts with `s-`.
 function parseWatchArgs(args: string[]) {
   const flags = args.filter(isFlag);
   const target = args.find((entry) => !isFlag(entry));
-  const isKey = target !== undefined && SESSION_KEY_PATTERN.test(target);
+  const looksLikeKey = target !== undefined && target.startsWith(SESSION_KEY_PREFIX);
+  const isKey = looksLikeKey && SESSION_KEY_PATTERN.test(target);
 
   return {
     sessionKey: isKey ? target : undefined,
+    malformedKey: looksLikeKey && !isKey ? target : null,
     directory: isKey ? process.cwd() : resolve(target ?? process.cwd()),
     web: flags.includes("--web"),
     unknownFlag: flags.find((flag) => flag !== "--web") ?? null,
   };
+}
+
+// `sessions` and `connect` name no target, so anything after the command is a mistake worth reporting.
+function reportExtraArgs(command: string, args: string[]): number | null {
+  const extra = args[0];
+
+  if (extra === undefined) {
+    return null;
+  }
+
+  if (isFlag(extra)) {
+    return reportUnknownFlag(command, extra);
+  }
+
+  console.error(`unexpected argument for ${command}: ${extra}`);
+  console.error(USAGE);
+  return 1;
 }
 
 function reportUnknownFlag(command: string, flag: string): number {
@@ -129,12 +145,17 @@ async function main(): Promise<number> {
       return reportUnknownFlag(command, parsed.unknownFlag);
     }
 
+    // A watcher that died leaves its socket behind, so starting pair mode clears the dead ones first.
+    await sweepDeadSessions();
+
+    const key = currentSessionKey();
+
     if (parsed.web) {
-      console.log(await pairOnWeb(parsed.directory, process.argv[1] ?? ""));
+      console.log(await pairOnWeb(parsed.directory, process.argv[1] ?? "", key));
       return 0;
     }
 
-    console.log(pairOn(parsed.directory, currentSessionKey()));
+    console.log(pairOn(parsed.directory, key));
     return 0;
   }
 
@@ -180,39 +201,56 @@ async function main(): Promise<number> {
       return reportUnknownFlag(command, parsed.unknownFlag);
     }
 
-    if (parsed.sessionKey !== undefined && !existsSync(sessionKeySocketPath(parsed.sessionKey))) {
-      console.error(`unknown session: ${parsed.sessionKey}`);
-      console.error("run pair-mode sessions to list the live ones");
+    // A well-formed id with no socket is the bootstrap case: the human read it off `pair-mode on`.
+    if (parsed.malformedKey !== null) {
+      console.error(`malformed session id: ${parsed.malformedKey}`);
+      console.error(
+        "an id is s- followed by eight hex characters; run pair-mode sessions to list them",
+      );
       return 1;
     }
 
-    const wantsWeb = parsed.web;
-    const directory = parsed.directory;
-    const sessionKey = parsed.sessionKey;
-    const { config, errors } = loadConfig();
+    return await watchSession({
+      directory: parsed.directory,
+      sessionKey: parsed.sessionKey,
+      web: parsed.web,
+    });
+  }
 
-    errors.forEach((error) => console.error(`config ${error.path}: ${error.message}`));
+  if (command === "sessions") {
+    const rejected = reportExtraArgs(command, process.argv.slice(3));
 
-    if (!wantsWeb && !config.web.enabled) {
-      return runWatch({ directory, sessionKey }, config);
+    if (rejected !== null) {
+      return rejected;
     }
 
-    const watcher = await startWebWatch({ directory, sessionKey, port: config.web.port }, config);
+    const result = await listSessions();
+    console.log(result.text);
+    return result.exitCode;
+  }
 
-    console.log(`pair mode is watching ${directory}`);
-    console.log(watcher.url);
+  if (command === "connect") {
+    const rejected = reportExtraArgs(command, process.argv.slice(3));
 
-    // The web watcher has no TTY loop of its own, so the process stays alive until a signal stops it.
-    await new Promise<void>((done) => {
-      const stop = (): void => {
-        void watcher.close().then(done);
-      };
+    if (rejected !== null) {
+      return rejected;
+    }
 
-      process.once("SIGINT", stop);
-      process.once("SIGTERM", stop);
+    const result = await runConnect(createWatchIo());
+    const chosen = result.selected;
+
+    if (chosen === null) {
+      return result.exitCode;
+    }
+
+    // The listing already names the socket and the directory, so joining never re-derives either from the cwd.
+    return await watchSession({
+      directory: chosen.directory === "" ? process.cwd() : chosen.directory,
+      sessionKey: chosen.kind === "session" ? chosen.id : undefined,
+      socketPath: join(sessionsDir(), `${chosen.id}.sock`),
+      web: false,
+      terminalOnly: true,
     });
-
-    return 0;
   }
 
   console.error(`unknown command: ${command}`);

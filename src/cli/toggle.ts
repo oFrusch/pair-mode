@@ -2,14 +2,15 @@ import { spawn } from "node:child_process";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import {
+  sessionKey,
   enable,
   disable,
-  flagPath,
   sessionUrlPath,
+  sessionKeyUrlPath,
   enableSession,
   optOutSession,
-  sessionFlagState,
   isEnabled,
+  flagPath,
 } from "../core/state";
 import type { SessionKey } from "../core/state";
 import { isRecord } from "../helpers";
@@ -33,12 +34,28 @@ export function agentSessionId(env: NodeJS.ProcessEnv): string | null {
   return null;
 }
 
+// A plain terminal has no session id, so the caller keeps the directory scope and behaves as it always has.
+export function currentSessionKey(): SessionKey | undefined {
+  const id = agentSessionId(process.env);
+  return id === null ? undefined : sessionKey(id);
+}
+
+// isEnabled walks up from a file, so both the status and the toggle name a file inside the directory they mean.
+function statusProbe(directory: string): string {
+  return join(directory, ".pair-mode-status-probe");
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((done) => setTimeout(done, ms));
 }
 
-function readLink(directory: string): SessionLink | null {
-  const path = sessionUrlPath(directory);
+// A session-scoped web watcher publishes its link beside its own socket, not beside the directory socket.
+function linkPath(directory: string, key?: SessionKey): string {
+  return key === undefined ? sessionUrlPath(directory) : sessionKeyUrlPath(key);
+}
+
+function readLink(directory: string, key?: SessionKey): SessionLink | null {
+  const path = linkPath(directory, key);
 
   if (!existsSync(path)) {
     return null;
@@ -62,11 +79,11 @@ function readLink(directory: string): SessionLink | null {
 }
 
 // The watcher writes its link once the server is listening, so the parent polls rather than guessing a delay.
-async function waitForLink(directory: string): Promise<SessionLink | null> {
+async function waitForLink(directory: string, key?: SessionKey): Promise<SessionLink | null> {
   const attempts = Array.from({ length: POLL_ATTEMPTS }, (_, index) => index);
 
   for (const _attempt of attempts) {
-    const link = readLink(directory);
+    const link = readLink(directory, key);
 
     if (link !== null) {
       return link;
@@ -78,8 +95,8 @@ async function waitForLink(directory: string): Promise<SessionLink | null> {
   return null;
 }
 
-function stopLink(directory: string): boolean {
-  const link = readLink(directory);
+function stopLink(directory: string, key?: SessionKey): boolean {
+  const link = readLink(directory, key);
 
   if (link === null) {
     return false;
@@ -92,7 +109,7 @@ function stopLink(directory: string): boolean {
   }
 
   try {
-    unlinkSync(sessionUrlPath(directory));
+    unlinkSync(linkPath(directory, key));
   } catch {
     // Best-effort cleanup only.
   }
@@ -100,46 +117,68 @@ function stopLink(directory: string): boolean {
   return true;
 }
 
+// The web path is the same command as the plain one, so both report the scope they turned on the same way.
+function onHeadline(directory: string, key?: SessionKey): string {
+  return key === undefined
+    ? `pair mode ON for ${directory}`
+    : `pair mode ON · ${key} · ${directory}`;
+}
+
 export function pairOn(directory: string, key?: SessionKey): string {
   if (key !== undefined) {
     enableSession(key);
-    return `pair mode ON · ${key} · ${directory}`;
+  } else {
+    enable(directory);
   }
 
-  enable(directory);
-  return `pair mode ON for ${directory}`;
+  return onHeadline(directory, key);
 }
 
 // A web watcher needs no TTY, so a slash command inside an agent can start one and read back the link.
-export async function pairOnWeb(directory: string, cliPath: string): Promise<string> {
-  enable(directory);
+export async function pairOnWeb(
+  directory: string,
+  cliPath: string,
+  key?: SessionKey,
+): Promise<string> {
+  const headline = onHeadline(directory, key);
 
-  const existing = readLink(directory);
-
-  if (existing !== null) {
-    return `pair mode ON for ${directory}\n${existing.url}`;
+  if (key === undefined) {
+    enable(directory);
+  } else {
+    enableSession(key);
   }
 
-  const child = spawn(process.execPath, [cliPath, "watch", "--web", directory], {
+  const existing = readLink(directory, key);
+
+  if (existing !== null) {
+    return `${headline}\n${existing.url}`;
+  }
+
+  const target = key ?? directory;
+
+  const child = spawn(process.execPath, [cliPath, "watch", "--web", target], {
+    cwd: directory,
     detached: true,
     stdio: "ignore",
   });
 
   child.unref();
 
-  const link = await waitForLink(directory);
+  const link = await waitForLink(directory, key);
 
   if (link === null) {
-    return `pair mode ON for ${directory}\nthe web watcher did not report a link`;
+    return `${headline}\nthe web watcher did not report a link`;
   }
 
-  return `pair mode ON for ${directory}\n${link.url}`;
+  return `${headline}\n${link.url}`;
 }
 
 export function pairOff(directory: string, key?: SessionKey): string {
   if (key !== undefined) {
     optOutSession(key);
-    return `pair mode OFF · ${key}`;
+    const stopped = stopLink(directory, key);
+
+    return stopped ? `pair mode OFF · ${key} (web watcher stopped)` : `pair mode OFF · ${key}`;
   }
 
   disable(directory);
@@ -157,23 +196,24 @@ export async function pairToggle(
   web: boolean,
   key?: SessionKey,
 ): Promise<string> {
-  const on = key === undefined ? existsSync(flagPath(directory)) : sessionFlagState(key) === "on";
+  // A session with no flag of its own still sees a directory flag; a plain directory toggle checks only its own path.
+  const on =
+    key === undefined ? existsSync(flagPath(directory)) : isEnabled(statusProbe(directory), key);
 
   if (on) {
     return pairOff(directory, key);
   }
 
   if (web) {
-    return await pairOnWeb(directory, cliPath);
+    return await pairOnWeb(directory, cliPath, key);
   }
 
   return pairOn(directory, key);
 }
 
 export function pairStatus(directory: string, key?: SessionKey): string {
-  const probe = join(directory, ".pair-mode-status-probe");
-  const on = isEnabled(probe, key);
-  const link = readLink(directory);
+  const on = isEnabled(statusProbe(directory), key);
+  const link = readLink(directory, key);
   const scope = key === undefined ? directory : `${key} · ${directory}`;
   const state = `pair mode ${on ? "ON" : "OFF"} for ${scope}`;
 

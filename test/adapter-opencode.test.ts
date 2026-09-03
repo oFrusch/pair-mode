@@ -1,7 +1,7 @@
 import { writeFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
-import { test, expect, beforeEach } from "vitest";
-import { enable } from "../src/core/state";
+import { test, expect, beforeEach, describe } from "vitest";
+import { enable, enableSession, optOutSession, sessionKey } from "../src/core/state";
 import { beforeToolExecute } from "../src/adapters/opencode";
 import type { RunPairFn } from "../src/adapters/opencode";
 import { useIsolatedHome } from "./helpers/env";
@@ -102,4 +102,48 @@ test("a call for a directory pair mode has not enabled resolves without calling 
       denyingRunPair("should not be reached"),
     ),
   ).resolves.toBeUndefined();
+});
+
+describe("the session id the harness supplies", () => {
+  test("a session flag written by pair-mode on holds an edit no directory flag covers", async () => {
+    const targetDir = realpathSync(isolated.tempDir("pair-mode-session-"));
+    const loosePath = join(targetDir, "loose.ts");
+    writeFileSync(loosePath, "before\n", "utf-8");
+    enableSession(sessionKey("opencode-session"));
+
+    await expect(
+      beforeToolExecute(
+        { tool: "write", sessionID: "opencode-session", callID: "c1" },
+        { args: { filePath: loosePath, content: "after\n" } },
+        denyingRunPair("held"),
+      ),
+    ).rejects.toThrow("held");
+  });
+
+  test("a session opt-out lets an edit through under a live directory flag", async () => {
+    optOutSession(sessionKey("opencode-muted"));
+
+    await expect(
+      beforeToolExecute(
+        { tool: "write", sessionID: "opencode-muted", callID: "c1" },
+        { args: { filePath, content: "after\n" } },
+        denyingRunPair("nope"),
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  test("the request carries the session id, so the hook resolves that session's socket", async () => {
+    const seen: Array<string | undefined> = [];
+
+    await beforeToolExecute(
+      { tool: "write", sessionID: "opencode-session", callID: "c1" },
+      { args: { filePath, content: "after\n" } },
+      async (request) => {
+        seen.push(request.sessionId);
+        return { decision: "allow", reviewed: true };
+      },
+    );
+
+    expect(seen).toEqual(["opencode-session"]);
+  });
 });

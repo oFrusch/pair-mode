@@ -39,6 +39,16 @@ export function sessionsDir(): string {
   return join(stateDir(), "sessions");
 }
 
+const OWNER_ONLY_DIR = 0o700;
+const OWNER_ONLY_FILE = 0o600;
+
+// The sidecars name a working directory and an agent session id, so nobody else on the machine reads them.
+function makeSessionsDir(): string {
+  const path = sessionsDir();
+  mkdirSync(path, { recursive: true, mode: OWNER_ONLY_DIR });
+  return path;
+}
+
 // The watcher and the hook both derive this from the directory, so neither side ever names a session id.
 export function sessionSocketPath(directory: string): string {
   return join(sessionsDir(), `${digestFor(directory)}.sock`);
@@ -124,17 +134,17 @@ export function isEnabled(filePath: string, key?: SessionKey): boolean {
 
 export function enableSession(key: SessionKey): string {
   const path = sessionKeyFlagPath(key);
-  mkdirSync(dirname(path), { recursive: true });
+  makeSessionsDir();
   removeQuietly(sessionKeyOptOutPath(key));
-  writeFileSync(path, "");
+  writeFileSync(path, "", { mode: OWNER_ONLY_FILE });
   return path;
 }
 
 export function optOutSession(key: SessionKey): string {
   const path = sessionKeyOptOutPath(key);
-  mkdirSync(dirname(path), { recursive: true });
+  makeSessionsDir();
   removeQuietly(sessionKeyFlagPath(key));
-  writeFileSync(path, "");
+  writeFileSync(path, "", { mode: OWNER_ONLY_FILE });
   return path;
 }
 
