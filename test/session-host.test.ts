@@ -185,3 +185,16 @@ test("an owner close removes the socket", async () => {
 
   expect(existsSync(socketPath)).toBe(false);
 });
+
+test("a repeated attach on one connection adds no second client", async () => {
+  const owner = await startOwner();
+  const extra = await connectAgent();
+
+  extra.send({ type: "attach", client: "tui" });
+  extra.send({ type: "attach", client: "tui" });
+
+  await waitFor(() => owner.counts().clients === 2);
+  await sleep(50);
+
+  expect(owner.counts().clients).toBe(2);
+});

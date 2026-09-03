@@ -183,6 +183,11 @@ export async function startSessionServer(options: SessionServerOptions): Promise
 
   // A review already offered never returns through offerAll, so a late client receives it straight from the queue.
   function handleAttach(socket: Socket): void {
+    // A second attach on one connection would orphan the first client id, so the repeat is ignored.
+    if (clientBySocket.has(socket)) {
+      return;
+    }
+
     nextClientId += 1;
     const client: Client = { id: `c${nextClientId}`, socket };
 
