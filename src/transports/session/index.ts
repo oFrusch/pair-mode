@@ -1,5 +1,6 @@
 export { createSessionTransport } from "./client";
 export { startSessionServer, probeSocket } from "./server";
+export { ownerHost, viewerHost } from "./host";
 export { encode, decodeLine, createLineReader } from "./wire";
 export {
   emptyQueue,
@@ -12,6 +13,7 @@ export {
   release,
 } from "./queue";
 export type { SessionServer, SessionServerOptions } from "./server.types";
+export type { HostCounts, SessionHost, SessionHostOptions } from "./host.types";
 export type { SessionClientOptions } from "./client.types";
 export type { QueuedReview, QueueState, ReviewStatus, OfferResult } from "./queue.types";
 export type {

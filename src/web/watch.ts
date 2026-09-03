@@ -1,5 +1,3 @@
-import { createConnection } from "node:net";
-import type { Socket } from "node:net";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { PairConfig } from "../core/config";
@@ -9,9 +7,8 @@ import {
   sessionUrlPath,
   sessionKeyUrlPath,
 } from "../core/state";
-import { startSessionServer } from "../transports/session";
-import { createLineReader, decodeLine, encode } from "../transports/session";
-import type { SessionServer } from "../transports/session";
+import { ownerHost } from "../transports/session";
+import type { SessionHost } from "../transports/session";
 import { toWebReview } from "./review";
 import { startWebServer } from "./server";
 import type { WebServer } from "./server.types";
@@ -30,26 +27,17 @@ function publishUrl(path: string, url: string): void {
   });
 }
 
-function connectSelf(socketPath: string): Promise<Socket> {
-  return new Promise((resolve, reject) => {
-    const socket = createConnection(socketPath);
-    socket.setEncoding("utf-8");
-    socket.once("error", reject);
-    socket.once("connect", () => resolve(socket));
-  });
-}
-
 // The web watcher needs no TTY, so a slash command can start it and print the link.
 export async function startWebWatch(
   options: WebWatchOptions,
   config: PairConfig,
 ): Promise<WebWatcher> {
   const socketPath = watchSocketPath(options.directory, options.sessionKey, options.socketPath);
-  const session: SessionServer = await startSessionServer({
+  const host: SessionHost = await ownerHost({
     socketPath,
+    client: "web",
     record: buildSessionRecord(options, socketPath),
   });
-  const client = await connectSelf(socketPath);
 
   // Rendering awaits shiki, so a cancel can land mid-render and the finished review must not be offered.
   const ownedIds = new Set<string>();
@@ -60,40 +48,31 @@ export async function startWebWatch(
     layout: config.layout,
     onVerdict(id, questions) {
       ownedIds.delete(id);
-      client.write(encode({ type: "verdict", id, questions }));
+      host.verdict(id, questions);
     },
   });
 
-  const readLines = createLineReader();
+  host.onReview((message) => {
+    const id = message.id;
+    ownedIds.add(id);
 
-  client.on("data", (chunk: string) => {
-    readLines(chunk).forEach((line) => {
-      const message = decodeLine(line);
+    // A render that throws would otherwise become an unhandled rejection and kill the watcher.
+    void toWebReview(message, config)
+      .then((review) => {
+        if (ownedIds.has(id)) {
+          web.offer(review);
+        }
+      })
+      .catch(() => {
+        if (ownedIds.delete(id)) {
+          host.verdict(id, []);
+        }
+      });
+  });
 
-      if (message?.type === "review") {
-        const id = message.id;
-        ownedIds.add(id);
-
-        // A render that throws would otherwise become an unhandled rejection and kill the watcher.
-        void toWebReview(message, config)
-          .then((review) => {
-            if (ownedIds.has(id)) {
-              web.offer(review);
-            }
-          })
-          .catch(() => {
-            if (ownedIds.delete(id)) {
-              client.write(encode({ type: "verdict", id, questions: [] }));
-            }
-          });
-        return;
-      }
-
-      if (message?.type === "cancel") {
-        ownedIds.delete(message.id);
-        web.withdraw(message.id);
-      }
-    });
+  host.onCancel((id) => {
+    ownedIds.delete(id);
+    web.withdraw(id);
   });
 
   // A session-scoped watcher publishes beside its own socket, so pair-mode on and off find the link they started.
@@ -103,8 +82,6 @@ export async function startWebWatch(
       : sessionKeyUrlPath(options.sessionKey);
   publishUrl(urlPath, web.url);
 
-  client.write(encode({ type: "attach", client: "web" }));
-
   return {
     url: web.url,
     socketPath,
@@ -112,9 +89,8 @@ export async function startWebWatch(
 
     async close(): Promise<void> {
       removeQuietly(urlPath);
-      client.destroy();
       await web.close();
-      await session.close();
+      await host.close();
     },
   };
 }
