@@ -1,11 +1,7 @@
 import type { SessionKind } from "../../core/state";
-import type { StateMessage } from "../../transports/session";
 
-// A refused connect proves no listener owns the socket. A silent one proves nothing, so only refused sweeps.
-export type SessionProbe =
-  | { status: "answered"; state: StateMessage }
-  | { status: "refused" }
-  | { status: "silent" };
+// The probe lives in the transport, so a session listing and a watcher read the same three outcomes.
+export type { SessionProbe } from "../../transports/session";
 
 export interface SessionListing {
   id: string;

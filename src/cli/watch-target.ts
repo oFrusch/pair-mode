@@ -3,12 +3,8 @@ import { runWatch } from "./watch";
 import { startWebWatch } from "../web";
 import type { WatchTarget } from "./watch-target.types";
 
-// startWebWatch always binds its own socket, so a run that joins a session another watcher owns stays in the terminal.
+// The flag names one run, and the setting names every run, so either one starts the browser watcher.
 export function usesWebWatcher(target: WatchTarget, webEnabled: boolean): boolean {
-  if (target.terminalOnly === true) {
-    return false;
-  }
-
   return target.web || webEnabled;
 }
 

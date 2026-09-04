@@ -19,11 +19,7 @@ describe("usesWebWatcher", () => {
     expect(usesWebWatcher(target(), true)).toBe(true);
   });
 
-  test("a run that joins another watcher's session ignores the config", () => {
-    expect(usesWebWatcher(target({ terminalOnly: true }), true)).toBe(false);
-  });
-
-  test("a run that joins another watcher's session ignores --web too", () => {
-    expect(usesWebWatcher(target({ terminalOnly: true, web: true }), true)).toBe(false);
+  test("a run that joins another watcher's session still reaches the browser", () => {
+    expect(usesWebWatcher(target({ socketPath: "/tmp/other.sock" }), true)).toBe(true);
   });
 });

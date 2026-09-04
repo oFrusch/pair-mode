@@ -413,6 +413,36 @@ describe("startWebWatch", () => {
     expect(existsSync(urlPath)).toBe(false);
   });
 
+  test("a second web watcher joins the owned session instead of binding it", async () => {
+    watcher = await startWebWatch({ directory, port: 0, socketPath, token: TOKEN }, config);
+
+    expect(watcher.owns).toBe(true);
+
+    const second = await startWebWatch({ directory, port: 0, socketPath, token: TOKEN }, config);
+
+    try {
+      expect(second.owns).toBe(false);
+      expect(second.socketPath).toBe(socketPath);
+    } finally {
+      await second.close();
+    }
+
+    expect(existsSync(socketPath)).toBe(true);
+  });
+
+  test("a joining web watcher leaves the owner's url file in place", async () => {
+    watcher = await startWebWatch({ directory, port: 0, socketPath, token: TOKEN }, config);
+
+    const urlPath = sessionUrlPath(directory);
+    const second = await startWebWatch({ directory, port: 0, socketPath, token: TOKEN }, config);
+
+    await second.close();
+
+    const published: unknown = JSON.parse(readFileSync(urlPath, "utf-8"));
+
+    expect(isRecord(published) ? published["url"] : null).toBe(watcher.url);
+  });
+
   test("reports the socket path it listened on and a real port", async () => {
     watcher = await startWebWatch({ directory, port: 0, socketPath, token: TOKEN }, config);
 

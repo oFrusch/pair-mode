@@ -14,5 +14,6 @@ export interface WebWatcher {
   url: string;
   socketPath: string;
   port: number;
+  owns: boolean;
   close(): Promise<void>;
 }
