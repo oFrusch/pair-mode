@@ -8,13 +8,7 @@
   },
   "homepage": "https://github.com/oFrusch/pair-mode#readme",
   "license": "MIT",
-  "keywords": [
-    "code-review",
-    "diff",
-    "hooks",
-    "pair-programming",
-    "terminal"
-  ],
+  "keywords": ["code-review", "diff", "hooks", "pair-programming", "terminal"],
   "hooks": "./hooks/codex.json",
   "skills": "./skills/",
   "interface": {
