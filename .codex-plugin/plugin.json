@@ -1,6 +1,6 @@
 {
   "name": "pair-mode",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Hold every proposed edit, annotate the diff line by line, and hand the notes back to the agent.",
   "author": {
     "name": "ofrusch",
@@ -8,7 +8,13 @@
   },
   "homepage": "https://github.com/oFrusch/pair-mode#readme",
   "license": "MIT",
-  "keywords": ["code-review", "diff", "hooks", "pair-programming", "terminal"],
+  "keywords": [
+    "code-review",
+    "diff",
+    "hooks",
+    "pair-programming",
+    "terminal"
+  ],
   "hooks": "./hooks/codex.json",
   "skills": "./skills/",
   "interface": {

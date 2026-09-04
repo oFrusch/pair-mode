@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-04
+
 ### Added
 
 - `pair-mode toggle` reads the current state and moves to the other one.

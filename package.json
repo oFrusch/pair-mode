@@ -1,6 +1,6 @@
 {
   "name": "pair-mode",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Annotate a coding agent's proposed edits line by line, in your terminal.",
   "keywords": [
     "ai",
