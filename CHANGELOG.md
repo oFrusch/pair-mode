@@ -46,6 +46,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- The README opens with an animated banner, and no heading rule crosses it.
 - The duck carries an alpha channel, so it no longer renders as a black square on npm and on a light browser tab.
 - The release script rewrites only the version line in each plugin manifest, so a release no longer breaks the format gate.
 - `.erb` renders as ERB, not as plain HTML.
