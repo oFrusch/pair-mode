@@ -6,5 +6,4 @@ export interface WatchTarget {
   sessionKey?: SessionKey;
   socketPath?: string;
   web: boolean;
-  terminalOnly?: boolean;
 }

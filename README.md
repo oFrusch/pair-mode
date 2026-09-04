@@ -170,9 +170,11 @@ A session flag outlives the agent that wrote it. `pair-mode sessions` removes a 
 and a session opt-out once the session has had no socket for fourteen days, and it says how
 many it removed.
 
-Several terminal watchers can watch one session at once. The first one to watch a session
-owns its socket. Every later one attaches to that socket as a viewer. Each attached client
-receives every diff, and the first answer wins. The others see the review withdraw.
+Several watchers can watch one session at once, in a terminal or in a browser. The first one
+to watch a session owns its socket. Every later one attaches to that socket as a viewer. Each
+attached client receives every diff, and the first answer wins. The others see the review
+withdraw. A browser tab therefore joins a session a terminal pane already owns, and closing
+the tab leaves that pane serving.
 
 ### Session mode config
 

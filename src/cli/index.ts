@@ -249,7 +249,6 @@ async function main(): Promise<number> {
       sessionKey: chosen.kind === "session" ? chosen.id : undefined,
       socketPath: join(sessionsDir(), `${chosen.id}.sock`),
       web: false,
-      terminalOnly: true,
     });
   }
 

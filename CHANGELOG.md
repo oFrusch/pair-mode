@@ -29,6 +29,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - A client that attaches during an outstanding review receives it right away, instead of waiting for the next edit.
 - The web review page queues every pending review in order. It shows one review at a time, so a second edit never replaces the first before the reviewer answers it.
 - A second `pair-mode watch` on a live session attaches to it as a viewer. It no longer fails because another watcher owns the socket.
+- A web watcher attaches to a live session as a viewer, so a browser tab joins a session a terminal watcher owns.
+- `pair-mode connect` honours the `web.enabled` setting, because the web watcher can now join any session.
 - `pair-mode doctor` removes a stale socket rather than printing an `rm` command. It removes the sidecar and the link file with it, the way the sweep does.
 - `pair-mode on --web` and `pair-mode toggle --web` honour the agent session id, so the browser path scopes exactly as the terminal path does.
 - `pair-mode toggle` reads the resolved state, so a session under a live directory flag turns pair mode off first rather than on.
