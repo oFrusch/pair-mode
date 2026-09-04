@@ -1,6 +1,6 @@
 {
   "name": "pair-mode",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Hold every proposed edit, annotate the diff line by line, and hand the notes back to the agent.",
   "author": {
     "name": "ofrusch",
