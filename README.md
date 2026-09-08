@@ -1,8 +1,10 @@
-<img src="https://raw.githubusercontent.com/oFrusch/pair-mode/main/docs/images/duck.png" alt="The pair-mode duck" width="120" align="right">
+<p align="center">
+  <img src="https://raw.githubusercontent.com/oFrusch/pair-mode/main/docs/images/duck-appalled-banner.gif" alt="A duck reacting to a diff full of deletions">
+</p>
 
-# pair mode
+<h1 align="center">pair mode</h1>
 
-#### For when your agent needs a rubber ducky.
+<p align="center"><b>For when your agent needs a rubber ducky.</b></p>
 
 `pair-mode` is a tool that allows you to sit somewhere between being an approval monkey for your agent running in manual mode and just totally vibe coding in auto mode.
 

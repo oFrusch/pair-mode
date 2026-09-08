@@ -118,8 +118,14 @@ function bumpPluginManifests(version) {
       fail(`${manifest} has no "version" field.`);
     }
 
-    parsed.version = version;
-    writeFileSync(manifestPath, `${JSON.stringify(parsed, null, 2)}\n`, "utf-8");
+    // A re-serialised manifest loses the formatter's layout, so only the version line is rewritten.
+    const stamped = text.replace(/"version":\s*"[^"]*"/, `"version": "${version}"`);
+
+    if (stamped === text && parsed.version !== version) {
+      fail(`${manifest} has no "version" line the release script can rewrite.`);
+    }
+
+    writeFileSync(manifestPath, stamped, "utf-8");
   }
 }
 
