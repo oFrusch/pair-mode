@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/oFrusch/pair-mode/main/docs/images/duck-appalled-banner.gif" alt="A duck reacting to a diff full of deletions">
+  <img src="https://raw.githubusercontent.com/oFrusch/pair-mode/main/assets/duck-appalled-banner-v2.gif" alt="A duck reacting to a diff full of deletions">
 </p>
 
 <h1 align="center">pair mode</h1>
