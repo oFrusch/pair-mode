@@ -5,7 +5,7 @@ import { isRecord } from "../../helpers";
 
 const HOOK_TIMEOUT_SECONDS = 1800;
 
-// Quote the joined path when it contains unsafe characters. POSIX single quoting wraps the path in ' and turns each inner ' into '\\''.
+// The hook runs through a shell, so a path with a space or a quote needs POSIX single quoting.
 export function hookCommand(installRoot: string, file: string): string {
   const path = join(installRoot, "dist", file);
 
@@ -137,7 +137,7 @@ function hasCommand(groups: unknown[], command: string): boolean {
   });
 }
 
-// A reinstall moves the install root, so a hook is ours by where it sits inside dist, not by its absolute path. The command may be quoted.
+// A reinstall moves the install root, so a hook is ours by where it sits inside dist, quoted or not.
 function matchesOurCommand(command: string): (entry: HookEntry) => boolean {
   const suffix = sep + join("dist", basename(command));
 

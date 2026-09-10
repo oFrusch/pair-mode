@@ -15,3 +15,15 @@ export interface ParsedPatch {
   content?: string;
   hunks?: Hunk[];
 }
+
+// One file section of a patch: its "*** ... File:" header and every line up to the next header.
+export interface PatchSection {
+  header: string;
+  body: string[];
+}
+
+// The raw lines of one hunk before classification, kept with the "@@" context that locates them.
+export interface HunkGroup {
+  context: string | null;
+  raw: string[];
+}

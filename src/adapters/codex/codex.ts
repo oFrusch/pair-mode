@@ -7,7 +7,7 @@ import { applyHunks } from "./apply";
 import type { PairConfig } from "../../core/config";
 import type { EditRequest } from "../../core/run";
 import type { SessionKey } from "../../core/state";
-import type { ParsedPatch, HunkLine } from "./types";
+import type { Hunk, HunkGroup, HunkLine, ParsedPatch, PatchSection } from "./types";
 import { isEntryPoint } from "../entry-point";
 import { isRecord, readFileOrEmpty, readPayload } from "../../helpers";
 
@@ -47,7 +47,7 @@ export function extractPatchText(toolInput: Record<string, unknown>): string | n
 }
 
 // Splits the patch body into every file section it contains, in order.
-function parseSections(patchText: string): { header: string; body: string[] }[] | null {
+function parseSections(patchText: string): PatchSection[] | null {
   const lines = patchText.split("\n");
   const beginIndex = lines.findIndex((line) => line.trim() === BEGIN_PATCH);
   const endIndex = lines.findIndex((line) => line.trim() === END_PATCH);
@@ -128,12 +128,7 @@ function contextFor(line: string): string | null {
   return line.startsWith("@@ ") ? line.slice(3) : line.slice(2);
 }
 
-interface HunkGroup {
-  context: string | null;
-  raw: string[];
-}
-
-function parseUpdateFile(body: string[]): { context: string | null; lines: HunkLine[] }[] | null {
+function parseUpdateFile(body: string[]): Hunk[] | null {
   const groups: HunkGroup[] = [];
   let current: HunkGroup | null = null;
 
@@ -166,16 +161,14 @@ function parseUpdateFile(body: string[]): { context: string | null; lines: HunkL
     return { context: group.context, lines: classified };
   });
 
-  if (
-    !hunks.every((hunk): hunk is { context: string | null; lines: HunkLine[] } => hunk !== null)
-  ) {
+  if (!hunks.every((hunk): hunk is Hunk => hunk !== null)) {
     return null;
   }
 
   return hunks;
 }
 
-function parseSection(section: { header: string; body: string[] }): ParsedPatch | null {
+function parseSection(section: PatchSection): ParsedPatch | null {
   const addPath = pathFromHeader(section.header, "*** Add File:");
 
   if (addPath !== null) {
