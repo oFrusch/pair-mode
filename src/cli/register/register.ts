@@ -5,6 +5,17 @@ import { isRecord } from "../../helpers";
 
 const HOOK_TIMEOUT_SECONDS = 1800;
 
+// Quote the joined path when it contains unsafe characters. POSIX single quoting wraps the path in ' and turns each inner ' into '\\''.
+export function hookCommand(installRoot: string, file: string): string {
+  const path = join(installRoot, "dist", file);
+
+  if (/^[A-Za-z0-9_./-]+$/.test(path)) {
+    return path;
+  }
+
+  return `'${path.replace(/'/g, "'\\''")}'`;
+}
+
 function isHookEntry(value: unknown): value is HookEntry {
   if (!isRecord(value)) {
     return false;
@@ -126,11 +137,14 @@ function hasCommand(groups: unknown[], command: string): boolean {
   });
 }
 
-// A reinstall moves the install root, so a hook is ours by where it sits inside dist, not by its absolute path.
+// A reinstall moves the install root, so a hook is ours by where it sits inside dist, not by its absolute path. The command may be quoted.
 function matchesOurCommand(command: string): (entry: HookEntry) => boolean {
   const suffix = sep + join("dist", basename(command));
 
-  return (entry) => entry.command === command || entry.command.endsWith(suffix);
+  return (entry) =>
+    entry.command === command ||
+    entry.command.endsWith(suffix) ||
+    entry.command.endsWith(suffix + "'");
 }
 
 function upsertHookGroup(
@@ -238,7 +252,7 @@ export function claudeCodeSettingsPath(homeDir: string): string {
 
 export function registerClaudeCode(homeDir: string, installRoot: string): RegisterResult {
   const path = claudeCodeSettingsPath(homeDir);
-  const command = join(installRoot, "dist", "claude-code.js");
+  const command = hookCommand(installRoot, "claude-code.js");
   return registerPreToolUseHook(path, "Write|Edit|MultiEdit", command, HOOK_TIMEOUT_SECONDS);
 }
 
@@ -248,7 +262,7 @@ export function codexHooksPath(homeDir: string): string {
 
 export function registerCodex(homeDir: string, installRoot: string): RegisterResult {
   const path = codexHooksPath(homeDir);
-  const command = join(installRoot, "dist", "codex.js");
+  const command = hookCommand(installRoot, "codex.js");
   return registerPreToolUseHook(path, "apply_patch|Edit|Write", command, HOOK_TIMEOUT_SECONDS);
 }
 
