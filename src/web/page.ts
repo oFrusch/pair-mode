@@ -629,12 +629,17 @@ function post(payload) {
     .then((response) => {
       // A refused verdict means another client already answered, so the notes typed here can never land.
       if (!response.ok) {
-        clearReview();
+        if (review !== null && review.id === payload.id) {
+          clearReview();
+        }
         warn("this review was already answered elsewhere - your notes were not sent");
         return;
       }
 
-      clearReview();
+      // Only clear if the server answered this review, not one that arrived via SSE meanwhile.
+      if (review !== null && review.id === payload.id) {
+        clearReview();
+      }
     })
     .catch(() => {
       sendButton.disabled = notes.length === 0;
@@ -649,10 +654,16 @@ approveButton.addEventListener("click", () => post({ id: review.id, notes: [] })
 const events = new EventSource("/r/" + token + "/events");
 
 events.addEventListener("review", (event) => {
-  review = JSON.parse(event.data);
-  notes = [];
-  expanded = new Set();
-  hidePopup();
+  const incoming = JSON.parse(event.data);
+
+  // Only reset if it is a different review.
+  if (review === null || review.id !== incoming.id) {
+    notes = [];
+    expanded = new Set();
+    hidePopup();
+  }
+
+  review = incoming;
   render();
 });
 
