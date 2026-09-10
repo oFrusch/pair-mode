@@ -1,5 +1,6 @@
 export {
   backupIfPresent,
+  hookCommand,
   isPreToolUseRegistered,
   claudeCodeSettingsPath,
   registerClaudeCode,

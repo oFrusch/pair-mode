@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, realpathSync, writeFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, expect, beforeEach } from "vitest";
@@ -144,11 +144,13 @@ test("runPair never consults the transport when the directory is not enabled", a
 interface RecordingEditor {
   editor: Editor;
   configDirs(): string[];
+  filePaths(): string[];
 }
 
 // prepare() writes a real file so a leaked directory is not silently empty and unnoticed.
 function recordingEditor(): RecordingEditor {
   let dirs: string[] = [];
+  let files: string[] = [];
 
   const editor: Editor = {
     name: "nano",
@@ -159,6 +161,12 @@ function recordingEditor(): RecordingEditor {
 
     prepare(context: EditorContext): EditorLaunch {
       dirs = [...dirs, context.configDir];
+      if (context.leftFile) {
+        files = [...files, context.leftFile];
+      }
+      if (context.rightFile) {
+        files = [...files, context.rightFile];
+      }
       mkdirSync(context.configDir, { recursive: true });
       writeFileSync(join(context.configDir, "pair.nanorc"), "colour", "utf-8");
 
@@ -166,7 +174,7 @@ function recordingEditor(): RecordingEditor {
     },
   };
 
-  return { editor, configDirs: () => dirs };
+  return { editor, configDirs: () => dirs, filePaths: () => files };
 }
 
 function fakeMultiplexer(result: RunResult): Multiplexer {
@@ -224,4 +232,27 @@ test("the pane transport gives each review its own editor config directory", asy
   expect(dirs).toHaveLength(2);
   expect(dirs[0]).not.toBe(dirs[1]);
   expect(editorDirCount()).toBe(0);
+});
+
+test("the pane transport writes temporary files with owner-only permissions", async () => {
+  if (process.platform === "win32") {
+    // File permissions work differently on Windows.
+    return;
+  }
+
+  const recording = recordingEditor();
+  const multiplexer = fakeMultiplexer({ ok: true, detail: "" });
+  const transport = createPaneTransport({ editor: recording.editor, multiplexer });
+
+  await transport.review(requestFor(join(repoRoot, "file.txt")), DEFAULT_CONFIG);
+
+  const files = recording.filePaths();
+
+  expect(files.length).toBeGreaterThan(0);
+  files.forEach((file) => {
+    if (existsSync(file)) {
+      const mode = statSync(file).mode & 0o777;
+      expect(mode).toBe(0o600);
+    }
+  });
 });

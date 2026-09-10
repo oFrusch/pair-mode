@@ -11,6 +11,7 @@ interface Handlers {
   review: Array<(review: ReviewMessage) => void>;
   cancel: Array<(id: string) => void>;
   change: Array<() => void>;
+  close: Array<() => void>;
   bufferedReviews: ReviewMessage[];
   bufferedCancels: string[];
 }
@@ -25,7 +26,14 @@ function connect(socketPath: string): Promise<Socket> {
 }
 
 function emptyHandlers(): Handlers {
-  return { review: [], cancel: [], change: [], bufferedReviews: [], bufferedCancels: [] };
+  return {
+    review: [],
+    cancel: [],
+    change: [],
+    close: [],
+    bufferedReviews: [],
+    bufferedCancels: [],
+  };
 }
 
 // The server sends an outstanding review the moment a client attaches, so it waits here until a handler exists.
@@ -48,6 +56,9 @@ async function attach(
 ): Promise<Socket> {
   const socket = await connect(socketPath);
   const readLines = createLineReader();
+
+  // The one-shot connect listener is gone once attached, so a later error would otherwise be unhandled.
+  socket.on("error", () => socket.destroy());
 
   socket.on("data", (chunk: string) => {
     readLines(chunk).forEach((line) => {
@@ -125,6 +136,9 @@ export async function ownerHost(options: SessionHostOptions): Promise<SessionHos
       handlers.change.push(handler);
     },
 
+    // The owner's socket only closes when the server it owns closes, so a handler here would never fire.
+    onClose(): void {},
+
     async close(): Promise<void> {
       socket.destroy();
       await server.close();
@@ -142,6 +156,13 @@ export async function viewerHost(options: SessionHostOptions): Promise<SessionHo
     handlers.change.forEach((handler) => handler());
   });
 
+  // Once the owner is gone there is nothing left to ask, so counts read as empty and writes become no-ops.
+  socket.on("close", () => {
+    remote = null;
+    handlers.change.forEach((handler) => handler());
+    handlers.close.forEach((handler) => handler());
+  });
+
   return {
     socketPath: options.socketPath,
     owns: false,
@@ -151,11 +172,15 @@ export async function viewerHost(options: SessionHostOptions): Promise<SessionHo
     },
 
     refreshCounts(): void {
-      socket.write(encode({ type: "status" }));
+      if (!socket.destroyed) {
+        socket.write(encode({ type: "status" }));
+      }
     },
 
     verdict(id: string, questions: Question[]): void {
-      socket.write(encode({ type: "verdict", id, questions }));
+      if (!socket.destroyed) {
+        socket.write(encode({ type: "verdict", id, questions }));
+      }
     },
 
     onReview(handler): void {
@@ -168,6 +193,10 @@ export async function viewerHost(options: SessionHostOptions): Promise<SessionHo
 
     onChange(handler): void {
       handlers.change.push(handler);
+    },
+
+    onClose(handler): void {
+      handlers.close.push(handler);
     },
 
     close(): Promise<void> {

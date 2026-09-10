@@ -319,3 +319,61 @@ test("doctor reports WARN, not FAIL, when shiki does not resolve", async () => {
   expect(report.text).not.toContain("[FAIL] shiki (syntax colour)");
   expect(report.exitCode).toBe(0);
 });
+
+test("doctor recognizes a hook registered with a quoted path when the install root contains a space", async () => {
+  const config: PairConfig = {
+    editor: "micro",
+    multiplexer: "tmux",
+    layout: "split",
+    context: 5,
+    minFold: 3,
+    pane: { width: "90%", height: "90%" },
+    transport: "pane",
+    session: { timeout: 300 },
+    web: { enabled: false, port: 0 },
+    theme: { add: "#1e3a1e", del: "#3a1e1e", fold: "#2a2a2a", rowBand: false },
+    trace: false,
+    autoApprove: true,
+    notes: "panel",
+    syntax: true,
+  };
+  saveConfig(config);
+
+  const installDirWithSpace = join(homeDir, "pair mode install");
+  registerClaudeCode(homeDir, installDirWithSpace);
+  registerCodex(homeDir, installDirWithSpace);
+
+  const distDir = join(installDirWithSpace, "dist");
+  mkdirSync(distDir, { recursive: true });
+  for (const entry of ["claude-code.js", "codex.js"]) {
+    const entryPath = join(distDir, entry);
+    writeFileSync(entryPath, "#!/usr/bin/env node\n// stub\n", "utf-8");
+    chmodSync(entryPath, 0o755);
+  }
+
+  const fakeTtyPath = join(homeDir, "fake-tty");
+  writeFileSync(fakeTtyPath, "", "utf-8");
+
+  const tmuxMultiplexer = {
+    name: "tmux" as const,
+    available: () => true,
+    run: () => ({ ok: true, detail: "" }),
+  };
+
+  const report = await runDoctor({
+    homeDir: homeDir,
+    installRoot: installDirWithSpace,
+    resolvesOnPath: () => false,
+    openTty: () => openSync(fakeTtyPath, "r+"),
+    multiplexerAdapters: { tmux: tmuxMultiplexer },
+    resolvesShiki: () => false,
+  });
+
+  const claudeCheck = report.checks.find((check) => check.name === "claude-code hook");
+  expect(claudeCheck?.passed).toBe(true);
+  expect(claudeCheck?.detail).toContain("registered");
+
+  const codexCheck = report.checks.find((check) => check.name === "codex hook");
+  expect(codexCheck?.passed).toBe(true);
+  expect(codexCheck?.detail).toContain("registered");
+});

@@ -14,6 +14,7 @@ import type { EditRequest, ReviewOutcome, ReviewTransport } from "../transport.t
 import type { PaneDeps } from "./pane.types";
 
 const NAME_BYTES = 6;
+const OWNER_ONLY_FILE = 0o600;
 
 function splitCommand(value: string): string[] {
   return value
@@ -25,7 +26,8 @@ function splitCommand(value: string): string[] {
 function tempFile(prefix: string, suffix: string, content: string): string {
   const name = `${prefix}${randomBytes(NAME_BYTES).toString("hex")}${suffix}`;
   const path = join(tmpdir(), name);
-  writeFileSync(path, content, "utf-8");
+  // Only the owner can read these files; they may contain sensitive source code.
+  writeFileSync(path, content, { encoding: "utf-8", mode: OWNER_ONLY_FILE, flag: "wx" });
   return path;
 }
 
