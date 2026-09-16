@@ -186,6 +186,31 @@ test("an owner close removes the socket", async () => {
   expect(existsSync(socketPath)).toBe(false);
 });
 
+test("a viewer whose owner closes reports zero counts and fires change and onClose once", async () => {
+  const owner = await startOwner();
+  const viewer = await startViewer();
+
+  viewer.refreshCounts();
+  await waitFor(() => viewer.counts().clients === 2);
+
+  const changes: number[] = [];
+  const closes: number[] = [];
+
+  viewer.onChange(() => changes.push(changes.length));
+  viewer.onClose(() => closes.push(closes.length));
+
+  await owner.close();
+  hosts.splice(hosts.indexOf(owner), 1);
+
+  await waitFor(() => closes.length === 1);
+
+  expect(viewer.counts()).toEqual({ clients: 0, waiting: 0 });
+  expect(changes.length).toBe(1);
+  expect(closes.length).toBe(1);
+
+  expect(() => viewer.verdict("some-id", [])).not.toThrow();
+});
+
 test("a repeated attach on one connection adds no second client", async () => {
   const owner = await startOwner();
   const extra = await connectAgent();

@@ -126,15 +126,34 @@ export async function runWatch(options: WatchOptions, config: PairConfig): Promi
   });
 
   host.onCancel((id) => {
-    cancelled.add(id);
-    aborts.get(id)?.abort();
-    nudge();
+    // A queued review just gets dropped, since nobody has opened its TUI yet to abort.
+    const queuedIndex = pending.findIndex((review) => review.id === id);
+
+    if (queuedIndex !== -1) {
+      pending.splice(queuedIndex, 1);
+      nudge();
+      return;
+    }
+
+    if (aborts.has(id)) {
+      cancelled.add(id);
+      aborts.get(id)?.abort();
+      nudge();
+    }
   });
 
   host.onChange(() => {
     if (!busy && !quitting) {
       paintIdle(io, status(), truecolor);
     }
+  });
+
+  // A viewer's socket only closes when the owner exits, so nothing here can answer whatever review is open.
+  host.onClose(() => {
+    quitting = true;
+    aborts.forEach((abort) => abort.abort());
+    errors = [...errors, new Error("the session owner exited")];
+    nudge();
   });
 
   while (!quitting) {

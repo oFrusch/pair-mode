@@ -3,7 +3,7 @@ import type { Socket } from "node:net";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test, expect, describe, beforeEach, afterEach } from "vitest";
+import { test, expect, describe, beforeEach, afterEach, vi } from "vitest";
 import { runWatch } from "../src/cli/watch";
 import type { WatchIo } from "../src/cli/watch";
 import { DEFAULT_CONFIG } from "../src/core/config";
@@ -193,6 +193,44 @@ async function connectAgent(order: string[], name: string): Promise<Agent> {
               after: "const a = 2;\n",
             }),
           ),
+      });
+    });
+  });
+}
+
+// A raw viewer speaks only attach and verdict, so a test can answer a review without running a second TUI.
+async function connectViewer(): Promise<{
+  received: WireMessage[];
+  answer(id: string): void;
+}> {
+  await waitFor("the watcher socket", () => existsSync(socketPath));
+
+  return new Promise((resolve, reject) => {
+    const socket = createConnection(socketPath);
+    const received: WireMessage[] = [];
+    const readLines = createLineReader();
+
+    openSockets.push(socket);
+    socket.setEncoding("utf-8");
+
+    socket.on("data", (chunk: string) => {
+      readLines(chunk).forEach((line) => {
+        const message = decodeLine(line);
+
+        if (message !== null) {
+          received.push(message);
+        }
+      });
+    });
+
+    socket.once("error", reject);
+
+    socket.once("connect", () => {
+      socket.write(encode({ type: "attach", client: "tui" }));
+
+      resolve({
+        received,
+        answer: (id) => socket.write(encode({ type: "verdict", id, questions: [] })),
       });
     });
   });
@@ -390,6 +428,78 @@ describe("runWatch review handling", () => {
     await finish(fake);
 
     expect(resultFilesInTmp()).toEqual(before);
+  });
+
+  test("a cancel for a queued review drops it and the TUI never opens it", async () => {
+    const fake = startWatcher();
+    const order: string[] = [];
+
+    const first = await connectAgent(order, "a");
+    const second = await connectAgent(order, "b");
+
+    first.submit("a.ts");
+    await waitFor("the first TUI", () => altScreenCount(fake.writes) === 1);
+
+    second.submit("b.ts");
+
+    const viewer = await connectViewer();
+
+    // The viewer attaches after both reviews are offered, so it sees review one too; only "b.ts" is the queued one.
+    await waitFor("the viewer to see the queued review", () =>
+      viewer.received.some((message) => message.type === "review" && message.path === "b.ts"),
+    );
+
+    const queued = viewer.received.find(
+      (message) => message.type === "review" && message.path === "b.ts",
+    );
+    const queuedId = queued?.type === "review" ? queued.id : "";
+
+    viewer.answer(queuedId);
+
+    await waitFor("the second hook's verdict", () => order.includes("b"));
+
+    fake.feed(QUIT_KEY);
+    await waitFor("the first hook's verdict", () => order.includes("a"));
+
+    // The queued review was cancelled before the loop ever reached it, so only one TUI ever opened.
+    expect(altScreenCount(fake.writes)).toBe(1);
+    expect(order).toEqual(["b", "a"]);
+
+    await finish(fake);
+  });
+});
+
+describe("runWatch when the owner exits", () => {
+  test("a viewer quits and reports the error on stderr", async () => {
+    const owner = startWatcher();
+
+    await waitFor("the owner socket", () => existsSync(socketPath));
+
+    const viewer = startWatcher();
+    const viewerDone = running.get(viewer);
+
+    if (viewerDone === undefined) {
+      throw new Error("that watcher was never started");
+    }
+
+    running.delete(viewer);
+
+    await waitFor("the viewer idle screen", () => viewer.writes.length > 0);
+
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    try {
+      await finish(owner);
+
+      const code = await viewerDone;
+
+      expect(code).toBe(0);
+
+      const written = stderr.mock.calls.map(([chunk]) => String(chunk)).join("");
+      expect(written).toContain("the session owner exited");
+    } finally {
+      stderr.mockRestore();
+    }
   });
 });
 

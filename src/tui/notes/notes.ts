@@ -4,6 +4,8 @@ import type { DiffModel } from "../model";
 import type { Selection } from "../selection/selection.types";
 import type { Note, NoteRange } from "./notes.types";
 
+const OWNER_ONLY_FILE = 0o600;
+
 function rangeOf(selection: Selection): NoteRange {
   const reversed =
     selection.anchorRow > selection.headRow ||
@@ -100,7 +102,11 @@ export function toQuestions(notes: Note[]): Question[] {
 
 export function writeResult(path: string, notes: Note[]): void {
   try {
-    writeFileSync(path, JSON.stringify({ questions: toQuestions(notes) }, null, 2), "utf-8");
+    // Only the owner can read the result file; it may contain sensitive source code.
+    writeFileSync(path, JSON.stringify({ questions: toQuestions(notes) }, null, 2), {
+      encoding: "utf-8",
+      mode: OWNER_ONLY_FILE,
+    });
   } catch {
     return;
   }

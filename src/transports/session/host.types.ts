@@ -17,6 +17,8 @@ export interface SessionHost {
   onReview(handler: (review: ReviewMessage) => void): void;
   onCancel(handler: (id: string) => void): void;
   onChange(handler: () => void): void;
+  // A viewer's socket can close out from under it, but the owner's server outlives its own attach, so only a viewer ever fires this.
+  onClose(handler: () => void): void;
   close(): Promise<void>;
 }
 

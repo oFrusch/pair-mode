@@ -7,8 +7,7 @@ import { fileURLToPath } from "node:url";
 import { test, expect, beforeAll, afterAll } from "vitest";
 import { useIsolatedHome } from "./helpers/env";
 import { enable, enableSession, sessionKey } from "../src/core/state";
-import { parsePatch, extractPatchText } from "../src/adapters/codex";
-import { applyEdit } from "../src/core/simulate";
+import { parsePatch, extractPatchText, applyHunks } from "../src/adapters/codex";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
@@ -203,9 +202,8 @@ test("an unparseable apply_patch patch exits 0 with no output", () => {
   const patch = [
     "*** Begin Patch",
     `*** Update File: ${harness.filePath}`,
-    "*** Move to: /tmp/elsewhere.ts",
     "@@",
-    " line one",
+    "?not a valid hunk line",
     "*** End Patch",
     "",
   ].join("\n");
@@ -219,6 +217,41 @@ test("an unparseable apply_patch patch exits 0 with no output", () => {
 
   expect(outcome.status).toBe(0);
   expect(outcome.stdout).toBe("");
+});
+
+test("a Move to line keeps its Update section and reviews it at the original path", () => {
+  const harness = setupHarness();
+  writeFileSync(harness.filePath, "line one\n", "utf-8");
+
+  const patch = [
+    "*** Begin Patch",
+    `*** Update File: ${harness.filePath}`,
+    "*** Move to: /tmp/elsewhere.ts",
+    "@@",
+    "-line one",
+    "+line ONE",
+    "*** End Patch",
+    "",
+  ].join("\n");
+
+  const parsed = parsePatch(patch);
+
+  expect(parsed).not.toBeNull();
+  expect(parsed?.length).toBe(1);
+  expect(parsed?.[0]?.filePath).toBe(harness.filePath);
+  expect(parsed?.[0]?.tool).toBe("MultiEdit");
+
+  const editorScript = writeEditorScript(harness.targetDir, "why the rename?");
+  const payload = JSON.stringify({
+    tool_name: "apply_patch",
+    tool_input: { command: patch },
+  });
+
+  const outcome = runAdapter(payload, harness, editorScript);
+
+  expect(outcome.status).toBe(0);
+  const denied = JSON.parse(outcome.stdout);
+  expect(denied.hookSpecificOutput.permissionDecisionReason).toContain("why the rename?");
 });
 
 test("a payload for a path with no flag file exits 0", () => {
@@ -264,15 +297,13 @@ test("parsePatch reconstructs the exact before and after text for an Update File
   const parsed = parsePatch(patch);
 
   expect(parsed).not.toBeNull();
-  expect(parsed?.filePath).toBe("/tmp/example.ts");
-  expect(parsed?.tool).toBe("MultiEdit");
-  expect(parsed?.edits).toEqual([
-    { old_string: "line one\nline two\nline three", new_string: "line one\nline TWO\nline three" },
-  ]);
+  expect(parsed?.length).toBe(1);
+  expect(parsed?.[0]?.filePath).toBe("/tmp/example.ts");
+  expect(parsed?.[0]?.tool).toBe("MultiEdit");
 
   const before = "line one\nline two\nline three";
-  const edit = parsed?.edits?.[0];
-  const after = edit === undefined ? null : applyEdit(before, edit);
+  const hunks = parsed?.[0]?.hunks;
+  const after = hunks === undefined ? null : applyHunks(before, hunks);
 
   expect(after).toBe("line one\nline TWO\nline three");
 });
@@ -293,14 +324,17 @@ test("parsePatch extracts a single-file Update patch terminated by the End of Fi
   const parsed = parsePatch(patch);
 
   expect(parsed).not.toBeNull();
-  expect(parsed?.filePath).toBe("/tmp/example.ts");
-  expect(parsed?.tool).toBe("MultiEdit");
-  expect(parsed?.edits).toEqual([
-    { old_string: "line one\nline two", new_string: "line one\nline TWO" },
-  ]);
+  expect(parsed?.length).toBe(1);
+  expect(parsed?.[0]?.filePath).toBe("/tmp/example.ts");
+  expect(parsed?.[0]?.tool).toBe("MultiEdit");
+
+  const after =
+    parsed?.[0]?.hunks === undefined ? null : applyHunks("line one\nline two", parsed[0].hunks);
+
+  expect(after).toBe("line one\nline TWO");
 });
 
-test("parsePatch still declines a multi-file patch whose first section ends at End of File", () => {
+test("parsePatch parses a two-file patch into two sections, even when the first ends at End of File", () => {
   const patch = [
     "*** Begin Patch",
     "*** Update File: /tmp/first.ts",
@@ -316,7 +350,20 @@ test("parsePatch still declines a multi-file patch whose first section ends at E
     "",
   ].join("\n");
 
-  expect(parsePatch(patch)).toBeNull();
+  const parsed = parsePatch(patch);
+
+  expect(parsed).not.toBeNull();
+  expect(parsed?.length).toBe(2);
+  expect(parsed?.[0]?.filePath).toBe("/tmp/first.ts");
+  expect(parsed?.[1]?.filePath).toBe("/tmp/second.ts");
+
+  const firstAfter =
+    parsed?.[0]?.hunks === undefined ? null : applyHunks("line one", parsed[0].hunks);
+  const secondAfter =
+    parsed?.[1]?.hunks === undefined ? null : applyHunks("line three", parsed[1].hunks);
+
+  expect(firstAfter).toBe("line one\nline two");
+  expect(secondAfter).toBe("line three\nline four");
 });
 
 test("parsePatch reconstructs the exact content for an Add File patch", () => {
@@ -331,9 +378,10 @@ test("parsePatch reconstructs the exact content for an Add File patch", () => {
   const parsed = parsePatch(patch);
 
   expect(parsed).not.toBeNull();
-  expect(parsed?.filePath).toBe("/tmp/hello.txt");
-  expect(parsed?.tool).toBe("Write");
-  expect(parsed?.content).toBe("Hello, world!\n");
+  expect(parsed?.length).toBe(1);
+  expect(parsed?.[0]?.filePath).toBe("/tmp/hello.txt");
+  expect(parsed?.[0]?.tool).toBe("Write");
+  expect(parsed?.[0]?.content).toBe("Hello, world!\n");
 });
 
 test("parsePatch keeps a trimmed blank context line in an Update File hunk, not drops it", () => {
@@ -351,9 +399,11 @@ test("parsePatch keeps a trimmed blank context line in an Update File hunk, not 
   const parsed = parsePatch(patch);
 
   expect(parsed).not.toBeNull();
-  expect(parsed?.edits).toEqual([
-    { old_string: "line one\n\nline three", new_string: "line one\n\nline three" },
-  ]);
+
+  const after =
+    parsed?.[0]?.hunks === undefined ? null : applyHunks("line one\n\nline three", parsed[0].hunks);
+
+  expect(after).toBe("line one\n\nline three");
 });
 
 test("parsePatch keeps a trimmed blank added line in an Add File patch, not drops it", () => {
@@ -370,7 +420,7 @@ test("parsePatch keeps a trimmed blank added line in an Add File patch, not drop
   const parsed = parsePatch(patch);
 
   expect(parsed).not.toBeNull();
-  expect(parsed?.content).toBe("Hello, world!\n\nGoodbye.\n");
+  expect(parsed?.[0]?.content).toBe("Hello, world!\n\nGoodbye.\n");
 });
 
 test("parsePatch reconstructs empty content for a Delete File patch", () => {
@@ -381,9 +431,9 @@ test("parsePatch reconstructs empty content for a Delete File patch", () => {
   const parsed = parsePatch(patch);
 
   expect(parsed).not.toBeNull();
-  expect(parsed?.filePath).toBe("/tmp/obsolete.txt");
-  expect(parsed?.tool).toBe("Write");
-  expect(parsed?.content).toBe("");
+  expect(parsed?.[0]?.filePath).toBe("/tmp/obsolete.txt");
+  expect(parsed?.[0]?.tool).toBe("Write");
+  expect(parsed?.[0]?.content).toBe("");
 });
 
 test("extractPatchText returns null for a command array whose elements contain no marker", () => {
@@ -458,4 +508,130 @@ test("a payload with an unrelated session id leaves the codex hook off", () => {
 
   expect(outcome.status).toBe(0);
   expect(outcome.stdout).toBe("");
+});
+
+test("apply_patch with two files denies with the first section's reason, not the second's", () => {
+  const harness = setupHarness();
+  const secondPath = join(harness.targetDir, "second.ts");
+  writeFileSync(harness.filePath, "line one\n", "utf-8");
+  writeFileSync(secondPath, "line alpha\n", "utf-8");
+
+  const editorScript = writeEditorScript(harness.targetDir, "why?");
+
+  const patch = [
+    "*** Begin Patch",
+    `*** Update File: ${harness.filePath}`,
+    "@@",
+    "-line one",
+    "+line ONE",
+    `*** Update File: ${secondPath}`,
+    "@@",
+    "-line alpha",
+    "+line ALPHA",
+    "*** End Patch",
+    "",
+  ].join("\n");
+
+  const payload = JSON.stringify({
+    tool_name: "apply_patch",
+    tool_input: { command: patch },
+  });
+
+  const outcome = runAdapter(payload, harness, editorScript);
+
+  expect(outcome.status).toBe(0);
+  const parsed = JSON.parse(outcome.stdout);
+  expect(parsed.hookSpecificOutput.permissionDecision).toBe("deny");
+  expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain(harness.filePath);
+  expect(parsed.hookSpecificOutput.permissionDecisionReason).not.toContain(secondPath);
+});
+
+test("applyHunks uses an @@ context header to select the second of two identical hunks", () => {
+  const patch = [
+    "*** Begin Patch",
+    "*** Update File: /tmp/example.py",
+    "@@ def bar():",
+    "-    return x",
+    "+    return y",
+    "*** End Patch",
+    "",
+  ].join("\n");
+
+  const parsed = parsePatch(patch);
+  const hunks = parsed?.[0]?.hunks;
+
+  expect(hunks).toBeDefined();
+
+  const before = "def foo():\n    return x\n\ndef bar():\n    return x\n";
+  const after = hunks === undefined ? null : applyHunks(before, hunks);
+
+  expect(after).toBe("def foo():\n    return x\n\ndef bar():\n    return y\n");
+});
+
+test("applyHunks advances the cursor, so two identical hunks hit the first occurrence then the second", () => {
+  const patch = [
+    "*** Begin Patch",
+    "*** Update File: /tmp/dup.txt",
+    "@@",
+    "-dup",
+    "+DUP",
+    "@@",
+    "-dup",
+    "+DUP",
+    "*** End Patch",
+    "",
+  ].join("\n");
+
+  const parsed = parsePatch(patch);
+  const hunks = parsed?.[0]?.hunks;
+
+  expect(hunks).toBeDefined();
+
+  const before = "dup\nmarker\ndup\n";
+  const after = hunks === undefined ? null : applyHunks(before, hunks);
+
+  expect(after).toBe("DUP\nmarker\nDUP\n");
+});
+
+test("applyHunks returns null when the @@ context line does not exist in the file", () => {
+  const patch = [
+    "*** Begin Patch",
+    "*** Update File: /tmp/example.ts",
+    "@@ nonexistent context",
+    "-line one",
+    "+line ONE",
+    "*** End Patch",
+    "",
+  ].join("\n");
+
+  const parsed = parsePatch(patch);
+  const hunks = parsed?.[0]?.hunks;
+
+  expect(hunks).toBeDefined();
+
+  const after = hunks === undefined ? undefined : applyHunks("line one\n", hunks);
+
+  expect(after).toBeNull();
+});
+
+test("applyHunks keeps a trailing newline on the round trip", () => {
+  const patch = [
+    "*** Begin Patch",
+    "*** Update File: /tmp/example.ts",
+    "@@",
+    "-line one",
+    "+line ONE",
+    "*** End Patch",
+    "",
+  ].join("\n");
+
+  const parsed = parsePatch(patch);
+  const hunks = parsed?.[0]?.hunks;
+
+  expect(hunks).toBeDefined();
+
+  const after = hunks === undefined ? null : applyHunks("line one\nline two\n", hunks);
+
+  expect(after).toBe("line ONE\nline two\n");
+  expect(after?.endsWith("\n")).toBe(true);
 });

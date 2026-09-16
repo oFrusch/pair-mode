@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
@@ -160,6 +160,23 @@ describe("writeResult", () => {
 
   test("an unwritable path does not throw", () => {
     expect(() => writeResult("/no/such/directory/result.json", [])).not.toThrow();
+  });
+
+  test("the written result file has owner-only permissions", () => {
+    if (process.platform === "win32") {
+      // File permissions work differently on Windows.
+      return;
+    }
+
+    const path = tempPath();
+    const notes = [makeNote({ id: 1, text: "why this" })];
+
+    writeResult(path, notes);
+
+    const mode = statSync(path).mode & 0o777;
+    expect(mode).toBe(0o600);
+
+    unlinkSync(path);
   });
 });
 

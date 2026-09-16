@@ -13,6 +13,7 @@ import { isReleased } from "../released";
 import {
   claudeCodeSettingsPath,
   codexHooksPath,
+  hookCommand,
   isPairCommandRegistered,
   isPreToolUseRegistered,
   isReExportRegistered,
@@ -123,8 +124,10 @@ function checkCommandOnPath(resolves: PathResolver): DoctorCheck {
 }
 
 function checkClis(home: string, root: string): DoctorCheck[] {
-  const claudeCommand = join(root, "dist", "claude-code.js");
-  const codexCommand = join(root, "dist", "codex.js");
+  const claudeCommand = hookCommand(root, "claude-code.js");
+  const codexCommand = hookCommand(root, "codex.js");
+  const claudeTarget = join(root, "dist", "claude-code.js");
+  const codexTarget = join(root, "dist", "codex.js");
   const opencodeTarget = join(root, "dist", "opencode.js");
   const piTarget = join(root, "dist", "pi.js");
 
@@ -132,12 +135,12 @@ function checkClis(home: string, root: string): DoctorCheck[] {
     {
       cli: "claude-code",
       registered: isPreToolUseRegistered(claudeCodeSettingsPath(home), claudeCommand),
-      targetExists: existsSync(claudeCommand),
+      targetExists: existsSync(claudeTarget),
     },
     {
       cli: "codex",
       registered: isPreToolUseRegistered(codexHooksPath(home), codexCommand),
-      targetExists: existsSync(codexCommand),
+      targetExists: existsSync(codexTarget),
     },
     {
       cli: "opencode",

@@ -204,3 +204,71 @@ test("two writes to one file in a single run keep the original in the backup", (
 
   expect(readFileSync(`${path}.pair-backup`, "utf-8")).toBe(original);
 });
+
+test("a root with a space registers a single-quoted command", () => {
+  const installDirWithSpace = isolated.tempDir("pair mode install ");
+  const result = registerClaudeCode(homeDir, installDirWithSpace);
+
+  expect(result.changed).toBe(true);
+
+  const written: unknown = JSON.parse(readFileSync(claudeCodeSettingsPath(homeDir), "utf-8"));
+  const groups = (written as { hooks: { PreToolUse: { hooks: { command: string }[] }[] } }).hooks
+    .PreToolUse;
+  const commands = groups.flatMap((group) => group.hooks.map((entry) => entry.command));
+
+  expect(commands[0]).toContain("'");
+  expect(commands[0]).toMatch(/^'.*'$/);
+});
+
+test("a root with a single quote in it escapes the quote", () => {
+  const installDirWithQuote = isolated.tempDir("pair'mode install");
+  const result = registerClaudeCode(homeDir, installDirWithQuote);
+
+  expect(result.changed).toBe(true);
+
+  const written: unknown = JSON.parse(readFileSync(claudeCodeSettingsPath(homeDir), "utf-8"));
+  const groups = (written as { hooks: { PreToolUse: { hooks: { command: string }[] }[] } }).hooks
+    .PreToolUse;
+  const commands = groups.flatMap((group) => group.hooks.map((entry) => entry.command));
+
+  expect(commands[0]).toContain("'\\''");
+});
+
+test("a plain root with only safe characters stays bare", () => {
+  const result = registerClaudeCode(homeDir, installDir);
+
+  expect(result.changed).toBe(true);
+
+  const written: unknown = JSON.parse(readFileSync(claudeCodeSettingsPath(homeDir), "utf-8"));
+  const groups = (written as { hooks: { PreToolUse: { hooks: { command: string }[] }[] } }).hooks
+    .PreToolUse;
+  const commands = groups.flatMap((group) => group.hooks.map((entry) => entry.command));
+
+  expect(commands[0]).toBe(join(installDir, "dist", "claude-code.js"));
+});
+
+test("re-running with a quoted root is a no-op", () => {
+  const installDirWithSpace = isolated.tempDir("pair mode install ");
+  registerClaudeCode(homeDir, installDirWithSpace);
+
+  const result = registerClaudeCode(homeDir, installDirWithSpace);
+
+  expect(result.changed).toBe(false);
+});
+
+test("upsert replaces an earlier quoted entry rather than adding a second one", () => {
+  const oldInstallDir = isolated.tempDir("pair mode old ");
+  const newInstallDir = isolated.tempDir("pair mode new ");
+
+  registerClaudeCode(homeDir, oldInstallDir);
+  const result = registerClaudeCode(homeDir, newInstallDir);
+
+  expect(result.changed).toBe(true);
+
+  const written: unknown = JSON.parse(readFileSync(claudeCodeSettingsPath(homeDir), "utf-8"));
+  const groups = (written as { hooks: { PreToolUse: { hooks: { command: string }[] }[] } }).hooks
+    .PreToolUse;
+  const commands = groups.flatMap((group) => group.hooks.map((entry) => entry.command));
+
+  expect(commands).toHaveLength(1);
+});
