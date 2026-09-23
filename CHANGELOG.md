@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- `pair-mode review` opens a finished diff and prints a lace gate answer as JSON when you close it.
+
 ## [0.4.0] - 2026-09-16
 
 ## [0.3.3] - 2026-09-04

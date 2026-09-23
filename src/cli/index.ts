@@ -10,6 +10,7 @@ import { sessionsDir } from "../core/state";
 import { installRoot } from "./install-root";
 import { isRecord } from "../helpers";
 import { watchSession } from "./watch-target";
+import { parseReviewArgs, runReview } from "./review";
 
 const USAGE = `pair-mode <command> [directory]
 
@@ -30,6 +31,12 @@ Commands:
   watch <id>           review edits for one session (see: pair-mode sessions)
   sessions             list every live pair mode session
   connect              pick a session from a list and watch it
+  review [options] [dir]
+                       review a diff, then print a lace gate answer as JSON
+    --base <ref>       the old side (default: HEAD)
+    --head <ref>       the new side (default: the working tree)
+    --approve <option> the answer with no notes (default: approve)
+    --reject <option>  the answer with notes (default: reject)
   --version            print the installed version
   --help               print this message
 `;
@@ -250,6 +257,33 @@ async function main(): Promise<number> {
       socketPath: join(sessionsDir(), `${chosen.id}.sock`),
       web: false,
     });
+  }
+
+  if (command === "review") {
+    const parsed = parseReviewArgs(process.argv.slice(3), process.cwd());
+
+    if (!parsed.ok) {
+      console.error(parsed.error);
+      console.error(USAGE);
+
+      return 1;
+    }
+
+    // Stdout carries only the JSON answer, because a lace annotate binding parses all of it.
+    const result = await runReview(parsed.options);
+
+    if (!result.ok) {
+      console.error(`pair-mode review: ${result.error}`);
+
+      return 1;
+    }
+
+    // A pipe write is async on macOS, and process.exit would cut the answer off at 64 KiB.
+    await new Promise<void>((done) => {
+      process.stdout.write(`${JSON.stringify(result.answer)}\n`, () => done());
+    });
+
+    return 0;
   }
 
   console.error(`unknown command: ${command}`);

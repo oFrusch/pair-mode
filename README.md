@@ -216,6 +216,35 @@ The page opens in the layout your `layout` setting names, and `u` swaps it while
 
 ![The split web layout, with a note threaded under the line it covers](https://raw.githubusercontent.com/oFrusch/pair-mode/main/docs/images/web-split.png)
 
+## One-shot review
+
+`pair-mode review` opens a finished diff for review, with no agent session. It opens each changed file in turn, in the same pane as an edit review. When you close the last file, it prints one JSON object and exits.
+
+```
+pair-mode review                               # HEAD against the working tree
+pair-mode review --base main --head my-branch  # one ref against another
+```
+
+- With no `--head`, the review covers the working tree, and untracked files are included.
+- With no notes, the answer is `approve`. With any note, the answer is `reject`, and `notes` holds every note, grouped by file.
+- `--approve <option>` and `--reject <option>` change the two answers to match the options of a gate.
+- The command skips a binary file and a submodule.
+- If a pane cannot open, the command exits 1 and prints nothing on stdout.
+
+The output is the answer format that a [lace](https://github.com/oFrusch/lace) gate reads from an `annotate` program:
+
+```json
+{ "answer": "reject", "notes": "src/app.ts\n  line 12: const retries = 0\n    why zero?" }
+```
+
+A lace reviewer for a diff gate passes the refs through:
+
+```yaml
+annotate:
+  diff:
+    argv: ["pair-mode", "review", "--base", "${base}", "--head", "${head}"]
+```
+
 ## Configuration
 
 Run `pair-mode setup` when first installing and that should get you most of the way there in terms of pair mode working for your setup. Regardless, all configuration options and their accepted values are listed below.
